@@ -1,9 +1,577 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>cl0w.nz</title>
-    </head>
-    <body>
-        <p>HONK! HONK!</p>
-    </body>
+<html lang="uk" class="gruvbox-dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vvs@cl0w.nz: ~</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    
+    <style>
+        @font-face {
+            font-family: 'e-ua';
+            src: url(https://fzerox.xyz/fonts/EUkraineHeadNerdFont-Light.otf);
+            font-display: swap;
+        }
+
+        :root {
+            --radius: 4px;
+            --border-width: 1px;
+            --transition-main: 150ms ease-in-out;
+        }
+
+        .gruvbox-dark {
+            --bg: #282828; --bg-dim: #1d2021; --bg-card: #3c3836; --bg-header: #504945;
+            --fg: #ebdbb2; --fg-dim: #a89984; --red: #fb4934; --green: #b8bb26;
+            --yellow: #fabd2f; --blue: #83a598; --purple: #d3869b; --aqua: #8ec07c;
+            --orange: #fe8019; --shadow: 8px 8px 0px #1d2021;
+        }
+
+        .gruvbox-light {
+            --bg: #fbf1c7; --bg-dim: #f2e5bc; --bg-card: #ebdbb2; --bg-header: #d5c4a1;
+            --fg: #3c3836; --fg-dim: #7c6f64; --red: #9d0006; --green: #79740e;
+            --yellow: #b57614; --blue: #076678; --purple: #8f3f71; --aqua: #427b58;
+            --orange: #af3a03; --shadow: 4px 4px 0px #d5c4a1;
+        }
+
+        body {
+            background-color: var(--bg); color: var(--fg);
+            font-family: 'ui-monospace', 'Cascadia Mono', 'Fira Code', monospace;
+            transition: background var(--transition-main), color var(--transition-main);
+            margin: 0; padding: 1rem; line-height: 1.5;
+        }
+
+        .terminal-window {
+            background-color: var(--bg-card); border: var(--border-width) solid var(--fg);
+            box-shadow: var(--shadow); margin-bottom: 2rem; border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background: var(--bg-header); padding: 0.5rem 1rem;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: var(--border-width) solid var(--fg);
+            font-size: 0.75rem; font-weight: bold; cursor: pointer; user-select: none;
+        }
+
+        .terminal-header:hover { background: var(--bg-dim); }
+        .terminal-body { padding: 1.2rem; }
+
+        .profile-img-container {
+            width: 140px; height: 140px; min-width: 140px;
+            border: 2px solid var(--fg); background: var(--bg-dim);
+            padding: 4px; box-shadow: 4px 4px 0px var(--fg-dim);
+        }
+        .profile-img-container img {
+            width: 100%; height: 100%; object-fit: cover;
+            #filter: grayscale(1) sepia(0.1);
+        }
+
+        .prompt { color: var(--green); font-weight: bold; }
+        .command { color: var(--yellow); }
+
+        .btn-action {
+            border: 1px solid var(--fg); background: var(--bg-card);
+            padding: 0.6rem 1rem; font-size: 0.75rem; font-weight: bold;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            transition: all 0.1s; box-shadow: 3px 3px 0px var(--bg-dim);
+        }
+        .btn-action:hover { background: var(--fg); color: var(--bg); transform: translate(-1px, -1px); box-shadow: 4px 4px 0px var(--bg-dim); }
+        
+        
+        
+                .btn-action2 {
+            border: 1px solid var(--fg); background: var(--red);
+            padding: 0.6rem 1rem; font-size: 0.75rem; font-weight: bold;
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            transition: all 0.1s; box-shadow: 3px 3px 0px var(--bg-dim);
+        }
+        .btn-action2:hover { background: var(--fg); color: var(--bg); transform: translate(-1px, -1px); box-shadow: 4px 4px 0px var(--bg-dim); }
+        
+        
+        
+
+        .job-entry { border-left: 2px solid var(--orange); padding-left: 1rem; margin-bottom: 2.5rem; position: relative; }
+        .job-entry::before {
+            content: ">>"; position: absolute; left: -10px; top: 0;
+            background: var(--bg-card); color: var(--orange); font-weight: bold; font-size: 0.7rem;
+        }
+
+        .bio-text { font-size: 0.85rem; text-align: justify; }
+        .bio-section-title { color: var(--aqua); font-weight: bold; margin-top: 1.5rem; margin-bottom: 0.5rem; border-bottom: 1px dashed var(--aqua); display: block; text-transform: uppercase; }
+
+        .chart-container { position: relative; width: 100%; height: 300px; }
+
+        .download-btn {
+            background-color: var(--green); color: var(--bg);
+            padding: 1rem; width: 100%; text-align: center;
+            font-size: 1.1rem; font-weight: 900; border: 2px solid var(--fg);
+            box-shadow: 6px 6px 0px var(--bg-dim); cursor: pointer; text-transform: uppercase;
+            transition: all 0.1s;
+        }
+        .download-btn:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0px var(--bg-dim); }
+        
+        .download-btn2 {
+            background-color: var(--red); color: var(--bg);
+            padding: 1rem; width: 100%; text-align: center;
+            font-size: 1.1rem; font-weight: 900; border: 2px solid var(--fg);
+            box-shadow: 6px 6px 0px var(--bg-dim); cursor: pointer; text-transform: uppercase;
+            transition: all 0.1s;
+        }
+        .download-btn2:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0px var(--bg-dim); }
+
+        .theme-toggle {
+            position: fixed; bottom: 2rem; left: 2rem;
+            width: 3.5rem; height: 3.5rem;
+            background: var(--bg-card); border: var(--border-width) solid var(--fg);
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; z-index: 1000; box-shadow: var(--shadow);
+        }
+
+        .hidden-content { display: none; }
+        .typing-cursor::after { content: "█"; animation: blink 1s step-end infinite; }
+        @keyframes blink { from, to { opacity: 1; } 50% { opacity: 0; } }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--bg-header); border: 1px solid var(--fg); }
+    </style>
+</head>
+<body class="p-2 sm:p-8">
+
+    <div class="theme-toggle" onclick="toggleTheme()" title="Перемкнути тему">
+        <span id="theme-icon"></span>
+    </div>
+
+    <div class="max-w-6xl mx-auto">
+        
+        <!-- HEADER -->
+        <header class="terminal-window">
+            <div class="terminal-header">
+                <span>session: vvs@local</span>
+                <span id="uptime-display">uptime: calculation...</span>
+            </div>
+            <div class="terminal-body flex flex-col md:flex-row gap-8 items-center">
+                <div class="profile-img-container">
+                    <img src="./photo.png" alt="VVS Photo" loading="lazy">
+                </div>
+                <div class="grow text-center md:text-left">
+                    <h1 class="text-3xl sm:text-5xl font-black text-orange-500 tracking-tighter">Швець В'ячеслав Віталійович</h1>
+                    <p class="text-lg font-bold text-aqua-500 mt-1 italic underline decoration-wavy underline-offset-4">{h,cr,sl,att,unp}acker</p>
+                    <div class="mt-6 flex flex-wrap justify-center md:justify-start gap-5 text-[10px] opacity-70 font-mono">
+                        <span>[📍 Біла Церква]</span>
+                        <span>[📧 vvs@cl0w.nz]</span>
+                        <span>[📱 +38(067) 181 67 44]</span>
+                        <span>[🎂 21.07.1999]</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- BIO/SKILLS SECTION -->
+        <div class="terminal-window">
+            <div class="terminal-header" onclick="runCommand('bio')">
+                <span class="prompt">vvs@cl0w.nz:~$ <span class="command">cat ~/profile_and_skills.md</span></span>
+                <span class="text-[10px] opacity-50 font-mono">[run]</span>
+            </div>
+            <div id="cmd-bio" class="terminal-body bio-text hidden-content"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Column: Edu & Projects -->
+            <div class="lg:col-span-1 space-y-8">
+                <div class="terminal-window">
+                    <div class="terminal-header" onclick="runCommand('edu')">
+                        <span class="prompt">vvs@cl0w.nz:~$ <span class="command">ls /education</span></span>
+                    </div>
+                    <div id="cmd-edu" class="terminal-body text-[11px] space-y-4 font-mono hidden-content"></div>
+                </div>
+
+                <div class="terminal-window">
+                    <div class="terminal-header" onclick="runCommand('projects')">
+                        <span class="prompt">vvs@cl0w.nz:~$ <span class="command">ls /r_and_d_projects</span></span>
+                    </div>
+                    <div id="cmd-projects" class="terminal-body text-[10px] space-y-3 font-mono opacity-80 hidden-content"></div>
+                </div>
+            </div>
+
+            <!-- Right Column: History -->
+            <div class="lg:col-span-2 space-y-8">
+                <div class="terminal-window">
+                    <div class="terminal-header" onclick="runCommand('history')">
+                        <span class="prompt">vvs@cl0w.nz:~$ <span class="command">cat /var/log/history</span></span>
+                        <span class="text-[10px] opacity-50 font-mono">[run]</span>
+                    </div>
+                    <div id="cmd-history" class="terminal-body text-[11px] hidden-content"></div>
+                </div>
+            </div>
+        </div>
+
+       <!-- BOTTOM INTERACTIVE BLOCKS -->
+       <!--  <div class="space-y-8 mt-8">
+            <div class="terminal-window">
+                <div class="terminal-header" onclick="toggleStats()">
+                    <span class="prompt">vvs@cl0w.nz:~$ <span class="command">stats --radar</span></span>
+                    <span class="text-[10px] opacity-50 font-mono">[toggle]</span>
+                </div>
+                <div id="cmd-stats" class="terminal-body h-[350px] hidden-content">
+                    <canvas id="skillsRadar"></canvas>
+                </div>
+            </div>
+
+            <div class="terminal-window">
+                <div class="terminal-header" onclick="toggleTechStack()">
+                    <span class="prompt">vvs@cl0w.nz:~$ <span class="command">tech_stack --filter</span></span>
+                    <span class="text-[10px] opacity-50 font-mono">[toggle]</span>
+                </div>
+                <div id="cmd-tech-stack" class="terminal-body hidden-content">
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <button onclick="filterStack('all')" class="btn-action">ALL</button>
+                        <button onclick="filterStack('security')" class="btn-action">SEC</button>
+                        <button onclick="filterStack('network')" class="btn-action">NET</button>
+                        <button onclick="filterStack('infra')" class="btn-action">INFRA</button>
+                    </div>
+                    <div id="tech-grid" class="flex flex-wrap gap-1"></div>
+                </div>
+            </div>
+        </div> -->
+
+        <!-- FOOTER -->
+        <footer class="mt-8 mb-16 space-y-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <a href="mailto:vvs@cl0w.nz" class="btn-action justify-center py-4">📧 Email</a>
+                <a href="https://discord.com/users/@zgraf." target="_blank" class="btn-action justify-center py-4">🐙 Discord</a>
+                <a href="https://t.me/zgraf" class="btn-action justify-center py-4">💬 Telegram</a>
+                <a href="./ShvetsVVResume.pdf" class="btn-action2 justify-center py-4">🔗 Завантажити резюме в PDF</a>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-4">
+                <button class="download-btn flex-1" onclick="generateMD()">
+                    📄 Згенерувати резюме в.md
+                </button>
+            </div>
+            
+            <div class="text-center text-[10px] opacity-20 uppercase tracking-[0.6em] mt-12 pb-10">
+                built in vim // interactive shell v4.5 // vvs-cl0w
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const rawContent = {
+            bio: `
+                <p class="font-bold text-orange-500 uppercase">ПРОФЕСІЙНИЙ ПРОФІЛЬ</p>
+                <p class="mt-2 opacity-90">Інженер-програміст та фахівець з інформаційної безпеки з експертизою у захисті критичної інфраструктури та державного сектору. Маю глибокий технічний бекграунд у системному адмініструванні (Linux/Windows), мережевій інженерії та початковий рівень в Low-level розробці (C++/C#, Reverse Engineering). Спеціалізуюсь на виявленні складних кіберзагроз, аналізі цільового шпигунського ПЗ (Forensics) та використанні OSINT-методик для превентивного захисту.</p>
+                
+                <span class="bio-section-title">ТЕХНІЧНІ НАВИЧКИ</span>
+                <p><b>Системне Адміністрування:</b> Windows xp/7/10/11. Linux (Ubuntu Server, Oracle, CentOS, засновані на *.deb), AD, EntraID, MS-365,.</p>
+                <p><b>Кібер безпека та розвідка:</b> OSINT Frameworks (Maltego, Shodan, Google Dorks), Wazuh, Security Onion, Kali Linux, Metasploit, CrackMapExec.</p>
+                <p class="mt-2"><b>Аналіз ШПЗ:</b> Пошук та аналіз Targeted Malware/Spyware (ручний аналіз реєстру, автозавантаження, дампу пам'яті), робота з Trend Micro Apex One, Digital Guardian DLP, Fortigate.</p>
+                <p class="mt-2"><b>Мережа та Фаєрволи:</b> Fortigate (FortiOS, IPS/IDS), Mikrotik, pfSense, DNS Cloudflare, TCP/IP, VPN (IPsec, OpenVPN, WireGuard, FortiVPN), аналіз трафіку (Wireshark).</p>
+                <p class="mt-2"><b>Хмари та Сервери:</b> Azure (AD/Entra ID), MS365, Proxmox VE, VMware ESXi.</p>
+                <p class="mt-2"><b>Програмування:</b> C++, Python (Security Automation), Assembler (x86 basics), SQL, Bash.</p>
+
+                <span class="bio-section-title">ОСОБИСТІ ЯКОСТІ</span>
+                <p class="opacity-90">Аналітичний склад розуму, уважність до деталей (критично для форензіки), стресостійкість при реагуванні на інциденти, постійне самонавчання у сфері кібербезпеки.</p>
+            `,
+            edu: `
+                <div class="mb-4">
+                    <p class="text-orange-500 font-bold uppercase underline">Магістр:</p>
+                    <p>Білоцерківський національний аграрний університет (20.09.2024 – 31.12.2025).</p>
+                    <p class="opacity-70 italic">Спеціальність: Публічне управління та адміністрування.</p>
+                </div>
+                <div>
+                    <p class="text-orange-500 font-bold uppercase underline">Бакалавр:</p>
+                    <p>НТУУ «Київський політехнічний інститут імені Ігоря Сікорського» (2017 – 2020).</p>
+                    <p class="opacity-70 italic">Спеціальність: Метрологія та інформаційно-вимірювальна техніка.</p>
+                </div>
+            `,
+            projects: `
+                <div class="space-y-6">
+                    <div>
+                        <p class="text-aqua-500 font-bold uppercase underline">Single Player Project (WoW Emulation)</p>
+                        <ul class="ml-2 opacity-80 list-none text-[9px] space-y-1 mt-1">
+                            <li>- Розробка ядра сервера на C++.</li>
+                            <li>- Написання аддонів та модулів ядра сервера на LUA.</li>
+                            <li>- Reverse Engineering: Аналіз бінарних протоколів та структури пам'яті клієнта гри.</li>
+                            <li>- Робота з MySQL та оптимізація високонавантажених систем.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <p class="text-aqua-500 font-bold uppercase underline">Nexus Forever (WildStar Emulation)</p>
+                        <ul class="ml-2 opacity-80 list-none text-[9px] space-y-1 mt-1">
+                            <li>- Розробка емулятора на C# (.NET Core).</li>
+                            <li>- Дослідження пропрієтарних алгоритмів шифрування та мережевої взаємодії.</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <p class="text-aqua-500 font-bold uppercase underline">Security Research</p>
+                        <ul class="ml-2 opacity-80 list-none text-[9px] space-y-1 mt-1">
+                            <li>- CrackMapExec: Розробка модулів на Python для аудиту безпеки Active Directory.</li>
+                            <li>- Практичний досвід використання відлагоджувачів (x64dbg, IDA Pro) для аналізу коду.</li>
+                        </ul>
+                    </div>
+                </div>
+            `,
+            history: `
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">Державна служба України з безпеки на транспорті, м. Київ</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(01.10.2025 р. – по нині)</p>
+                    <p class="text-fg italic mb-2 font-bold">Головний спеціаліст Відділу інформаційної безпеки</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Поглиблений аналіз (Forensics) робочих станцій: виявлення та нейтралізація таргетованого шкідливого ПЗ (spyware, rootkits), розробленого спеціально для атаки на держслужбовців, яке не детектується стандартними антивірусами.</li>
+                        <li>- Використання інструментів OSINT для моніторингу витоків даних (Leaked Credentials) та збору Threat Intelligence інформації щодо активності хакерських груп.</li>
+                        <li>- Впровадження політик DLP (Microsoft Purview, Digital Guardian) для запобігання витоку конфіденційної інформації.</li>
+                        <li>- Управління DNS-зонами в Cloudflare, налаштування WAF-Fortigate правил.</li>
+                        <li>- Взаємодія з CERT-UA: аналіз індикаторів компрометації (IoC) та реагування на кіберінциденти.</li>
+                        <li>- Побудова внутрішньої VPN-мережі на базі Fortigate для безпечного віддаленого доступу.</li>
+                        <li>- Адміністрування гібридної хмарної інфраструктури (Azure AD, MS365) та віртуалізації (Proxmox, VMware).</li>
+                        <li>- Міграція VM з “хмари” на “землю”.</li>
+                        <li>- Налаштування мережевого екранування та сегментація мережі для захисту критичних вузлів.</li>
+                        <li>- Моніторинг подій безпеки через SIEM (Wazuh, Security Onion, Fortigate EMS).</li>
+                    </ul>
+                </div>
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">Державна служба України з безпеки на транспорті</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(09.01.2025 р. – 30.09.2025)</p>
+                    <p class="text-fg italic mb-2 font-bold">Провідний фахівець відділу адміністрування ІКС</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Налаштування локальної мережі в Територіальних органах.</li>
+                        <li>- Налаштування, конфігурація, підтримка ПК та оргтехніки.</li>
+                    </ul>
+                </div>
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">Державна служба України з безпеки на транспорті</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(06.02.2024 р. – 08.01.2025)</p>
+                    <p class="text-fg italic mb-2 font-bold">Головний спеціаліст Відділу інформаційної безпеки</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Управління інфраструктурою відкритих ключів (КЕП), контроль засобів криптографічного захисту.</li>
+                        <li>- Проведення внутрішніх пентестів та сканування вразливостей (Vulnerability Assessment) за допомогою Kali Linux.</li>
+                        <li>- Розробка інструкцій та навчання персоналу методам протидії фішингу та соціальній інженерії.</li>
+                    </ul>
+                </div>
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">Державна служба України з безпеки на транспорті</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(12.05.2023 р. – 05.02.2024)</p>
+                    <p class="text-fg italic mb-2 font-bold">Провідний фахівець Відділу інформаційної безпеки</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Реагування на інциденти безпеки, аналіз підозрілих файлів та посилань.</li>
+                        <li>- Адміністрування антивірусного захисту Trend Micro, Fortigate.</li>
+                        <li>- Написання та впровадження КСЗІ.</li>
+                        <li>- Налаштування мережевого шлюзу PfSense.</li>
+                        <li>- Локалізація, налаштування та обслуговування Fortimail.</li>
+                        <li>- Адміністрування хмарної інфраструктури Azure.</li>
+                        <li>- Налаштування SIEM Wazuh.</li>
+                    </ul>
+                </div>
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">ТОВ «Бінотел», м. Київ</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(01.08.2022 р. – 01.05.2023)</p>
+                    <p class="text-fg italic mb-2 font-bold">Програмний інженер</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Експертна підтримка VoIP-інфраструктури. Глибока діагностика SIP/RTP трафіку (Wireshark, tcpdump) на рівні пакетів.</li>
+                        <li>- Налаштування мережевого обладнання клієнтів (Mikrotik) для проходження голосового трафіку (NAT, QoS).</li>
+                        <li>- Вирішення аварійних та складних питань в роботі телефонії клієнтів.</li>
+                        <li>- Написання конфігураційних файлів для інтеграції різних клієнтьських систем (CRM, API, сервіс подачі показників з лічильників за допомогою IVR, тощо.) з SIP-сервером.</li>
+                    </ul>
+                </div>
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">ТОВ «КНАЙПА ПРО СЕРВІС», м. Київ</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(01.11.2021 р. – 01.04.2022)</p>
+                    <p class="text-fg italic mb-2 font-bold">Програмний інженер</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Розгортання комплексних систем автоматизації (POS).</li>
+                        <li>- Технічна підтримка клієнтів, та консультація працівників стосовно роботи касового/бухгалтерського/офіціантського ПЗ.</li>
+                        <li>- Побудова захищених VPN-тунелів між філіями закладів.</li>
+                        <li>- Адміністрування баз даних SQL, забезпечення резервного копіювання.</li>
+                        <li>- Супровід клієнтьських серверів на базі Windows Server 2003-2018.</li>
+                    </ul>
+                </div>
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">ТОВ «Бінотел», м. Київ</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(01.09.2020 р. – 29.10.2021)</p>
+                    <p class="text-fg italic mb-2 font-bold">Програмний інженер</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Технічний супровід клієнтів хмарної АТС.</li>
+                        <li>- Комунікація з клієнтами в телефонному режимі.</li>
+                        <li>- Налаштування програмних та фізичних IP-телефонів.</li>
+                    </ul>
+                </div>
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">Навчальний центр «Перспектива», м. Київ</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(27.06.2019 р. – 07.09.2020 р.)</p>
+                    <p class="text-fg italic mb-2 font-bold">Молодший системний адміністратор</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Консультування працівників з питань використання комп’ютерів.</li>
+                        <li>- Здійснення інсталяції, настроювання й оптимізації системного програмного забезпечення, впроваджування прикладних програм.</li>
+                        <li>- Підключення й заміна зовнішніх обладнань, проведення тестування засобів обчислювальної техніки, забезпечення ведення комп’ютерних баз даних, проведення комп’ютерних антивірусних заходів.</li>
+                        <li>- Адміністрування локальної обчислювальної мережі організації; усунення аварійних ситуацій, пов’язаних з ушкодженням програмного забезпечення й баз даних.</li>
+                        <li>- Контроль графіку навчання, та уроків навчального центру.</li>
+                    </ul>
+                </div>
+                <div class="job-entry">
+                    <p class="text-aqua-500 font-bold uppercase text-[10px]">Магазин «Reima», м. Київ</p>
+                    <p class="text-yellow-500 font-bold font-mono text-[9px]">(27.07.18 р. – 01.09.18 р.)</p>
+                    <p class="text-fg italic mb-2 font-bold">Касир торговельного залу</p>
+                    <ul class="space-y-1 opacity-90 font-mono text-[9px] list-none">
+                        <li>- Ведення обліку грошових коштів.</li>
+                        <li>- Оформлення первинних касових документів.</li>
+                        <li>- Проведення розрахункових операцій через РРО.</li>
+                        <li>- Ведення книги обліку розрахункових операцій та складання звітів про використання РРО.</li>
+                        <li>- Ведення касової книги.</li>
+                    </ul>
+                </div>
+            `
+        };
+
+        const techStack = [
+            { name: "Wazuh SIEM", category: "security", icon: "🛡️" },
+            { name: "Forensics", category: "security", icon: "🔍" },
+            { name: "FortiOS", category: "security", icon: "🧱" },
+            { name: "OSINT", category: "security", icon: "🌐" },
+            { name: "Azure / MS365", category: "infra", icon: "☁️" },
+            { name: "Mikrotik", category: "network", icon: "📡" },
+            { name: "C++ / Python", category: "dev", icon: "⚙️" },
+            { name: "Reverse Eng", category: "security", icon: "🔓" }
+        ];
+
+        let radarChart;
+
+        function calculateUptime() {
+            const start = new Date('1999-07-21T00:00:00');
+            const now = new Date();
+            const diffInYears = (now - start) / (1000 * 60 * 60 * 24 * 365.25);
+            document.getElementById('uptime-display').textContent = `uptime: ${diffInYears.toFixed(1)}y`;
+        }
+
+        function filterStack(category) {
+            const grid = document.getElementById('tech-grid');
+            const filtered = category === 'all' ? techStack : techStack.filter(s => s.category === category);
+            grid.innerHTML = filtered.map(item => `
+                <div class="skill-tag text-[8px] border border-fg-dim px-2 py-1 m-0.5 bg-bg-dim uppercase font-bold">
+                    <span>${item.icon}</span> ${item.name}
+                </div>
+            `).join('');
+        }
+
+        function runCommand(id) {
+            const container = document.getElementById(`cmd-${id}`);
+            container.classList.toggle('hidden-content');
+            
+            if (!container.classList.contains('hidden-content')) {
+                container.innerHTML = "";
+                container.classList.add('typing-cursor');
+                const html = rawContent[id];
+                
+                let currentPos = 0;
+                const totalLen = html.length;
+                const step = Math.ceil(totalLen / 60); // Швидкість друкування
+                
+                const timer = setInterval(() => {
+                    if (currentPos < totalLen) {
+                        currentPos += step;
+                        container.innerHTML = html.substring(0, currentPos);
+                    } else {
+                        container.innerHTML = html;
+                        container.classList.remove('typing-cursor');
+                        clearInterval(timer);
+                    }
+                }, 10);
+            }
+        }
+
+        function toggleStats() {
+            const container = document.getElementById('cmd-stats');
+            container.classList.toggle('hidden-content');
+            if (!container.classList.contains('hidden-content') && !radarChart) {
+                initRadar();
+            }
+        }
+
+        function toggleTechStack() {
+            const container = document.getElementById('cmd-tech-stack');
+            container.classList.toggle('hidden-content');
+            if (!container.classList.contains('hidden-content')) {
+                filterStack('all');
+            }
+        }
+
+        function initRadar() {
+            const ctx = document.getElementById('skillsRadar').getContext('2d');
+            const isDark = document.documentElement.classList.contains('gruvbox-dark');
+            const color = isDark ? '#ebdbb2' : '#3c3836';
+            const gridColor = isDark ? 'rgba(235, 219, 178, 0.1)' : 'rgba(60, 56, 54, 0.1)';
+
+            radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Форензіка', 'Мережі', 'Реверс', 'Хмари', 'OSINT', 'Linux'],
+                    datasets: [{
+                        data: [98, 92, 88, 85, 95, 96],
+                        backgroundColor: 'rgba(184, 187, 38, 0.2)',
+                        borderColor: isDark ? '#b8bb26' : '#79740e',
+                        borderWidth: 2,
+                        pointBackgroundColor: isDark ? '#b8bb26' : '#79740e'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 600 },
+                    scales: {
+                        r: {
+                            angleLines: { color: gridColor },
+                            grid: { color: gridColor },
+                            ticks: { display: false },
+                            pointLabels: { color: color, font: { size: 10 } }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            const isDark = html.classList.contains('gruvbox-dark');
+            if (isDark) {
+                html.classList.replace('gruvbox-dark', 'gruvbox-light');
+                icon.innerText = '';
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.replace('gruvbox-light', 'gruvbox-dark');
+                icon.innerText = '';
+                localStorage.setItem('theme', 'dark');
+            }
+            if(radarChart) {
+                radarChart.destroy();
+                radarChart = null;
+                if (!document.getElementById('cmd-stats').classList.contains('hidden-content')) {
+                    initRadar();
+                }
+            }
+        }
+
+        function generateMD() {
+            let md = `# РЕЗЮМЕ: Швець В’ячеслав Віталійович\n\n`;
+            md += `Email: vvs@cl0w.nz | Phone: +38(067) 181 67 44\n\n`;
+            md += `ПРОФІЛЬ:\n${rawContent.bio.replace(/<[^>]*>/g, '')}\n\n`;
+            md += `ДОСВІД:\n${rawContent.history.replace(/<[^>]*>/g, '')}`;
+            const blob = new Blob([md], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'shvets_resume.md';
+            a.click();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            calculateUptime();
+            if (localStorage.getItem('theme') === 'light') {
+                document.documentElement.classList.replace('gruvbox-dark', 'gruvbox-light');
+                document.getElementById('theme-icon').innerText = '';
+            }
+        });
+    </script>
+</body>
 </html>
