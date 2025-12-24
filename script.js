@@ -1,3 +1,41 @@
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║                         MAIN APPLICATION MODULE                            ║
+// ║  Головний модуль клієнтської частини сайту                                 ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+//
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                              ЗМІСТ (ANCHORS)                                │
+// ├─────────────────────────────────────────────────────────────────────────────┤
+// │  #SECTION_AUDIO       - Аудіо система (playSfx, toggleSound)               │
+// │  #SECTION_DATA        - Ініціалізація даних (initData, saveData)           │
+// │  #SECTION_MENU        - Видимість меню (applyMenuVisibility)               │
+// │  #SECTION_THEMES      - Система тем (themesList, setTheme, toggleThemeMenu)│
+// │  #SECTION_NAVIGATION  - Навігація (nav, updateTreeVisuals)                 │
+// │  #SECTION_HOME        - Головна сторінка (renderHome, selectHomeProfile)   │
+// │  #SECTION_WORK        - Робочі інструменти (renderWork, generatePass)      │
+// │  #SECTION_ABOUT       - Про мене (renderAbout, switchLang, typeEffect)     │
+// │  #SECTION_RESUME      - Резюме (renderResume, generateDOC, genMD)          │
+// │  #SECTION_OBSIDIAN    - Нотатки Obsidian (renderObsidian)                  │
+// │  #SECTION_BLOG        - Блог (renderBlog, filterBlog, renderBlogPost)      │
+// │  #SECTION_TODO        - Список справ (renderTodo, renderTodoList)          │
+// │  #SECTION_GALLERY     - Галерея (renderGallery, expandGallery)             │
+// │  #SECTION_GAMES       - Ігри (renderGameMenu, runGame, stopGames)          │
+// │  #SECTION_CONTACTS    - Контакти (renderLinks)                             │
+// │  #SECTION_EASTER      - Easter Eggs (easterEggLogo, easterEggClown, etc)   │
+// │  #SECTION_INIT        - Ініціалізація (window.onload)                      │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_AUDIO - Аудіо система
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * playSfx - Відтворює звуковий ефект
+ * @param {number} f - Частота звуку в Гц
+ * @param {string} t - Тип хвилі ('sine', 'square', 'sawtooth', 'triangle')
+ * @param {number} d - Тривалість в секундах
+ * @param {number} v - Гучність (0.0 - 1.0)
+ */
 let audioCtx = null; let soundOn = true;
 function playSfx(f, t = 'sine', d = 0.1, v = 0.05) {
     if (!soundOn) return;
@@ -11,9 +49,20 @@ function playSfx(f, t = 'sine', d = 0.1, v = 0.05) {
         o.start(); o.stop(audioCtx.currentTime + d);
     } catch (e) { }
 }
+/** toggleSound - Перемикає звук увімкнено/вимкнено */
 function toggleSound() { soundOn = !soundOn; document.getElementById('sound-toggle').innerText = soundOn ? '🕪' : '🕩'; }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_DATA - Ініціалізація та збереження даних
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** systemData - Глобальне сховище даних додатка */
+
 let systemData = {};
+/**
+ * initData - Ініціалізує дані з localStorage або встановлює default
+ * Виконує міграцію даних при оновленні версії
+ */
 function initData() {
     const saved = localStorage.getItem('vvs_system_data_v15'); // Version bump
     if (saved) {
@@ -36,10 +85,8 @@ function initData() {
             if (typeof systemData.resume.rnd === 'string') systemData.resume.rnd = [systemData.resume.rnd];
 
             if (!systemData.about) systemData.about = JSON.parse(JSON.stringify(defaultData.about));
-            // Migrate About to new structure
             if (!systemData.about.languages || !Array.isArray(systemData.about.languages)) {
                 systemData.about.languages = JSON.parse(JSON.stringify(defaultData.about.languages));
-                // Try to migrate existing UK/EN text if they differ from default
                 if (systemData.about.uk && systemData.about.uk !== defaultData.about.languages.find(l => l.code === 'uk').text) {
                     const uk = systemData.about.languages.find(l => l.code === 'uk'); if (uk) uk.text = systemData.about.uk;
                 }
@@ -47,7 +94,7 @@ function initData() {
                     const en = systemData.about.languages.find(l => l.code === 'en'); if (en) en.text = systemData.about.en;
                 }
             }
-            if (!systemData.about.activeLang) systemData.about.activeLang = 'uk'; // Default
+            if (!systemData.about.activeLang) systemData.about.activeLang = 'uk';
 
             if (typeof systemData.about.showPhoto === 'undefined') systemData.about.showPhoto = false;
             if (typeof systemData.about.photo === 'undefined') systemData.about.photo = defaultData.about.photo;
@@ -64,12 +111,12 @@ function initData() {
 
             if (!systemData.password) systemData.password = defaultData.password;
             if (!systemData.games) systemData.games = defaultData.games;
+            if (typeof systemData.todoEditable === 'undefined') systemData.todoEditable = defaultData.todoEditable;
 
             if (!systemData.home.logoText) systemData.home.logoText = defaultData.home.logoText;
             if (!systemData.home.browserTitle) systemData.home.browserTitle = defaultData.home.browserTitle || systemData.home.logoText.replace(':~$', '');
 
             if (!systemData.themes) systemData.themes = JSON.parse(JSON.stringify(defaultData.themes));
-            // New theme trigger migration
             if (!systemData.themes.adminTriggerTheme) systemData.themes.adminTriggerTheme = 'mix-eva';
 
             updateCustomThemeCSS();
@@ -86,15 +133,25 @@ function initData() {
         systemData = JSON.parse(JSON.stringify(defaultData));
         setTheme(systemData.themes.defaultId);
     }
-    applyMenuVisibility(); // Apply on init
-    renderDynamicLogo(); // Ensure logo is updated
+    applyMenuVisibility();
+    renderDynamicLogo();
 }
+
+/** saveData - Зберігає systemData в localStorage */
 function saveData() { localStorage.setItem('vvs_system_data_v15', JSON.stringify(systemData)); }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_MENU - Видимість меню
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * applyMenuVisibility - Застосовує налаштування видимості пунктів меню
+ * Керує відображенням секцій: work, notes, blog, todo, gallery, game
+ */
 
 // --- MENU VISIBILITY LOGIC ---
 function applyMenuVisibility() {
     const mv = systemData.menuVisibility;
-    // Helper to safe toggle
     const toggle = (id, visible) => {
         const el = document.getElementById(id);
         if (el) el.style.display = visible ? 'block' : 'none';
@@ -108,7 +165,17 @@ function applyMenuVisibility() {
     toggle('nav-game', mv.game);
 }
 
-// --- THEMES ---
+/**
+ * hexToRgba - Конвертує HEX колір у RGBA формат
+ * @param {string} hex - HEX колір (#RRGGBB)
+ * @param {number} alpha - Прозорість (0.0 - 1.0)
+ * @returns {string} RGBA рядок
+ */
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_THEMES - Система тем оформлення
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** themesList - Список доступних тем оформлення */
 const themesList = [
     { id: 'amber', name: 'Amber Classic', c: '#ffb000' },
     { id: 'amber-light', name: 'Amber Day', c: '#ffb000' },
@@ -144,13 +211,22 @@ function updateCustomThemeCSS() {
     document.getElementById('custom-theme-style').innerHTML = css;
 }
 
-// --- CORE ---
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_NAVIGATION - Навігація та глобальні змінні
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Глобальні змінні стану додатка */
 let isTyping = false; let currentObsCat = 'SECURITY'; let currentObsFile = '';
 let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0;
 let currentLang = 'uk'; let adminAuth = false;
 let admNoteCat = ''; let admNoteFile = '';
 let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
 
+/**
+ * nav - Головна функція навігації між секціями
+ * @param {string} id - ID секції (home, about, resume, work, тощо)
+ * Оновлює заголовок вікна, активну кнопку та рендерить контент
+ */
 function nav(id) {
     if (isTyping) return;
 
@@ -169,7 +245,7 @@ function nav(id) {
     else if (id === 'resume') renderResume();
     else if (id === 'work') renderWork();
     else if (id === 'obsidian') { currentObsFile = ''; renderObsidian(); }
-    else if (id === 'blog') { activeBlogTag = null; renderBlog(); } // Reset filter on nav
+    else if (id === 'blog') { activeBlogTag = null; renderBlog(); }
     else if (id === 'todo') renderTodo();
     else if (id === 'gallery') renderGallery();
     else if (id === 'game') renderGameMenu();
@@ -177,7 +253,6 @@ function nav(id) {
     else if (id === 'admin') renderAdmin();
 }
 
-// Helper to update tree visuals
 function updateTreeVisuals() {
     const contactBtn = document.getElementById('nav-contact');
     if (adminAuth) {
@@ -189,23 +264,33 @@ function updateTreeVisuals() {
     }
 }
 
-// --- RESUME UNLOCK ---
+
+/**
+ * unlockResume - Розблоковує та відкриває секцію RESUME
+ * Використовується через HIRE_ME_PROTOCOL
+ */
 function unlockResume() {
     document.getElementById('nav-resume').style.display = 'block';
-    playSfx(600, 'square', 0.2); // Sound effect for unlocking
+    playSfx(600, 'square', 0.2);
     nav('resume');
 }
 
-// --- HOME RENDERER ---
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_HOME - Головна сторінка
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Активний профіль та тег на головній сторінці */
 let activeHomeProfile = null;
 let activeHomeTag = null;
 
+/**
+ * renderHome - Рендерить головну сторінку з профілями та посиланнями
+ * Відображає ASCII лого, список профілів, теги та відфільтровані посилання
+ */
 function renderHome() {
     const v = document.getElementById('view');
-    // Basic Home Content
     let html = `<div style="text-align:center; margin-top:40px;"><pre style="font-size:1rem; line-height:1; display:inline-block; text-align:left; font-family:monospace; opacity:0.9;">${systemData.home.ascii}</pre><h1 style="font-size:2.2rem; margin-top:10px;">${systemData.home.title}</h1><p>${systemData.home.text}</p></div>`;
 
-    // Profiles Section
     html += `<h3 class="underline" style="margin-top:30px">PROFILES</h3><div class="home-profile-grid">`;
     systemData.homeLinks.profiles.forEach(p => {
         const isActive = activeHomeProfile === p.id ? 'active' : '';
@@ -215,7 +300,6 @@ function renderHome() {
     });
     html += `</div>`;
 
-    // Tags Section (if profile selected)
     if (activeHomeProfile) {
         const profile = systemData.homeLinks.profiles.find(p => p.id === activeHomeProfile);
         if (profile) {
@@ -229,7 +313,6 @@ function renderHome() {
         }
     }
 
-    // Links Section (if tag selected)
     if (activeHomeTag) {
         const filteredLinks = systemData.homeLinks.links.filter(l => l.tags.includes(activeHomeTag));
         html += `<h3 class="underline">LINKS [${activeHomeTag}]</h3><div class="home-links-grid">`;
@@ -250,6 +333,11 @@ function renderHome() {
     v.innerHTML = html;
 }
 
+/**
+ * selectHomeProfile - Вибирає профіль на головній сторінці
+ * @param {string} id - ID профілю
+ * Перевіряє пароль якщо профіль захищений
+ */
 async function selectHomeProfile(id) {
     if (activeHomeProfile === id) {
         activeHomeProfile = null; // Toggle off
@@ -271,18 +359,21 @@ async function selectHomeProfile(id) {
                 return;
             }
         } else {
-            // Admin Bypass Feedback
             playSfx(800, 'sine', 0.1);
             alert("ADMIN: PASSWORD BYPASSED");
         }
     }
 
     activeHomeProfile = id;
-    activeHomeTag = null; // Reset tag when profile changes
+    activeHomeTag = null;
     playSfx(600, 'sine');
     renderHome();
 }
 
+/**
+ * selectHomeTag - Вибирає тег для фільтрації посилань
+ * @param {string} tag - Назва тегу
+ */
 function selectHomeTag(tag) {
     if (activeHomeTag === tag) {
         activeHomeTag = null;
@@ -293,20 +384,42 @@ function selectHomeTag(tag) {
     renderHome();
 }
 
-// --- WORKTHING ---
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_WORK - Робочі інструменти
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * renderWork - Рендерить сторінку робочих інструментів
+ * Включає генератор паролів та транслітерацію UA↔EN
+ */
 function renderWork() {
     const v = document.getElementById('view');
     v.innerHTML = `<h2>WORK_TOOLS</h2><div class="work-grid"><div class="work-card"><h3>SECURE_PASS_GEN</h3><div id="pass-out" class="pass-result">...</div><div class="opts-grid"><label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label><label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label><label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label><label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label></div><div class="form-group" style="margin-bottom:10px;"><label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label><input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value"></div><button class="btn btn-green" onclick="generatePass()">GENERATE</button><button class="btn" onclick="copyPass()">COPY</button></div><div class="work-card"><h3>TRANSLITERATION (KMU 55)</h3><div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div><textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea><div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div><textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea><div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div></div></div>`;
     generatePass();
 }
+/** words - Слова для генерації парольних фраз */
 const words = ["cyber", "secure", "hack", "node", "core", "linux", "root", "admin", "flux", "neon", "grid", "data", "byte", "bit", "net", "web", "cloud", "void", "null", "zero"];
+/** generatePass - Генерує випадковий пароль за налаштуваннями */
 function generatePass() { const isPhrase = document.getElementById('p-phrase').checked; const len = parseInt(document.getElementById('p-len').value); const useUp = document.getElementById('p-upper').checked; const useNum = document.getElementById('p-nums').checked; const useSym = document.getElementById('p-syms').checked; let res = ""; if (isPhrase) { let wCount = Math.floor(len / 4); if (wCount < 3) wCount = 3; let arr = []; for (let i = 0; i < wCount; i++) { let w = words[Math.floor(Math.random() * words.length)]; if (useUp) w = w.charAt(0).toUpperCase() + w.slice(1); arr.push(w); } res = arr.join(useSym ? "-" : ""); if (useNum) res += Math.floor(Math.random() * 100); } else { let chars = "abcdefghijklmnopqrstuvwxyz"; if (useUp) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; if (useNum) chars += "0123456789"; if (useSym) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"; for (let i = 0; i < len; i++) res += chars.charAt(Math.floor(Math.random() * chars.length)); } document.getElementById('pass-out').innerText = res; }
+/** copyPass - Копіює згенерований пароль у буфер обміну */
 function copyPass() { const txt = document.getElementById('pass-out').innerText; if (txt !== "...") { navigator.clipboard.writeText(txt); alert("Copied!"); } }
+
+/** mapUA - Таблиця транслітерації українських літер у латинські (КМУ 55) */
 const mapUA = { 'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e', 'ж': 'zh', 'з': 'z', 'и': 'y', 'і': 'i', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ь': '', '\'': '', '’': '', 'ю': 'iu', 'я': 'ia', 'є': 'ie', 'ї': 'i', 'й': 'i' };
+/** mapUA_Start - Спеціальна транслітерація для літер на початку слова */
 const mapUA_Start = { 'є': 'ye', 'ї': 'yi', 'й': 'y', 'ю': 'yu', 'я': 'ya' };
+/**
+ * doTranslit - Виконує транслітерацію тексту
+ * @param {string} dir - Напрямок ('ua' - UA→EN, 'en' - EN→UA)
+ */
 function doTranslit(dir) { if (dir === 'ua') { let src = document.getElementById('tr-ua').value; let out = ""; let temp = src.replace(/зг/g, "zgh").replace(/Зг/g, "Zgh").replace(/ЗГ/g, "ZGH"); for (let i = 0; i < temp.length; i++) { const c = temp[i]; const low = c.toLowerCase(); const isUp = c !== low; const isStart = (i === 0 || /[\s\n\t\.,!?]/.test(temp[i - 1])); let tr = ""; if (isStart && mapUA_Start[low]) tr = mapUA_Start[low]; else if (mapUA[low] !== undefined) tr = mapUA[low]; else tr = c; if (tr.length > 0) { if (isUp) { if (tr.length > 1 && temp[i + 1] && temp[i + 1] === temp[i + 1].toUpperCase()) tr = tr.toUpperCase(); else tr = tr.charAt(0).toUpperCase() + tr.slice(1); } } out += tr; } document.getElementById('tr-en').value = out; } else { let src = document.getElementById('tr-en').value; src = src.replace(/zgh/gi, "зг"); const revMapMulti = [{ k: 'shch', v: 'щ' }, { k: 'zh', v: 'ж' }, { k: 'kh', v: 'х' }, { k: 'ts', v: 'ц' }, { k: 'ch', v: 'ч' }, { k: 'sh', v: 'ш' }, { k: 'ye', v: 'є' }, { k: 'yi', v: 'ї' }, { k: 'yu', v: 'ю' }, { k: 'ya', v: 'я' }, { k: 'ia', v: 'я' }, { k: 'ie', v: 'є' }, { k: 'iu', v: 'ю' }]; for (let pair of revMapMulti) { const reg = new RegExp(pair.k, "gi"); src = src.replace(reg, (match) => { const isUp = match[0] === match[0].toUpperCase(); return isUp ? pair.v.toUpperCase() : pair.v; }); } const revMapSingle = { 'a': 'а', 'b': 'б', 'v': 'в', 'h': 'г', 'g': 'ґ', 'd': 'д', 'e': 'е', 'z': 'з', 'y': 'и', 'i': 'і', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф' }; let out = ""; for (let i = 0; i < src.length; i++) { const c = src[i]; const low = c.toLowerCase(); const isUp = c !== low; if (revMapSingle[low]) out += isUp ? revMapSingle[low].toUpperCase() : revMapSingle[low]; else out += c; } document.getElementById('tr-ua').value = out; } }
 
 // --- CRYPTO HELPER ---
+/**
+ * hashPass - Генерує SHA-256 хеш рядка
+ * @param {string} str - Вхідний рядок
+ * @returns {string} Хеш-сума
+ */
 async function hashPass(str) {
     if (!str) return '';
     const msgBuffer = new TextEncoder().encode(str);
@@ -315,9 +428,8 @@ async function hashPass(str) {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-
 // --- GENERATE DOC (WORD) ---
-// --- GENERATE DOC (WORD) ---
+/** generateDOC - Генерує та завантажує резюме у форматі Word (DOC) */
 window.generateDOC = function () {
     const r = systemData.resume;
     const t = r.titles;
@@ -353,22 +465,25 @@ window.generateDOC = function () {
     document.body.removeChild(link);
 }
 
-// --- UI RENDERING ---
-// --- UI RENDERING ---
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_ABOUT - Про мене
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * renderAbout - Рендерить секцію "Про мене"
+ * Відображає текст обраною мовою з ефектом друку
+ */
 function renderAbout() {
     const v = document.getElementById('view');
-    // Dynamic Language Buttons
     let btns = systemData.about.languages.map(l =>
         `<button class="btn ${systemData.about.activeLang === l.code ? 'active' : ''}" onclick="switchLang('${l.code}')">${l.label}</button>`
     ).join('');
 
     let html = `<div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom:15px;">${btns}</div>`;
 
-    // Float structure for about photo
     html += `<div style="overflow:hidden;">`; // Container to manage floats if needed
 
     if (systemData.about.showPhoto) {
-        // Determine photo source: use specific about photo if available, fallback to resume photo
         const photoSrc = systemData.about.photo || systemData.resume.photo;
         html += `<img src="${photoSrc}" style="float:right; margin-left:20px; margin-bottom:10px; width:150px; border: 2px solid var(--text); object-fit:cover;" alt="Me">`;
     }
@@ -382,6 +497,10 @@ function renderAbout() {
     if (activeData) typeEffect(activeData.text, 'about-txt');
 }
 
+/**
+ * switchLang - Перемикає мову секції "Про мене"
+ * @param {string} langCode - Код мови
+ */
 window.switchLang = function (langCode) {
     if (systemData.about.languages.find(l => l.code === langCode)) {
         systemData.about.activeLang = langCode;
@@ -389,8 +508,17 @@ window.switchLang = function (langCode) {
     }
 }
 function switchLang(l) { if (currentLang === l || isTyping) return; currentLang = l; renderAbout(); }
+/** typeEffect - Створює ефект поступового друку тексту */
 function typeEffect(html, targetId) { const v = document.getElementById(targetId); v.innerHTML = '<div id="type-box" class="typing"></div>'; const b = document.getElementById('type-box'); isTyping = true; const startTime = Date.now(); const duration = 1000; const timer = setInterval(() => { const elapsed = Date.now() - startTime; let progress = elapsed / duration; if (progress > 1) progress = 1; let i = Math.floor(html.length * progress); const sub = html.substring(0, i); const lastOpen = sub.lastIndexOf('<'); const lastClose = sub.lastIndexOf('>'); if (lastOpen > lastClose) { const closing = html.indexOf('>', lastOpen); if (closing !== -1) i = closing + 1; } if (Math.random() > 0.8) playSfx(200 + Math.random() * 100, 'sine', 0.02, 0.02); b.innerHTML = html.substring(0, i); if (progress === 1) { clearInterval(timer); b.innerHTML = html; b.classList.remove('typing'); isTyping = false; } }, 16); }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_RESUME - Резюме (CV)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * renderResume - Рендерить секцію резюме
+ * Використовує дані з systemData.resume та titles
+ */
 function renderResume() {
     const v = document.getElementById('view');
     const r = systemData.resume;
@@ -403,6 +531,7 @@ function renderResume() {
     v.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--text); padding-bottom:10px; margin-bottom:20px;"><h1>РЕЗЮМЕ</h1><div style="display:flex; gap:10px;"><button class="btn" onclick="genMD()">[ MD ]</button><button class="btn" onclick="generateDOC()">[ DOC ]</button></div></div><div style="display:flex; gap:20px; flex-wrap:wrap"><div class="photo"><img class="photo" src="${r.photo}" alt="VVS Photo"></div><div><h2>${r.name}</h2><p>DOB: ${birthDate}</p><p>Email: ${r.email}</p><p>Phone: ${r.phone || 'N/A'}</p><div style="font-size:0.8rem; margin-top:10px;">${skills}</div><h3 style="margin-top:10px; font-size:1rem; border-bottom:1px solid var(--dim); display:inline-block;">${t.langs}</h3><div style="font-size:0.8rem; margin-top:5px;">${langs}</div></div></div><h3 class="underline" style="margin-top:25px">${t.summary}</h3><p style="margin-bottom:20px; line-height:1.5;">${r.summary || ''}</p><h3 class="underline">${t.jobs}</h3><div class="scroll-area">${r.jobs.map(j => `<div class="exp-item"><h4>${j.co}</h4><div class="meta">${j.per} | ${j.pos}</div><ul>${j.tasks.map(t => `<li>${t}</li>`).join("")}</ul></div>`).join("")}</div>${eduHTML}<h3 class="underline" style="margin-top:15px">${t.rnd}</h3><div style="font-size:0.9rem">${rnds}</div>`;
 }
 // --- GENERATE MD (MARKDOWN) ---
+/** genMD - Генерує та завантажує резюме у форматі Markdown */
 window.genMD = function () {
     const r = systemData.resume;
     const t = r.titles;
@@ -437,6 +566,14 @@ window.genMD = function () {
     document.body.removeChild(link);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_OBSIDIAN - Нотатки Obsidian
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * renderObsidian - Рендерить інтерфейс перегляду нотаток
+ * Підтримує категорії, файли та захист паролем
+ */
 function renderObsidian() {
     const v = document.getElementById('view'); const content = currentObsFile ? systemData.obsidian[currentObsCat][currentObsFile].replace(/\\\\/g, '\\') : "Оберіть нотатку для зчитування..."; v.innerHTML = `<h2>Obsidian.Vault</h2><div class="obs-container"><div class="obs-tabs" id="o-t"></div><div class="obs-main"><div class="obs-files" id="o-f"></div><div class="obs-viewer" id="o-v"><pre>${content}</pre></div></div></div>`; const tabBox = document.getElementById('o-t');
     systemData.obsidian.cats.forEach(c => {
@@ -467,8 +604,17 @@ function renderObsidian() {
     const fileBox = document.getElementById('o-f'); Object.keys(systemData.obsidian[currentObsCat]).forEach(f => { const b = document.createElement('button'); b.className = `obs-file-item ${f === currentObsFile ? 'active' : ''}`; b.innerText = '> ' + f; b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); }; fileBox.appendChild(b); });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_BLOG - Керування блогом
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** activeBlogTag - Поточний тег для фільтрації блогу */
 let activeBlogTag = null;
 
+/**
+ * renderBlog - Рендерить список постів блогу
+ * Підтримує фільтрацію за тегами
+ */
 function renderBlog() {
     const v = document.getElementById('view');
     // Collect all unique tags
@@ -503,16 +649,88 @@ function renderBlog() {
     }
 }
 
+/** filterBlog - Встановлює тег для фільтрації блогу */
 function filterBlog(tag) {
     activeBlogTag = tag;
     renderBlog();
     playSfx(600, 'sine', 0.05);
 }
 
+/** renderBlogPost - Рендерить повний текст одного поста блогу */
 function renderBlogPost(id) { const p = systemData.blog.find(x => x.id === id); const v = document.getElementById('view'); playSfx(500); v.innerHTML = `<button class="btn" onclick="nav('blog')" style="margin-bottom:15px;">< BACK</button><h2 style="border-bottom:2px solid var(--text); padding-bottom:5px; margin-bottom:10px;">${p.title}</h2><div style="font-size:0.8rem; margin-bottom:20px; opacity:0.7;">DATE: ${p.date} | TAGS: ${p.tags.join(', ')}</div><div class="blog-read-view blog-full">${p.content}</div>`; }
-function renderTodo() { const v = document.getElementById('view'); v.innerHTML = `<h2>TODO_LIST [READ_ONLY]</h2><div class="todo-container"><div class="todo-list" id="todo-list"></div></div>`; renderTodoList(); }
-function renderTodoList() { const l = document.getElementById('todo-list'); l.innerHTML = ''; systemData.todos.forEach((t) => { const el = document.createElement('div'); el.className = `todo-item ${t.d ? 'todo-done' : ''}`; el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>`; l.appendChild(el); }); }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_TODO - Список справ
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderTodo - Рендерить контейнер списку справ */
+function renderTodo() {
+    const v = document.getElementById('view');
+    const editable = systemData.todoEditable;
+    let html = `<h2>TODO_LIST ${editable ? '[EDIT_MODE]' : '[READ_ONLY]'}</h2>`;
+    if (editable) {
+        html += `<div class="todo-input-group" style="margin-bottom:15px;">
+            <input type="text" id="new-todo-input" class="todo-input" placeholder="New task..." onkeypress="if(event.key==='Enter') addTodoItem()">
+            <button class="btn" onclick="addTodoItem()">ADD</button>
+        </div>`;
+    }
+    html += `<div class="todo-container"><div class="todo-list" id="todo-list"></div></div>`;
+    v.innerHTML = html;
+    renderTodoList();
+}
+/** renderTodoList - Відображає елементи списку справ */
+function renderTodoList() {
+    const l = document.getElementById('todo-list');
+    l.innerHTML = '';
+    const editable = systemData.todoEditable;
+    systemData.todos.forEach((t, i) => {
+        const el = document.createElement('div');
+        el.className = `todo-item ${t.d ? 'todo-done' : ''}`;
+        if (editable) {
+            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span> 
+                           <span class="todo-text">${t.t}</span>
+                           <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})" style="margin-left:auto">X</button>`;
+        } else {
+            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>`;
+        }
+        l.appendChild(el);
+    });
+}
+/** addTodoItem - Додає новий елемент до списку справ */
+function addTodoItem() {
+    const inp = document.getElementById('new-todo-input');
+    if (!inp || !inp.value.trim()) return;
+    systemData.todos.push({ t: inp.value.trim(), d: false });
+    saveData();
+    renderTodoList();
+    inp.value = '';
+    playSfx(800);
+}
+/** toggleTodoDone - Змінює статус виконання завдання */
+function toggleTodoDone(i) {
+    systemData.todos[i].d = !systemData.todos[i].d;
+    saveData();
+    renderTodoList();
+    playSfx(systemData.todos[i].d ? 900 : 700);
+}
+/** removeTodoItem - Видаляє елемент зі списку справ */
+function removeTodoItem(i) {
+    if (confirm("Delete this task?")) {
+        systemData.todos.splice(i, 1);
+        saveData();
+        renderTodoList();
+        playSfx(400);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_GALLERY - Галерея (фото та ASCII арт)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * renderGallery - Рендерить сітку галереї
+ * Відображає фото або ASCII-арт залежно від обраної категорії
+ */
 function renderGallery() {
     const v = document.getElementById('view');
     v.innerHTML = `<h2>Gallery.Manager</h2><div class="obs-tabs" id="g-t"></div><div class="gallery-grid" id="g-g"></div>`;
@@ -535,6 +753,11 @@ function renderGallery() {
 }
 
 // EXPAND GALLERY (FIXED: Fullscreen + No Scroll)
+/**
+ * expandGallery - Відкриває зображення або ASCII-арт на весь екран
+ * @param {string} c - Категорія
+ * @param {number} i - Індекс елемента
+ */
 window.expandGallery = function (c, i) {
     const item = systemData.gallery[c][i];
     const overlay = document.createElement('div');
@@ -559,6 +782,11 @@ window.expandGallery = function (c, i) {
     document.body.appendChild(overlay);
     playSfx(600, 'square', 0.1);
 }
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_CONTACTS - Контакти та мережевий статус
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderLinks - Рендерить сторінку контактів та друзів */
 function renderLinks() {
     const linksHtml = systemData.contacts.map(c => `<a href="${c.url}" target="_blank" class="node-link"><span style="opacity:0.6">#</span> ${c.label}</a>`).join('');
     const friendsHtml = (systemData.friends || []).map(f => `<a href="${f.url}" target="_blank" class="node-link" style="opacity:${f.status === 'OFFLINE' ? 0.5 : 1}"><span style="opacity:0.6; color:${f.status === 'ONLINE' ? '#0f0' : 'inherit'}">●</span> ${f.label} <span style="font-size:0.7rem; margin-left:auto; opacity:0.7">[${f.status}]</span></a>`).join('');
@@ -572,19 +800,30 @@ function renderLinks() {
     document.getElementById('view').innerHTML = `<h2>NODE_NETWORK</h2><div class="node-grid"><div class="node-card"><div class="node-status">ONLINE</div><h3>[ ME ]</h3>${linksHtml}</div><div class="node-card"><div class="node-status">NET_SCAN</div><h3>[ FRIENDS ]</h3>${friendsHtml || '<div class="node-link" style="opacity:0.5">Scanning... No peers found.</div>'}</div></div>${hireHtml}`;
 }
 
-let gameInt = null; function stopGames() { if (gameInt) clearInterval(gameInt); window.onkeydown = null; }
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_GAMES - Ігровий центр
+// ═══════════════════════════════════════════════════════════════════════════════
 
+/** gameInt - Інтервал активної гри для коректної зупинки */
+var gameInt = null;
+/** stopGames - Зупиняє всі ігрові цикли та видаляє слухачі подій */
+function stopGames() { if (gameInt) clearInterval(gameInt); window.onkeydown = null; }
+
+/** renderGameMenu - Рендерить меню вибору ігор */
 function renderGameMenu() {
     const gamesHtml = systemData.games.map((g, index) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
     document.getElementById('view').innerHTML = `<h2>Game Hub</h2><div class="game-hub">${gamesHtml}</div><div id="arena" style="margin-top:20px; display:flex; justify-content:center"></div>`;
 }
 
+/**
+ * runGame - Запускає обрану гру за її ID
+ * @param {string} id - ID гри
+ */
 function runGame(id) {
     stopGames();
     const g = systemData.games.find(x => x.id === id);
     if (g && g.code) {
         try {
-            // Safe evaluation in local context
             const f = new Function(g.code);
             f();
         } catch (e) {
@@ -593,7 +832,12 @@ function runGame(id) {
     }
 }
 
+/** toggleThemeMenu - Відкриває/закриває меню вибору тем */
 function toggleThemeMenu() { const popup = document.getElementById('theme-popup'); popup.innerHTML = ''; themesList.forEach(t => { const el = document.createElement('div'); el.className = 'theme-item'; el.innerHTML = `<div class="color-preview" style="background:${t.c}"></div> ${t.name}`; el.onclick = () => setTheme(t.id); popup.appendChild(el); }); popup.classList.toggle('show'); playSfx(400); }
+/** 
+ * setTheme - Встановлює тему оформлення
+ * @param {string} t - ID теми
+ */
 function setTheme(t) {
     document.body.className = `theme-${t}`;
     playSfx(1000, 'sine', 0.05);
@@ -606,6 +850,11 @@ function setTheme(t) {
     if (t === 'eva') { evaCount++; if (evaCount >= 5) { const sound = new Audio('xero.wav'); sound.play().catch(e => console.log(e)); evaCount = 0; } }
     document.getElementById('theme-popup').classList.remove('show');
 }
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_EASTER - Великодні яйця (Easter Eggs)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** easterEggLogo - Секретна анімація при кліку на логотип */
 function easterEggLogo() {
     logoClicks++;
     const logo = document.getElementById('logo-text');
@@ -625,19 +874,23 @@ function easterEggLogo() {
         }, 120);
     }
 }
+/** checkAdminUnlock - Перевіряє умови прихованого розблокування адмін-панелі */
 function checkAdminUnlock() {
     if (glitchTriggered && mintEvaClicks >= 10) {
         const btn = document.getElementById('nav-admin');
         if (btn.style.display !== 'block') { btn.style.display = 'block'; playSfx(800, 'square', 0.5); alert("SYSTEM OVERRIDE: ADMIN ACCESS UNLOCKED"); }
     }
 }
+/** easterEggClown - Секретний оверлей з клоуном */
 function easterEggClown() { clownClicks++; if (clownClicks >= 5) { playSfx(400); setTimeout(() => playSfx(300), 100); const o = document.getElementById('clown-overlay'); o.style.display = 'flex'; setTimeout(() => { o.style.display = 'none'; clownClicks = 0; }, 1000); } }
+/** easterEggClock - Перемикає матричний фон */
 function easterEggClock() { const m = document.getElementById('matrix-bg'); m.style.display = m.style.display === 'block' ? 'none' : 'block'; if (m.style.display === 'block') startMatrix(); }
+/** startMatrix - Запускає анімацію дощу символів Matrix */
 function startMatrix() { const c = document.getElementById('matrix-bg'), x = c.getContext('2d'); c.width = window.innerWidth; c.height = window.innerHeight; const col = Array(Math.floor(c.width / 16)).fill(1); setInterval(() => { x.fillStyle = "rgba(0,0,0,0.05)"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = getComputedStyle(document.body).getPropertyValue('--text'); col.forEach((y, i) => { x.fillText(String.fromCharCode(33 + Math.random() * 90), i * 16, y * 16); if (y * 16 > c.height && Math.random() > 0.975) col[i] = 0; col[i]++; }); }, 50); }
 
+/** renderDynamicLogo - Оновлює текст логотипу та заголовка сторінки */
 function renderDynamicLogo() {
     if (document.getElementById('matrix-bg')) startMatrix();
-    // Dynamic Title & Logo
     if (systemData.home && systemData.home.logoText) {
         document.title = systemData.home.logoText;
         const logoEl = document.getElementById('logo-text');
@@ -645,12 +898,16 @@ function renderDynamicLogo() {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_INIT - Головна ініціалізація (Entry Point)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** window.onload - Початкове завантаження, ініціалізація даних та початкова навігація */
 window.onload = () => {
     initData();
     const savedTheme = localStorage.getItem('vvs_theme_v12'); if (savedTheme) document.body.className = `theme-${savedTheme}`;
     renderDynamicLogo();
 
-    // Boot Logic
     if (sessionStorage.getItem('boot_shown')) {
         document.getElementById('boot').style.display = 'none';
         nav('home');

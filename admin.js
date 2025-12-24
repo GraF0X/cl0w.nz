@@ -1,4 +1,40 @@
-// --- ADMIN PANEL ---
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║                           ADMIN PANEL MODULE                               ║
+// ║  Модуль адміністративної панелі для керування контентом сайту              ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+//
+// ┌─────────────────────────────────────────────────────────────────────────────┐
+// │                              ЗМІСТ (ANCHORS)                                │
+// ├─────────────────────────────────────────────────────────────────────────────┤
+// │  #SECTION_HELP        - Система допомоги (HELP_CONTENT, showHelp)          │
+// │  #SECTION_AUTH        - Авторизація (renderAdmin, checkAdmin, logoutAdmin) │
+// │  #SECTION_DASHBOARD   - Головна панель (renderAdminDash, loadAdminEditor)  │
+// │  #SECTION_MENU_CONFIG - Збереження конфігурації меню                       │
+// │  #SECTION_RESUME      - Функції резюме (skills, langs, jobs, edu, rnd)     │
+// │  #SECTION_NOTES       - Менеджер нотаток Obsidian                          │
+// │  #SECTION_BLOG        - Керування блогом                                   │
+// │  #SECTION_TODO        - Список справ                                       │
+// │  #SECTION_GALLERY     - Галерея (фото + ASCII арт)                         │
+// │  #SECTION_GAMES       - Редактор ігор                                      │
+// │  #SECTION_HOME_PROF   - Профілі головної сторінки                          │
+// │  #SECTION_HOME_LINKS  - Посилання головної сторінки                        │
+// │  #SECTION_HOME_SAVE   - Збереження налаштувань Home                        │
+// │  #SECTION_ABOUT_LANG  - Мови розділу About                                 │
+// │  #SECTION_SYSTEM      - Системні налаштування (пароль, glitch, phrases)    │
+// │  #SECTION_CONTACTS    - Контакти та друзі                                  │
+// │  #SECTION_THEMES      - Керування темами                                   │
+// │  #SECTION_DOWNLOAD    - Завантаження data.js                               │
+// └─────────────────────────────────────────────────────────────────────────────┘
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_HELP - Система допомоги адміністратора
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * HELP_CONTENT - Контент довідки для адмін-панелі
+ * @property {Object} templates - Опис змінних шаблонів (UA/EN)
+ * @property {Object} global - Загальна інструкція адміністратора (UA/EN)
+ */
 const HELP_CONTENT = {
     templates: {
         ua: "<h3>Змінні Шаблонів</h3><ul><li>{{name}} - Ім'я</li><li>{{birth}} - Дата народження</li><li>{{email}} - Email</li><li>{{phone}} - Телефон</li><li>{{summary}} - Текст Про Мене</li><li>{{title_summary/skills/langs/jobs/edu/rnd}} - Заголовки секцій</li><li>{{skills_list}} - Список навичок</li><li>{{langs_list}} - Список мов</li><li>{{jobs_list}} - Досвід роботи (HTML/MD)</li><li>{{edu_list}} - Освіта (HTML/MD)</li><li>{{rnd_list}} - Список R&D</li></ul>",
@@ -10,9 +46,13 @@ const HELP_CONTENT = {
     }
 };
 
-window.currentHelpContext = null;
-window.currentHelpLang = 'ua';
+window.currentHelpContext = null;  // Поточний контекст довідки
+window.currentHelpLang = 'ua';      // Поточна мова довідки
 
+/**
+ * showHelp - Відображає модальне вікно довідки
+ * @param {string} context - Контекст довідки ('templates' або 'global')
+ */
 window.showHelp = function (context) {
     window.currentHelpContext = context;
     const overlay = document.createElement('div');
@@ -32,18 +72,34 @@ window.showHelp = function (context) {
     document.body.appendChild(overlay);
 }
 
+/**
+ * switchHelp - Перемикає мову довідки (UA/EN)
+ * @param {string} lang - Код мови ('ua' або 'en')
+ */
 window.switchHelp = function (lang) {
     window.currentHelpLang = lang;
     const c = document.getElementById('help-content');
     if (c) c.innerHTML = HELP_CONTENT[window.currentHelpContext][lang];
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_AUTH - Авторизація адміністратора
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * renderAdmin - Рендерить форму входу або панель адміністратора
+ * Перевіряє adminAuth та відображає відповідний інтерфейс
+ */
 function renderAdmin() {
     const v = document.getElementById('view');
     if (!adminAuth) {
         v.innerHTML = `<div class="admin-login"><h2 style="color:red; margin-bottom:20px;">SECURE ACCESS REQUIRED</h2><input type="password" id="admin-pass" class="admin-input" placeholder="Enter Password..." onkeypress="if(event.key==='Enter') checkAdmin()"><button class="btn" onclick="checkAdmin()">LOGIN</button></div>`;
     } else { renderAdminDash('home'); }
 }
+/**
+ * checkAdmin - Перевіряє введений пароль адміністратора
+ * Порівнює хеш введеного пароля з збереженим у systemData
+ */
 async function checkAdmin() {
     const p = document.getElementById('admin-pass').value;
     // Check against stored password
@@ -57,12 +113,25 @@ async function checkAdmin() {
     }
 }
 
+/**
+ * logoutAdmin - Вихід з адмін-панелі
+ * Скидає авторизацію та повертає на головну сторінку
+ */
 function logoutAdmin() {
     adminAuth = false;
     updateTreeVisuals();
     nav('home');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_DASHBOARD - Головна панель адміністратора
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * renderAdminDash - Рендерить головну панель адміністратора
+ * @param {string} section - Активна секція (home, resume, gallery тощо)
+ * Створює бокове меню та контейнер для редактора
+ */
 function renderAdminDash(section) {
     const v = document.getElementById('view');
     v.innerHTML = `<h2>ADMIN_PANEL</h2>
@@ -99,6 +168,11 @@ function renderAdminDash(section) {
     if (section) loadAdminEditor(section);
 }
 
+/**
+ * loadAdminEditor - Завантажує редактор для обраної секції
+ * @param {string} sec - Назва секції для редагування
+ * Генерує HTML форми залежно від типу контенту
+ */
 function loadAdminEditor(sec) {
     const el = document.getElementById('admin-editor');
     if (sec === 'resume') {
@@ -144,7 +218,14 @@ function loadAdminEditor(sec) {
         el.innerHTML = `<h3>Manage Blog Posts</h3><div class="item-list" id="adm-blog-list"></div><button class="btn" onclick="addBlogPost()">+ NEW POST</button>`;
         renderAdminBlogList();
     } else if (sec === 'todo') {
-        el.innerHTML = `<h3>Todo List Manager</h3><div class="todo-input-group"><input type="text" id="adm-new-todo" class="todo-input" placeholder="Admin task..." onkeypress="if(event.key==='Enter') addAdminTodo()"><button class="btn" onclick="addAdminTodo()">ADD</button></div><div class="item-list" id="adm-todo-list"></div>`;
+        el.innerHTML = `<h3>Todo List Manager</h3>
+                <div style="margin-bottom:20px; border:1px solid var(--dim); padding:10px;">
+                    <label class="opt-check" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                        <input type="checkbox" id="adm-todo-editable" ${systemData.todoEditable ? 'checked' : ''} onchange="saveTodoSettings()"> 
+                        <span><b>Allow User edit ToDo (Дозволити користувачам редагувати список)</b></span>
+                    </label>
+                </div>
+                <div class="todo-input-group"><input type="text" id="adm-new-todo" class="todo-input" placeholder="Admin task..." onkeypress="if(event.key==='Enter') addAdminTodo()"><button class="btn" onclick="addAdminTodo()">ADD</button></div><div class="item-list" id="adm-todo-list"></div>`;
         renderAdminTodo();
     } else if (sec === 'gallery') {
         el.innerHTML = `<h3>Manage Gallery (Images)</h3><div class="form-group"><label class="form-label">Upload Image:</label><input type="file" id="adm-img-upload" accept="image/*" class="form-control"></div><div class="form-group"><label class="form-label">Name:</label><input class="form-control" id="adm-img-name" placeholder="IMG_NAME"></div><button class="btn btn-green" onclick="uploadImage()">UPLOAD</button><hr><div class="item-list" id="adm-gal-list"></div>
@@ -296,6 +377,14 @@ function loadAdminEditor(sec) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_MENU_CONFIG - Конфігурація меню
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * saveMenuVis - Зберігає налаштування видимості пунктів меню
+ * Керує відображенням секцій: work, notes, blog, todo, gallery, game
+ */
 // --- MENU CONFIG SAVE ---
 window.saveMenuVis = function () {
     systemData.menuVisibility.work = document.getElementById('mv-work').checked;
@@ -309,8 +398,14 @@ window.saveMenuVis = function () {
     alert("Menu Configuration Saved!");
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_RESUME - Функції редагування резюме
+// ═══════════════════════════════════════════════════════════════════════════════
+
 // --- GLOBAL ADMIN FUNCTIONS ---
 
+// --- RESUME BASICS ---
+/** saveResumeBasics - Зберігає базові дані резюме (ім'я, email, телефон, опис) */
 // RESUME
 window.saveResumeBasics = function () {
     systemData.resume.name = document.getElementById('adm-res-name').value;
@@ -320,6 +415,7 @@ window.saveResumeBasics = function () {
     systemData.resume.summary = document.getElementById('adm-res-summary').value;
     saveData(); alert("Saved!");
 }
+/** uploadResumePhoto - Завантажує фото для резюме як base64 */
 window.uploadResumePhoto = function () {
     const file = document.getElementById('adm-res-photo-up').files[0];
     if (!file) return alert("Select file!");
@@ -327,20 +423,41 @@ window.uploadResumePhoto = function () {
     reader.onload = function (e) { systemData.resume.photo = e.target.result; saveData(); alert("Photo Updated!"); };
     reader.readAsDataURL(file);
 }
+// --- SKILLS ---
+/** renderAdminSkills - Рендерить список навичок з полями редагування */
 window.renderAdminSkills = function () { const l = document.getElementById('adm-skill-list'); l.innerHTML = systemData.resume.skills.map((s, i) => `<div class="item-row"><input class="form-control" style="width:50%" value="${s.n}" onchange="updateSkill(${i}, 'n', this.value)"><input type="number" class="form-control" style="width:20%" value="${s.p}" onchange="updateSkill(${i}, 'p', this.value)">%<button class="btn btn-red btn-sm" onclick="delSkill(${i})">X</button></div>`).join(''); }
+/** updateSkill - Оновлює навичку за індексом */
 window.updateSkill = function (i, f, v) { systemData.resume.skills[i][f] = v; saveData(); }
+/** addSkill - Додає нову навичку */
 window.addSkill = function () { systemData.resume.skills.push({ n: "New Skill", p: 50 }); saveData(); renderAdminSkills(); }
+/** delSkill - Видаляє навичку за індексом */
 window.delSkill = function (i) { if (confirm("Del?")) { systemData.resume.skills.splice(i, 1); saveData(); renderAdminSkills(); } }
+
+// --- LANGUAGES ---
+/** renderAdminLangs - Рендерить список мов */
 window.renderAdminLangs = function () { const l = document.getElementById('adm-lang-list'); l.innerHTML = systemData.resume.languages.map((lang, i) => `<div class="item-row"><input class="form-control" value="${lang}" onchange="updateLang(${i}, this.value)"><button class="btn btn-red btn-sm" onclick="delLang(${i})">X</button></div>`).join(''); }
+/** updateLang - Оновлює мову за індексом */
 window.updateLang = function (i, v) { systemData.resume.languages[i] = v; saveData(); }
+/** addLang - Додає нову мову */
 window.addLang = function () { systemData.resume.languages.push("New Language"); saveData(); renderAdminLangs(); }
+/** delLang - Видаляє мову за індексом */
+window.delLang = function (i) { if (confirm("Del?")) { systemData.resume.languages.splice(i, 1); saveData(); renderAdminLangs(); } }
+
+// --- JOBS (Experience) ---
+/** renderAdminJobs - Рендерить список досвіду роботи */
 window.delLang = function (i) { if (confirm("Del?")) { systemData.resume.languages.splice(i, 1); saveData(); renderAdminLangs(); } }
 window.renderAdminJobs = function () { const l = document.getElementById('adm-job-list'); l.innerHTML = systemData.resume.jobs.map((j, i) => `<div class="item-row"><span>${j.co}</span> <div><button class="btn btn-sm" onclick="editJob(${i})">EDIT</button> <button class="btn btn-red btn-sm" onclick="delJob(${i})">DEL</button></div></div>`).join(''); }
+/** addJob - Додає новий запис про роботу */
 window.addJob = function () { systemData.resume.jobs.unshift({ co: "New Corp", pos: "Position", per: "2024-2025", tasks: ["Task 1"] }); saveData(); renderAdminJobs(); editJob(0); }
+/** delJob - Видаляє запис про роботу */
 window.delJob = function (i) { if (confirm("Delete job?")) { systemData.resume.jobs.splice(i, 1); saveData(); renderAdminJobs(); document.getElementById('job-editor-area').style.display = 'none'; } }
+/** editJob - Відкриває редактор для запису про роботу */
 window.editJob = function (i) { const j = systemData.resume.jobs[i]; const area = document.getElementById('job-editor-area'); area.style.display = 'block'; area.innerHTML = `<h4>Editing: ${j.co}</h4><div class="form-group"><label>Company:</label><input class="form-control" id="ej-co" value="${j.co}"></div><div class="form-group"><label>Position:</label><input class="form-control" id="ej-pos" value="${j.pos}"></div><div class="form-group"><label>Period:</label><input class="form-control" id="ej-per" value="${j.per}"></div><div class="form-group"><label>Tasks (one per line):</label><textarea class="form-control" id="ej-tasks" style="height:100px">${j.tasks.join('\n')}</textarea></div><button class="btn btn-green" onclick="saveJob(${i})">SAVE JOB</button> <button class="btn" onclick="document.getElementById('job-editor-area').style.display='none'">CLOSE</button>`; }
+/** saveJob - Зберігає зміни до запису про роботу */
 window.saveJob = function (i) { const j = systemData.resume.jobs[i]; j.co = document.getElementById('ej-co').value; j.pos = document.getElementById('ej-pos').value; j.per = document.getElementById('ej-per').value; j.tasks = document.getElementById('ej-tasks').value.split('\n').filter(t => t.trim() !== ''); saveData(); renderAdminJobs(); alert("Job Updated!"); }
-window.renderAdminEdu = function () { const l = document.getElementById('adm-edu-list'); l.innerHTML = systemData.resume.education.map((e, i) => `<div class="item-row"><span>${e.inst}</span> <div><button class="btn btn-sm" onclick="editEdu(${i})">EDIT</button> <button class="btn btn-red btn-sm" onclick="delEdu(${i})">DEL</button></div></div>`).join(''); }
+
+// --- EDUCATION ---
+/** renderAdminEdu - Рендерить список освіти */
 window.addEdu = function () { systemData.resume.education.unshift({ inst: "University", year: "2020-2024", deg: "Degree" }); saveData(); renderAdminEdu(); editEdu(0); }
 window.delEdu = function (i) { if (confirm("Delete?")) { systemData.resume.education.splice(i, 1); saveData(); renderAdminEdu(); document.getElementById('edu-editor-area').style.display = 'none'; } }
 window.editEdu = function (i) { const e = systemData.resume.education[i]; const area = document.getElementById('edu-editor-area'); area.style.display = 'block'; area.innerHTML = `<h4>Editing: ${e.inst}</h4><div class="form-group"><label>Institution:</label><input class="form-control" id="ee-inst" value="${e.inst}"></div><div class="form-group"><label>Year:</label><input class="form-control" id="ee-year" value="${e.year}"></div><div class="form-group"><label>Degree:</label><input class="form-control" id="ee-deg" value="${e.deg}"></div><button class="btn btn-green" onclick="saveEdu(${i})">SAVE EDU</button> <button class="btn" onclick="document.getElementById('edu-editor-area').style.display='none'">CLOSE</button>`; }
@@ -350,6 +467,8 @@ window.updateRnd = function (i, v) { systemData.resume.rnd[i] = v; saveData(); }
 window.addRnd = function () { systemData.resume.rnd.push("New Project"); saveData(); renderAdminRnd(); }
 window.delRnd = function (i) { if (confirm("Del?")) { systemData.resume.rnd.splice(i, 1); saveData(); renderAdminRnd(); } }
 
+// --- RESUME TITLES & TEMPLATES ---
+/** saveResumeTitles - Зберігає заголовки секцій резюме */
 // RESUME CONFIG
 window.saveResumeTitles = function () {
     if (!systemData.resume.titles) systemData.resume.titles = {};
@@ -362,12 +481,18 @@ window.saveResumeTitles = function () {
     t.rnd = document.getElementById('rt-rnd').value;
     saveData(); alert("Titles Saved!");
 }
+/** saveResumeTemplates - Зберігає шаблони генерації DOC/MD */
 window.saveResumeTemplates = function () {
     systemData.resume.templates.doc = document.getElementById('tpl-doc').value;
     systemData.resume.templates.md = document.getElementById('tpl-md').value;
     saveData(); alert("Templates Saved!");
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_NOTES - Менеджер нотаток Obsidian
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderNoteCats - Рендерить список категорій нотаток */
 // NOTES
 window.renderNoteCats = function () {
     const l = document.getElementById('adm-note-cat-list'); l.innerHTML = systemData.obsidian.cats.map(c => {
@@ -403,6 +528,11 @@ window.addNoteFile = function () { const n = prompt("File Name (e.g. note.md):")
 window.delNoteFile = function (f, e) { e.stopPropagation(); if (confirm("Del File?")) { delete systemData.obsidian[admNoteCat][f]; if (admNoteFile === f) { admNoteFile = ''; document.getElementById('adm-note-content').style.display = 'none'; } saveData(); renderNoteFiles(); } }
 window.saveNoteContent = function () { if (admNoteCat && admNoteFile) { systemData.obsidian[admNoteCat][admNoteFile] = document.getElementById('adm-note-content').value; saveData(); alert("Note Saved!"); } }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_BLOG - Керування блогом
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderAdminBlogList - Рендерить список постів блогу */
 // BLOG
 window.renderAdminBlogList = function () { const l = document.getElementById('adm-blog-list'); l.innerHTML = systemData.blog.map((p, i) => `<div class="item-row"><span>${p.title}</span><div><button class="btn btn-sm" onclick="editBlog(${i})">EDIT</button><button class="btn btn-red btn-sm" onclick="delBlog(${i})">DEL</button></div></div>`).join(''); }
 window.addBlogPost = function () { systemData.blog.unshift({ id: Date.now(), title: "New Blog Post", date: new Date().toISOString().split('T')[0], tags: ["NEW"], snippet: "Description...", content: "Content..." }); saveData(); renderAdminBlogList(); editBlog(0); }
@@ -418,13 +548,22 @@ window.saveBlogEdit = function (i) {
     saveData(); renderAdminDash('blog');
 }
 window.delBlog = function (i) { if (confirm("Delete?")) { systemData.blog.splice(i, 1); saveData(); renderAdminBlogList(); } }
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_TODO - Список справ (Todo)
+// ═══════════════════════════════════════════════════════════════════════════════
 
+/** renderAdminTodo - Рендерить список завдань */
 // TODO
 window.renderAdminTodo = function () { const l = document.getElementById('adm-todo-list'); l.innerHTML = systemData.todos.map((t, i) => `<div class="item-row" style="${t.d ? 'opacity:0.5' : ''}"><span><input type="checkbox" ${t.d ? 'checked' : ''} onchange="toggleTodo(${i})"> ${t.t}</span><button class="btn btn-red btn-sm" onclick="delTodo(${i})">DEL</button></div>`).join(''); }
 window.addAdminTodo = function () { const inp = document.getElementById('adm-new-todo'); if (inp.value.trim()) { systemData.todos.push({ t: inp.value.trim(), d: false }); saveData(); renderAdminTodo(); inp.value = ''; } }
 window.toggleTodo = function (i) { systemData.todos[i].d = !systemData.todos[i].d; saveData(); renderAdminTodo(); }
 window.delTodo = function (i) { systemData.todos.splice(i, 1); saveData(); renderAdminTodo(); }
+window.saveTodoSettings = function () { systemData.todoEditable = document.getElementById('adm-todo-editable').checked; saveData(); }
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_GALLERY - Галерея (фото + ASCII арт)
+// ═══════════════════════════════════════════════════════════════════════════════
 
+/** uploadImage - Завантажує зображення з автоматичним resize до 1280x720 */
 // GALLERY
 window.uploadImage = function () {
     const file = document.getElementById('adm-img-upload').files[0];
@@ -473,15 +612,29 @@ window.renderAdminAsciiList = function () { const l = document.getElementById('a
 window.addAscii = function () { const name = document.getElementById('adm-asc-name').value; const content = document.getElementById('adm-asc-content').value; if (!name || !content) return alert("Fill all fields!"); systemData.gallery.ASCII_ART.unshift({ n: name, d: new Date().toISOString().split('T')[0], a: content }); saveData(); renderAdminAsciiList(); document.getElementById('adm-asc-name').value = ''; document.getElementById('adm-asc-content').value = ''; }
 window.delAscii = function (i) { if (confirm("Delete?")) { systemData.gallery.ASCII_ART.splice(i, 1); saveData(); renderAdminAsciiList(); } }
 
-// GAMES
-let editingGameId = null;
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_GAMES - Редактор ігор
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let editingGameId = null;  // ID гри що редагується
+/** renderAdminGameList - Рендерить список ігор */
 window.renderAdminGameList = function () { const l = document.getElementById('adm-game-list'); l.innerHTML = systemData.games.map((g) => `<div class="item-row"><span>${g.name}</span><div><button class="btn btn-sm" onclick="editGame('${g.id}')">EDIT CODE</button> <button class="btn btn-red btn-sm" onclick="delGame('${g.id}')">DEL</button></div></div>`).join(''); }
+/** createNewGame - Створює нову гру з шаблоном коду */
 window.createNewGame = function () { editingGameId = 'game_' + Date.now(); document.getElementById('game-editor-area').style.display = 'block'; document.getElementById('ge-heading').innerText = 'Creating New Game'; document.getElementById('ge-name').value = 'My New Game'; document.getElementById('ge-code').value = `// Game Code Here. \n// Container: document.getElementById('arena')\n\nconst arena = document.getElementById('arena');\narena.innerHTML = '<div style="padding:20px">Hello World</div>';`; }
+/** editGame - Відкриває редактор коду гри */
 window.editGame = function (id) { const g = systemData.games.find(x => x.id === id); if (!g) return; editingGameId = id; document.getElementById('game-editor-area').style.display = 'block'; document.getElementById('ge-heading').innerText = 'Editing: ' + g.name; document.getElementById('ge-name').value = g.name; document.getElementById('ge-code').value = g.code; }
+/** saveGameCode - Зберігає код гри */
 window.saveGameCode = function () { if (!editingGameId) return; const name = document.getElementById('ge-name').value; const code = document.getElementById('ge-code').value; const existingIndex = systemData.games.findIndex(x => x.id === editingGameId); if (existingIndex >= 0) { systemData.games[existingIndex].name = name; systemData.games[existingIndex].code = code; } else { systemData.games.push({ id: editingGameId, name: name, code: code }); } saveData(); renderAdminGameList(); alert("Game Saved!"); }
+/** delGame - Видаляє гру */
 window.delGame = function (id) { if (confirm("Delete Game?")) { systemData.games = systemData.games.filter(x => x.id !== id); saveData(); renderAdminGameList(); closeGameEditor(); } }
+/** closeGameEditor - Закриває редактор гри */
 window.closeGameEditor = function () { document.getElementById('game-editor-area').style.display = 'none'; editingGameId = null; }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_HOME_PROF - Профілі головної сторінки
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderAdminHomeProfiles - Рендерить список профілів (тегових груп) */
 // HOME PROFILES ADMIN FUNCTIONS
 window.renderAdminHomeProfiles = function () {
     const l = document.getElementById('adm-hp-list');
@@ -526,13 +679,13 @@ window.editHomeProfile = function (i) {
     document.getElementById('ehp-id').value = i;
     document.getElementById('ehp-name').value = p.name;
     document.getElementById('ehp-tags').value = p.tags.join(', ');
-    document.getElementById('ehp-pass').value = ''; // Don't show hash
+    document.getElementById('ehp-pass').value = '';
 }
 window.saveHomeProfile = async function () {
     const i = document.getElementById('ehp-id').value;
     const name = document.getElementById('ehp-name').value;
     const tagsVal = document.getElementById('ehp-tags').value;
-    const passVal = document.getElementById('ehp-pass').value; // New password or empty
+    const passVal = document.getElementById('ehp-pass').value;
 
     if (!name || !tagsVal) return alert("Fill Name and Tags!");
 
@@ -551,6 +704,11 @@ window.saveHomeProfile = async function () {
     alert("Profile Updated!");
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_HOME_LINKS - Посилання головної сторінки
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderAdminHomeLinks - Рендерить список веб-посилань */
 // HOME LINKS ADMIN FUNCTIONS
 window.renderAdminHomeLinks = function () {
     const l = document.getElementById('adm-hl-list');
@@ -586,22 +744,24 @@ window.delHomeLink = function (i) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_HOME_SAVE - Збереження налаштувань Home
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** saveHome - Зберігає налаштування Header, Home Screen, About */
 // HOME & SYS (UPDATED)
 window.saveHome = function () {
-    // Save Header/Branding fields
     systemData.home.logoText = document.getElementById('adm-home-logotxt').value;
     systemData.home.browserTitle = document.getElementById('adm-home-btitle').value;
 
-    // Save Home Screen Content
     systemData.home.ascii = document.getElementById('adm-home-ascii').value;
     systemData.home.title = document.getElementById('adm-home-title').value;
     systemData.home.text = document.getElementById('adm-home-text').value;
 
-    // Save About Photo Checkbox
     systemData.about.showPhoto = document.getElementById('adm-about-photo').checked;
 
     saveData();
-    renderDynamicLogo(); // Update header immediately
+    renderDynamicLogo();
     alert("Home/About Updated!");
 }
 
@@ -623,6 +783,11 @@ window.setAdminTriggerTheme = function (id) {
     alert("Admin trigger theme updated to: " + id);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_ABOUT_LANG - Мови розділу About
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderAboutLangList - Рендерить список мов для About */
 // ABOUT LANGUAGES
 window.renderAboutLangList = function () {
     const l = document.getElementById('adm-al-list');
@@ -662,20 +827,16 @@ window.saveAboutLang = function () {
     if (!code || !label) return alert("Code and Label required!");
 
     if (origCode && origCode !== code) {
-        // Renaming code (complicated, but let's allow it)
         const idx = systemData.about.languages.findIndex(x => x.code === origCode);
         if (idx !== -1) systemData.about.languages.splice(idx, 1);
     }
 
-    // Check if code exists (if new)
     if (!origCode && systemData.about.languages.find(x => x.code === code)) return alert("Code exists!");
 
     const idx = systemData.about.languages.findIndex(x => x.code === origCode || x.code === code);
     if (idx !== -1) {
-        // Update
         systemData.about.languages[idx] = { code, label, text };
     } else {
-        // Add
         systemData.about.languages.push({ code, label, text });
     }
 
@@ -693,6 +854,11 @@ window.delAboutLang = function (code) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_SYSTEM - Системні налаштування (пароль, glitch, phrases)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** saveSysPass - Зберігає новий пароль адміністратора */
 window.saveSysPass = async function () {
     const p = document.getElementById('adm-sys-pass').value;
     if (!p) return alert("Cannot be empty");
@@ -713,11 +879,15 @@ window.updPhrase = function (i, v) { systemData.glitch.footerPhrases[i] = v; sav
 window.delPhrase = function (i) { if (confirm("Del?")) { systemData.glitch.footerPhrases.splice(i, 1); saveData(); renderSysLists(); } }
 window.addPhrase = function () { systemData.glitch.footerPhrases.push("New Phrase"); saveData(); renderSysLists(); }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_CONTACTS - Контакти та друзі
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderAdminLinks - Рендерить список контактів та друзів */
 // LINKS (FRIENDS + CONTACTS)
 window.renderAdminLinks = function () {
     const l = document.getElementById('adm-link-list'); l.innerHTML = systemData.contacts.map((c, i) => `<div class="item-row"><div><input class="form-control" style="margin-bottom:2px" value="${c.label}" onchange="updLink(${i},'label',this.value)"><input class="form-control" style="font-size:0.8rem" value="${c.url}" onchange="updLink(${i},'url',this.value)"></div><button class="btn btn-red btn-sm" onclick="delLink(${i})">X</button></div>`).join('');
 
-    // Friends section
     const f = document.getElementById('adm-friend-list'); f.innerHTML = (systemData.friends || []).map((c, i) => `<div class="item-row"><div><input class="form-control" style="margin-bottom:2px" value="${c.label}" onchange="updFriend(${i},'label',this.value)"><input class="form-control" style="font-size:0.8rem; margin-bottom:2px" value="${c.url}" onchange="updFriend(${i},'url',this.value)"><select class="form-control" onchange="updFriend(${i},'status',this.value)" style="font-size:0.8rem"><option value="ONLINE" ${c.status === 'ONLINE' ? 'selected' : ''}>ONLINE</option><option value="OFFLINE" ${c.status === 'OFFLINE' ? 'selected' : ''}>OFFLINE</option></select></div><button class="btn btn-red btn-sm" onclick="delFriend(${i})">X</button></div>`).join('');
 }
 window.updLink = function (i, f, v) { systemData.contacts[i][f] = v; saveData(); }
@@ -736,9 +906,13 @@ window.toggleHireMe = function () {
     alert("Button Status: " + (cb.checked ? "ACTIVE" : "HIDDEN"));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_THEMES - Керування темами
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** renderAdminThemeList - Рендерить список всіх тем (стандартні + кастомні) */
 // THEMES ADMIN
 window.renderAdminThemeList = function () {
-    // Combine standard and custom themes for list
     const combined = [...themesList, ...systemData.themes.custom];
     const l = document.getElementById('adm-theme-list');
     l.innerHTML = combined.map(t => {
@@ -772,7 +946,7 @@ window.createCustomTheme = function () {
     saveData();
     updateCustomThemeCSS();
     renderAdminThemeList();
-    setTheme(id); // Immediately apply new theme
+    setTheme(id);
 
     alert("Theme Created!");
     document.getElementById('adm-theme-name').value = '';
@@ -782,7 +956,6 @@ window.delCustomTheme = function (id) {
     if (confirm("Delete this theme?")) {
         systemData.themes.custom = systemData.themes.custom.filter(t => t.id !== id);
 
-        // If deleted theme was active or default, revert to amber
         if (systemData.themes.defaultId === id) systemData.themes.defaultId = 'amber';
         if (document.body.classList.contains(`theme-${id}`)) setTheme('amber');
 
@@ -799,6 +972,14 @@ window.setDefaultTheme = function (id) {
     alert("Default Theme Updated!");
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_DOWNLOAD - Завантаження data.js
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * downloadSource - Генерує та завантажує data.js
+ * Створює файл з усіма налаштуваннями для заміни на сервері
+ */
 // --- DOWNLOAD DATA ---
 function downloadSource() {
     const dataStr = JSON.stringify(systemData, null, 4);
