@@ -4,6 +4,7 @@ const defaultData = {
     "themes": {
         "defaultId": "amber",
         "adminTriggerTheme": "mix-eva",
+        "font": "modern",
         "custom": []
     },
     "todoEditable": false,
