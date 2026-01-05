@@ -2109,21 +2109,26 @@ window.addBlogComment = function (postId) {
 // #SECTION_TODO - Список справ
 // ═══════════════════════════════════════════════════════════════════════════════
 
+function computeTodoStats(list) {
+    const todos = Array.isArray(list) ? list : [];
+    const total = todos.length;
+    const done = todos.filter(t => t.d).length;
+    const scheduled = todos.filter(t => t.due).length;
+    const progress = total ? Math.round((done / total) * 100) : 0;
+    return { total, done, scheduled, progress };
+}
+
 /** renderTodo - Рендерить контейнер списку справ */
 function renderTodo() {
     const v = document.getElementById('view');
     const editable = systemData.todoEditable;
-
-    const totalTasks = systemData.todos.length;
-    const doneTasks = systemData.todos.filter(t => t.d).length;
-    const scheduledTasks = systemData.todos.filter(t => t.due).length;
-    const progress = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+    const stats = computeTodoStats(systemData.todos);
 
     let html = `<h2>TODO_MANAGER ${editable ? '[EDIT_MODE]' : '[READ_ONLY]'}</h2>`;
     html += `<div class="todo-stats">
-        <div><strong>${doneTasks}/${totalTasks}</strong> completed</div>
-        <div class="progress"><span style="width:${progress}%;"></span></div>
-        <div>${scheduledTasks} scheduled</div>
+        <div><strong>${stats.done}/${stats.total}</strong> completed</div>
+        <div class="progress"><span style="width:${stats.progress}%;"></span></div>
+        <div>${stats.scheduled} scheduled</div>
     </div>`;
 
     if (editable) {
