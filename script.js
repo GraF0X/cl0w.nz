@@ -454,6 +454,7 @@ function initData() {
 
             if (!systemData.password) systemData.password = defaultData.password;
             if (!systemData.games) systemData.games = defaultData.games;
+            if (!systemData.picoCarts) systemData.picoCarts = JSON.parse(JSON.stringify(defaultData.picoCarts));
             if (typeof systemData.todoEditable === 'undefined') systemData.todoEditable = defaultData.todoEditable;
 
             if (!systemData.effects) systemData.effects = JSON.parse(JSON.stringify(defaultData.effects));
@@ -593,15 +594,18 @@ function toggleThemeMenu() {
 
     // EFFECTS SECTION
     const fx = systemData.effects || { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
+    const fxBtn = (key, label) => `<button class="btn btn-sm ${fx[key] ? 'active' : 'btn-ghost'}" onclick="toggleEffect('${key}')">${label}: ${fx[key] ? 'ON' : 'OFF'}</button>`;
 
     const fontChoice = (systemData.themes && systemData.themes.font) ? systemData.themes.font : 'modern';
     html += `<div class="theme-extras">
-        <label class="opt-check"><input type="checkbox" ${fx.glow ? 'checked' : ''} onchange="toggleEffect('glow')"> Glow FX</label>
-        <label class="opt-check"><input type="checkbox" ${fx.flicker ? 'checked' : ''} onchange="toggleEffect('flicker')"> Flicker</label>
-        <label class="opt-check"><input type="checkbox" ${fx.scanline ? 'checked' : ''} onchange="toggleEffect('scanline')"> Scanline+</label>
-        <label class="opt-check"><input type="checkbox" ${fx.svgGlow ? 'checked' : ''} onchange="toggleEffect('svgGlow')"> SVG Glow/Flicker</label>
-        <label class="opt-check"><input type="checkbox" ${fx.screenPulse ? 'checked' : ''} onchange="toggleEffect('screenPulse')"> Screen Pulse</label>
-        <label class="opt-check"><input type="checkbox" ${systemData.home.showIcons !== false ? 'checked' : ''} onchange="toggleIcons(this.checked)"> Show Menu Icons</label>
+        <div class="theme-toggle-row">
+            ${fxBtn('glow', 'Glow')}
+            ${fxBtn('flicker', 'Flicker')}
+            ${fxBtn('scanline', 'Scanlines')}
+            ${fxBtn('svgGlow', 'SVG Glow')}
+            ${fxBtn('screenPulse', 'Screen Pulse')}
+            <button class="btn btn-sm ${systemData.home.showIcons !== false ? 'active' : 'btn-ghost'}" onclick="toggleIcons()">Icons: ${systemData.home.showIcons !== false ? 'ON' : 'OFF'}</button>
+        </div>
         <div class="font-switcher">
             <div style="font-size:0.75rem; opacity:0.75;">Font</div>
             <button class="btn btn-sm ${fontChoice === 'modern' ? 'active' : ''}" onclick="setFontChoice('modern')">Mono</button>
@@ -653,9 +657,10 @@ window.setFontChoice = function (fontId) {
 
 window.toggleIcons = function (show) {
     if (!systemData.home) systemData.home = {};
-    systemData.home.showIcons = show;
+    const next = typeof show === 'boolean' ? show : systemData.home.showIcons === false ? true : false;
+    systemData.home.showIcons = next;
     saveData();
-    document.body.classList.toggle('no-icons', !show);
+    document.body.classList.toggle('no-icons', !next);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -724,7 +729,10 @@ document.addEventListener('click', resetIdleTimer);
 
 window.startScreensaver = function (previewType) {
     if (ssActive) return;
+    if (!systemData.screensaver) systemData.screensaver = { enabled: true, timeout: 60, type: 'matrix' };
     const type = previewType || (systemData.screensaver ? systemData.screensaver.type : 'matrix');
+    systemData.screensaver.type = type;
+    saveData();
 
     let overlay = document.getElementById('screensaver-overlay');
     if (!overlay) {
@@ -1419,11 +1427,11 @@ function renderWork() {
             <div class="work-card">
                 <h3>QR CODE GENERATOR</h3>
                 <div class="form-group">
-                    <label>Text / URL <span style="opacity:0.6; font-size:0.8rem;">(max 256 chars)</span></label>
-                    <textarea id="qr-text" class="translit-area" style="height:80px;" maxlength="256" placeholder="https://example.com" oninput="autoPreviewQR(); document.getElementById('qr-limit').innerText=this.value.length + '/256';"></textarea>
-                    <div id="qr-limit" style="font-size:0.8rem; opacity:0.6; text-align:right;">0/256</div>
+                    <label>Text / URL <span style="opacity:0.6; font-size:0.8rem;">(up to 5KB, paged)</span></label>
+                    <textarea id="qr-text" class="translit-area" style="height:80px;" maxlength="5120" placeholder="https://example.com" oninput="autoPreviewQR(); document.getElementById('qr-limit').innerText=this.value.length + '/5120';"></textarea>
+                    <div id="qr-limit" style="font-size:0.8rem; opacity:0.6; text-align:right;">0/5120</div>
                 </div>
-                <div class="form-group" style="display:flex; gap:10px; flex-wrap:wrap;">
+                <div class="form-group" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                     <label class="opt-check">Size:
                         <input type="range" id="qr-size" min="120" max="420" value="256" oninput="document.getElementById('qr-size-val').innerText=this.value; autoPreviewQR();">
                         <span id="qr-size-val">256</span>px
@@ -1431,10 +1439,13 @@ function renderWork() {
                     <label class="opt-check">Format:
                         <select id="qr-format" onchange="autoPreviewQR()"><option value="png">PNG</option><option value="svg">SVG</option></select>
                     </label>
+                    <div class="muted" id="qr-page-info" style="margin-left:auto;">SINGLE QR</div>
                 </div>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
                     <button class="btn" onclick="generateQR()">GENERATE</button>
                     <button class="btn" onclick="downloadQR()">DOWNLOAD</button>
+                    <button class="btn btn-sm" onclick="shiftQRPage(-1)">PREV</button>
+                    <button class="btn btn-sm" onclick="shiftQRPage(1)">NEXT</button>
                 </div>
                 <div id="qr-preview" class="qr-preview">
                     <canvas id="qr-canvas" width="256" height="256" aria-label="QR preview"></canvas>
@@ -1455,7 +1466,8 @@ function renderWork() {
     const qrInput = document.getElementById('qr-text');
     if (qrInput) {
         qrInput.value = rememberedQR;
-        document.getElementById('qr-limit').innerText = `${qrInput.value.length}/256`;
+        const limitBox = document.getElementById('qr-limit');
+        if (limitBox) limitBox.innerText = `${qrInput.value.length}/5120`;
     }
     generatePass();
     autoPreviewQR();
@@ -1483,108 +1495,115 @@ const mapUA_Start = { 'є': 'ye', 'ї': 'yi', 'й': 'y', 'ю': 'yu', 'я': 'ya' 
  */
 function doTranslit(dir) { if (dir === 'ua') { let src = document.getElementById('tr-ua').value; let out = ""; let temp = src.replace(/зг/g, "zgh").replace(/Зг/g, "Zgh").replace(/ЗГ/g, "ZGH"); for (let i = 0; i < temp.length; i++) { const c = temp[i]; const low = c.toLowerCase(); const isUp = c !== low; const isStart = (i === 0 || /[\s\n\t\.,!?]/.test(temp[i - 1])); let tr = ""; if (isStart && mapUA_Start[low]) tr = mapUA_Start[low]; else if (mapUA[low] !== undefined) tr = mapUA[low]; else tr = c; if (tr.length > 0) { if (isUp) { if (tr.length > 1 && temp[i + 1] && temp[i + 1] === temp[i + 1].toUpperCase()) tr = tr.toUpperCase(); else tr = tr.charAt(0).toUpperCase() + tr.slice(1); } } out += tr; } document.getElementById('tr-en').value = out; } else { let src = document.getElementById('tr-en').value; src = src.replace(/zgh/gi, "зг"); const revMapMulti = [{ k: 'shch', v: 'щ' }, { k: 'zh', v: 'ж' }, { k: 'kh', v: 'х' }, { k: 'ts', v: 'ц' }, { k: 'ch', v: 'ч' }, { k: 'sh', v: 'ш' }, { k: 'ye', v: 'є' }, { k: 'yi', v: 'ї' }, { k: 'yu', v: 'ю' }, { k: 'ya', v: 'я' }, { k: 'ia', v: 'я' }, { k: 'ie', v: 'є' }, { k: 'iu', v: 'ю' }]; for (let pair of revMapMulti) { const reg = new RegExp(pair.k, "gi"); src = src.replace(reg, (match) => { const isUp = match[0] === match[0].toUpperCase(); return isUp ? pair.v.toUpperCase() : pair.v; }); } const revMapSingle = { 'a': 'а', 'b': 'б', 'v': 'в', 'h': 'г', 'g': 'ґ', 'd': 'д', 'e': 'е', 'z': 'з', 'y': 'и', 'i': 'і', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф' }; let out = ""; for (let i = 0; i < src.length; i++) { const c = src[i]; const low = c.toLowerCase(); const isUp = c !== low; if (revMapSingle[low]) out += isUp ? revMapSingle[low].toUpperCase() : revMapSingle[low]; else out += c; } document.getElementById('tr-ua').value = out; } }
 
-// --- QR GENERATOR (VERSION 1-L, OFFLINE) ---
-const gfExp = new Array(512);
-const gfLog = new Array(256);
-(function initGalois() {
-    let x = 1;
-    for (let i = 0; i < 255; i++) {
-        gfExp[i] = x;
-        gfLog[x] = i;
-        x <<= 1;
-        if (x & 0x100) x ^= 0x11d;
+// --- QR GENERATOR (VERSION 1-L, OFFLINE, PAGED UP TO 5KB) ---
+const qrEncoder = (() => {
+    const gfExp = new Array(512);
+    const gfLog = new Array(256);
+    (function initGalois() {
+        let x = 1;
+        for (let i = 0; i < 255; i++) {
+            gfExp[i] = x;
+            gfLog[x] = i;
+            x <<= 1;
+            if (x & 0x100) x ^= 0x11d;
+        }
+        for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
+    })();
+    function gfMul(a, b) { if (a === 0 || b === 0) return 0; return gfExp[gfLog[a] + gfLog[b]]; }
+    function rsGeneratorPoly(ec) {
+        let poly = [1];
+        for (let i = 0; i < ec; i++) {
+            poly = polyMultiply(poly, [1, gfExp[i]]);
+        }
+        return poly;
     }
-    for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
+    function polyMultiply(p, q) {
+        const res = new Array(p.length + q.length - 1).fill(0);
+        for (let i = 0; i < p.length; i++) {
+            for (let j = 0; j < q.length; j++) res[i + j] ^= gfMul(p[i], q[j]);
+        }
+        return res;
+    }
+    function reedSolomon(data, ec) {
+        const gen = rsGeneratorPoly(ec);
+        const res = new Array(ec).fill(0);
+        data.forEach((byte) => {
+            const factor = byte ^ res[0];
+            res.shift(); res.push(0);
+            gen.slice(1).forEach((coef, idx) => { res[idx] ^= gfMul(coef, factor); });
+        });
+        return res;
+    }
+
+    function encodeQRBytes(text) {
+        const bytes = Array.from(new TextEncoder().encode(text));
+        if (bytes.length > 17) throw new Error('Chunk too long for offline QR page (17 bytes max).');
+        const bits = [];
+        const pushBits = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
+        pushBits(0b0100, 4); // Byte mode
+        pushBits(bytes.length, 8);
+        bytes.forEach((b) => pushBits(b, 8));
+        pushBits(0, Math.min(4, 152 - bits.length));
+        while (bits.length % 8 !== 0) bits.push(0);
+        const data = [];
+        for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+        const pad = [0xec, 0x11]; let padIdx = 0;
+        while (data.length < 19) { data.push(pad[padIdx % 2]); padIdx++; }
+        return data;
+    }
+
+    function buildQRMatrix(text) {
+        const data = encodeQRBytes(text);
+        const ecc = reedSolomon(data, 7);
+        const codewords = data.concat(ecc);
+        const size = 21;
+        const m = Array.from({ length: size }, () => Array(size).fill(null));
+
+        const placeFinder = (x, y) => {
+            for (let dy = 0; dy < 7; dy++) {
+                for (let dx = 0; dx < 7; dx++) {
+                    const on = (dx === 0 || dx === 6 || dy === 0 || dy === 6) || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
+                    m[y + dy][x + dx] = on;
+                }
+            }
+        };
+        placeFinder(0, 0); placeFinder(size - 7, 0); placeFinder(0, size - 7);
+        for (let i = 0; i < 8; i++) { m[7][i] = false; m[i][7] = false; m[7][size - 1 - i] = false; m[size - 1 - i][7] = false; m[i][size - 8] = false; m[size - 8][i] = false; }
+        for (let i = 0; i < size; i++) { if (m[6][i] === null) m[6][i] = i % 2 === 0; if (m[i][6] === null) m[i][6] = i % 2 === 0; }
+        m[size - 8][8] = true; // Dark module
+
+        const dataBits = [];
+        codewords.forEach((cw) => { for (let i = 7; i >= 0; i--) dataBits.push((cw >> i) & 1); });
+        let bitIdx = 0; let upward = true;
+        for (let col = size - 1; col > 0; col -= 2) {
+            if (col === 6) col--;
+            for (let rowOffset = 0; rowOffset < size; rowOffset++) {
+                const row = upward ? size - 1 - rowOffset : rowOffset;
+                for (let dx = 0; dx < 2; dx++) {
+                    const c = col - dx;
+                    if (m[row][c] !== null) continue;
+                    const bit = bitIdx < dataBits.length ? dataBits[bitIdx++] : 0;
+                    const masked = bit ^ ((row + c) % 2 === 0 ? 1 : 0);
+                    m[row][c] = !!masked;
+                }
+            }
+            upward = !upward;
+        }
+
+        const formatBits = 0b111011111000100; // Level L + mask 0
+        const fmtCoordsA = [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]];
+        const fmtCoordsB = [[20, 8], [19, 8], [18, 8], [17, 8], [16, 8], [15, 8], [14, 8], [13, 8], [8, 13], [8, 14], [8, 15], [8, 16], [8, 17], [8, 18], [8, 19]];
+        const fmtBit = (idx) => ((formatBits >> (14 - idx)) & 1) === 1;
+        fmtCoordsA.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+        fmtCoordsB.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+        return m;
+    }
+
+    return { buildQRMatrix };
 })();
-function gfMul(a, b) { if (a === 0 || b === 0) return 0; return gfExp[gfLog[a] + gfLog[b]]; }
-function rsGeneratorPoly(ec) {
-    let poly = [1];
-    for (let i = 0; i < ec; i++) {
-        poly = polyMultiply(poly, [1, gfExp[i]]);
-    }
-    return poly;
-}
-function polyMultiply(p, q) {
-    const res = new Array(p.length + q.length - 1).fill(0);
-    for (let i = 0; i < p.length; i++) {
-        for (let j = 0; j < q.length; j++) res[i + j] ^= gfMul(p[i], q[j]);
-    }
-    return res;
-}
-function reedSolomon(data, ec) {
-    const gen = rsGeneratorPoly(ec);
-    const res = new Array(ec).fill(0);
-    data.forEach((byte) => {
-        const factor = byte ^ res[0];
-        res.shift(); res.push(0);
-        gen.slice(1).forEach((coef, idx) => { res[idx] ^= gfMul(coef, factor); });
-    });
-    return res;
-}
 
-function encodeQRBytes(text) {
-    const bytes = Array.from(new TextEncoder().encode(text));
-    if (bytes.length > 17) throw new Error('Text too long for offline QR (17 bytes max).');
-    const bits = [];
-    const pushBits = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
-    pushBits(0b0100, 4); // Byte mode
-    pushBits(bytes.length, 8);
-    bytes.forEach((b) => pushBits(b, 8));
-    pushBits(0, Math.min(4, 152 - bits.length));
-    while (bits.length % 8 !== 0) bits.push(0);
-    const data = [];
-    for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
-    const pad = [0xec, 0x11]; let padIdx = 0;
-    while (data.length < 19) { data.push(pad[padIdx % 2]); padIdx++; }
-    return data;
-}
-
-function buildQRMatrix(text) {
-    const data = encodeQRBytes(text);
-    const ecc = reedSolomon(data, 7);
-    const codewords = data.concat(ecc);
-    const size = 21;
-    const m = Array.from({ length: size }, () => Array(size).fill(null));
-
-    const placeFinder = (x, y) => {
-        for (let dy = 0; dy < 7; dy++) {
-            for (let dx = 0; dx < 7; dx++) {
-                const on = (dx === 0 || dx === 6 || dy === 0 || dy === 6) || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
-                m[y + dy][x + dx] = on;
-            }
-        }
-    };
-    placeFinder(0, 0); placeFinder(size - 7, 0); placeFinder(0, size - 7);
-    for (let i = 0; i < 8; i++) { m[7][i] = false; m[i][7] = false; m[7][size - 1 - i] = false; m[size - 1 - i][7] = false; m[i][size - 8] = false; m[size - 8][i] = false; }
-    for (let i = 0; i < size; i++) { if (m[6][i] === null) m[6][i] = i % 2 === 0; if (m[i][6] === null) m[i][6] = i % 2 === 0; }
-    m[size - 8][8] = true; // Dark module
-
-    const dataBits = [];
-    codewords.forEach((cw) => { for (let i = 7; i >= 0; i--) dataBits.push((cw >> i) & 1); });
-    let bitIdx = 0; let upward = true;
-    for (let col = size - 1; col > 0; col -= 2) {
-        if (col === 6) col--;
-        for (let rowOffset = 0; rowOffset < size; rowOffset++) {
-            const row = upward ? size - 1 - rowOffset : rowOffset;
-            for (let dx = 0; dx < 2; dx++) {
-                const c = col - dx;
-                if (m[row][c] !== null) continue;
-                const bit = bitIdx < dataBits.length ? dataBits[bitIdx++] : 0;
-                const masked = bit ^ ((row + c) % 2 === 0 ? 1 : 0);
-                m[row][c] = !!masked;
-            }
-        }
-        upward = !upward;
-    }
-
-    const formatBits = 0b111011111000100; // Level L + mask 0
-    const fmtCoordsA = [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]];
-    const fmtCoordsB = [[20, 8], [19, 8], [18, 8], [17, 8], [16, 8], [15, 8], [14, 8], [13, 8], [8, 13], [8, 14], [8, 15], [8, 16], [8, 17], [8, 18], [8, 19]];
-    const fmtBit = (idx) => ((formatBits >> (14 - idx)) & 1) === 1;
-    fmtCoordsA.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
-    fmtCoordsB.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
-    return m;
-}
+let lastQRPages = [];
+let lastQRIndex = 0;
 
 function drawQRToCanvas(matrix, size, canvas) {
     const ctx = canvas.getContext('2d');
@@ -1624,18 +1643,43 @@ function generateQR() {
     const size = parseInt((sizeEl && sizeEl.value) ? sizeEl.value : '256');
     const format = formatEl && formatEl.value ? formatEl.value : 'png';
     lastQRFormat = format; lastQRSize = size; lastQRText = txt;
+    const info = document.getElementById('qr-page-info');
+    if (info) info.innerText = '';
     if (!txt.trim()) { const canvas = document.getElementById('qr-canvas'); if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillText('Enter text', 10, 20); } return; }
-    if (txt.length > 256) {
-        showModal({ title: 'QR LIMIT', body: 'Please keep QR content within 256 characters.' });
+    const bytes = Array.from(new TextEncoder().encode(txt.trim()));
+    const maxBytes = 5120;
+    if (bytes.length > maxBytes) {
+        showModal({ title: 'QR LIMIT', body: `Please keep QR content within ${maxBytes} bytes (~5KB).` });
         return;
     }
+
+    const decoder = new TextDecoder();
+    const chunked = [];
+    for (let i = 0; i < bytes.length; i += 17) {
+        const slice = bytes.slice(i, i + 17);
+        chunked.push(decoder.decode(new Uint8Array(slice)));
+    }
+
+    lastQRPages = [];
+    lastQRIndex = 0;
     try {
-        lastQRMatrix = buildQRMatrix(txt.trim());
+        chunked.forEach((chunk) => {
+            lastQRPages.push(qrEncoder.buildQRMatrix(chunk));
+        });
+        lastQRMatrix = lastQRPages[0];
     } catch (e) {
         showModal({ title: 'QR ERROR', body: e.message || 'Unable to build QR' });
         return;
     }
 
+    renderQRPage(size, format);
+}
+
+function renderQRPage(size, format) {
+    if (!lastQRPages.length) return;
+    if (lastQRIndex >= lastQRPages.length) lastQRIndex = lastQRPages.length - 1;
+    if (lastQRIndex < 0) lastQRIndex = 0;
+    lastQRMatrix = lastQRPages[lastQRIndex];
     const canvas = document.getElementById('qr-canvas');
     const svgBox = document.getElementById('qr-svg');
     if (canvas) drawQRToCanvas(lastQRMatrix, size, canvas);
@@ -1650,6 +1694,8 @@ function generateQR() {
             svgBox.innerHTML = '';
         }
     }
+    const info = document.getElementById('qr-page-info');
+    if (info) info.innerText = lastQRPages.length > 1 ? `PAGE ${lastQRIndex + 1} / ${lastQRPages.length}` : 'SINGLE QR';
 }
 
 function downloadQR() {
@@ -1659,16 +1705,26 @@ function downloadQR() {
         const blob = new Blob([svg], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'qr.svg'; a.click(); URL.revokeObjectURL(url);
+        const suffix = lastQRPages.length > 1 ? `-${lastQRIndex + 1}` : '';
+        a.href = url; a.download = `qr${suffix}.svg`; a.click(); URL.revokeObjectURL(url);
     } else {
         const canvas = document.getElementById('qr-canvas');
         drawQRToCanvas(lastQRMatrix, lastQRSize, canvas);
         canvas.toBlob((blob) => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = 'qr.png'; a.click(); URL.revokeObjectURL(url);
+            const suffix = lastQRPages.length > 1 ? `-${lastQRIndex + 1}` : '';
+            a.href = url; a.download = `qr${suffix}.png`; a.click(); URL.revokeObjectURL(url);
         });
     }
+}
+
+function shiftQRPage(dir) {
+    if (!lastQRPages.length) return;
+    lastQRIndex += dir;
+    if (lastQRIndex < 0) lastQRIndex = 0;
+    if (lastQRIndex >= lastQRPages.length) lastQRIndex = lastQRPages.length - 1;
+    renderQRPage(lastQRSize, lastQRFormat);
 }
 
 // --- CRYPTO HELPER ---
@@ -2039,8 +2095,10 @@ function renderTodo() {
     const v = document.getElementById('view');
     const editable = systemData.todoEditable;
 
-    // Initialize events
-    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+    const totalTasks = systemData.todos.length;
+    const doneTasks = systemData.todos.filter(t => t.d).length;
+    const scheduledTasks = systemData.todos.filter(t => t.due).length;
+    const progress = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
     const totalTasks = systemData.todos.length;
     const doneTasks = systemData.todos.filter(t => t.d).length;
@@ -2118,34 +2176,29 @@ function renderCalendar() {
     const listBtn = document.getElementById('list-view-btn');
     if (listBtn) listBtn.style.display = 'inline-block';
 
-    // Ensure data exists
-    if (!systemData.calendarEvents) systemData.calendarEvents = [];
-
     const now = new Date();
-    // Use current view state if we want to navigate months, but for now simple:
     const m = now.getMonth();
     const y = now.getFullYear();
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
 
-    let html = `<div class="calendar-grid">`;
-    // Headers
+    const events = (systemData.todos || []).filter(t => t.due).map((t, idx) => ({ date: t.due, title: t.t, time: t.time || 'All Day', idx }));
+
+    let html = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-weight:bold;">${y}-${String(m + 1).padStart(2, '0')}</div>
+        <button class="btn btn-sm" onclick="renderTodoList()">BACK TO LIST</button>
+    </div>`;
+    html += `<div class="calendar-grid">`;
     ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(d => html += `<div style="text-align:center; font-weight:bold; border-bottom:1px solid var(--text); padding:5px 0;">${d}</div>`);
-
-    // Empty cells
     for (let i = 0; i < firstDay; i++) html += `<div></div>`;
-
-    // Days
     for (let i = 1; i <= daysInMonth; i++) {
         const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        // Find events
-        const events = systemData.calendarEvents.filter(e => e.date === dateStr);
-        const hasEv = events.length > 0;
-
+        const dayEvents = events.filter(e => e.date === dateStr);
+        const hasEv = dayEvents.length > 0;
         html += `<div class="cal-day" onclick="openCalDate('${dateStr}')" style="border:1px solid var(--dim); min-height:80px; padding:5px; cursor:pointer; position:relative;">
             <div style="font-weight:bold; opacity:${hasEv ? 1 : 0.5}; margin-bottom:5px;">${i}</div>
             <div style="font-size:0.65rem; line-height:1.2;">
-                ${events.map(e => `<div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:var(--dim); margin-bottom:2px; padding:1px;">• ${e.title}</div>`).join('')}
+                ${dayEvents.map(e => `<div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:var(--dim); margin-bottom:2px; padding:1px;">• ${e.title}</div>`).join('')}
             </div>
             ${i === now.getDate() ? '<div style="position:absolute; top:5px; right:5px; width:8px; height:8px; background:var(--text); border-radius:50%;"></div>' : ''}
         </div>`;
@@ -2156,7 +2209,7 @@ function renderCalendar() {
 }
 
 window.openCalDate = function (date) {
-    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+    if (!systemData.todos) systemData.todos = [];
     const wrapper = document.createElement('div');
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
@@ -2166,7 +2219,7 @@ window.openCalDate = function (date) {
     listBox.className = 'cal-event-list';
 
     const renderList = () => {
-        const events = systemData.calendarEvents.filter(e => e.date === date);
+        const events = systemData.todos.filter(e => e.due === date);
         if (!events.length) {
             listBox.innerHTML = '<div style="opacity:0.6;">No events for this date</div>';
             return;
@@ -2182,14 +2235,13 @@ window.openCalDate = function (date) {
             delBtn.onclick = () => {
                 showConfirm('Delete this event?').then((ok) => {
                     if (!ok) return;
-                    const dayEvents = systemData.calendarEvents.filter(ev => ev.date === date);
-                    const target = dayEvents[idx];
+                    const target = systemData.todos.filter(t => t.due === date)[idx];
                     if (!target) return;
-                    const realIdx = systemData.calendarEvents.indexOf(target);
-                    if (realIdx > -1) systemData.calendarEvents.splice(realIdx, 1);
+                    const realIdx = systemData.todos.indexOf(target);
+                    if (realIdx > -1) systemData.todos.splice(realIdx, 1);
                     saveData();
                     renderList();
-                    renderCalendar();
+                    renderTodoList();
                 });
             };
             row.appendChild(delBtn);
@@ -2215,11 +2267,11 @@ window.openCalDate = function (date) {
     addBtn.onclick = () => {
         const time = form.querySelector('#cal-time').value || 'All Day';
         const title = form.querySelector('#cal-title').value.trim() || 'Event';
-        systemData.calendarEvents.push({ date, time, title });
+        systemData.todos.push({ t: title, due: date, time, d: false });
         saveData();
         form.querySelector('#cal-title').value = '';
         renderList();
-        renderCalendar();
+        renderTodoList();
     };
 
     renderList();
@@ -2233,7 +2285,7 @@ window.openCalDate = function (date) {
 window.exportTodoData = function () {
     const data = {
         todos: systemData.todos,
-        calendar: systemData.calendarEvents
+        calendar: []
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2258,7 +2310,6 @@ window.exportTodoICS = function () {
         lines.push('SUMMARY:' + title);
         lines.push('END:VEVENT');
     };
-    (systemData.calendarEvents || []).forEach((ev) => pushEvent(ev.title || 'Event', ev.date, ev.time && ev.time !== 'All Day' ? ev.time : ''));
     (systemData.todos || []).forEach((t) => pushEvent(t.t, t.due, t.time));
     lines.push('END:VCALENDAR');
     const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
@@ -2275,7 +2326,13 @@ window.importTodoData = function (acc) {
         try {
             const d = JSON.parse(e.target.result);
             if (d.todos) systemData.todos = d.todos;
-            if (d.calendar) systemData.calendarEvents = d.calendar;
+            if (Array.isArray(d.calendar)) {
+                d.calendar.forEach(ev => {
+                    if (ev && ev.date && ev.title) {
+                        systemData.todos.push({ t: ev.title, due: ev.date, time: ev.time || 'All Day', d: false });
+                    }
+                });
+            }
             saveData();
             showToast('Tasks Imported!', 'success');
             renderTodo();
@@ -2298,10 +2355,6 @@ function addTodoItem() {
     if (dueDate) item.due = dueDate;
     if (dueTime) item.time = dueTime;
     systemData.todos.push(item);
-    if (dueDate) {
-        if (!systemData.calendarEvents) systemData.calendarEvents = [];
-        systemData.calendarEvents.push({ date: dueDate, time: dueTime || 'All Day', title: item.t });
-    }
     saveData();
     renderTodoList();
     inp.value = '';
@@ -2359,14 +2412,6 @@ function openTodoDetail(i) {
                     item.time = time || undefined;
                     item.d = done;
 
-                    if (!systemData.calendarEvents) systemData.calendarEvents = [];
-                    if (prevDue) {
-                        systemData.calendarEvents = systemData.calendarEvents.filter(ev => !(ev.title === prevTitle && ev.date === prevDue));
-                    }
-                    if (item.due) {
-                        systemData.calendarEvents.push({ date: item.due, time: item.time || 'All Day', title: item.t });
-                    }
-
                     saveData();
                     renderTodoList();
                 }
@@ -2383,7 +2428,10 @@ function renderGameMenu() {
     const v = document.getElementById('view');
     // MERGED RENDER GAME MENU
     const gameList = Array.isArray(systemData.games) ? systemData.games : [];
-    const customGames = gameList.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
+    const reserved = ['snake', 'tetris', 'pong', 'pico8'];
+    const customGames = gameList
+        .filter((g) => g && g.id && reserved.indexOf(g.id) === -1)
+        .map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
 
     v.innerHTML = `<h2>GAME_CENTER</h2>
     <div class="game-hub">
@@ -2394,7 +2442,7 @@ function renderGameMenu() {
         ${customGames}
     </div>
     <div class="game-panels">
-        <div id="game-area" class="game-area" style="display:none; width:640px; height:480px;">
+        <div id="game-area" class="game-area" style="display:none;">
             <canvas id="game-canvas" width="640" height="480"></canvas>
             <div class="game-hint">Arrows to move. Space/Enter to rotate. Esc to exit.</div>
         </div>
@@ -2404,6 +2452,11 @@ function renderGameMenu() {
                 <button class="btn" onclick="loadPicoCart()">LOAD CART</button>
                 <button class="btn" onclick="playPicoDemo()">PLAY CELESTE</button>
             </div>
+            <div class="game-toolbar">
+                <input id="pico-name" class="todo-input" placeholder="Cart name" style="max-width:220px;">
+                <button class="btn btn-sm" onclick="savePicoEntry()">SAVE TO LIST</button>
+            </div>
+            <div id="pico-list" class="pico-list"></div>
             <iframe id="pico-frame" src="" style="width:100%; height:70vh; border:1px solid var(--text); background:#000;"></iframe>
         </div>
     </div>
@@ -2411,6 +2464,8 @@ function renderGameMenu() {
         <div id="game-status" aria-live="polite">Select a game to start.</div>
         <button class="btn btn-red" onclick="stopGames()">EXIT_GAME</button>
     </div>`;
+
+    renderPicoList();
 }
 
 window.loadPicoCart = function () {
@@ -2431,6 +2486,67 @@ window.playPicoDemo = function () {
     if (status) status.innerText = 'Playing Celeste demo';
 }
 
+function renderPicoList() {
+    const box = document.getElementById('pico-list');
+    if (!box) return;
+    if (!Array.isArray(systemData.picoCarts)) systemData.picoCarts = [];
+    if (!systemData.picoCarts.length) {
+        box.innerHTML = '<div class="muted">No saved carts yet.</div>';
+        return;
+    }
+    box.innerHTML = '';
+    systemData.picoCarts.forEach((c, idx) => {
+        const row = document.createElement('div');
+        row.className = 'pico-item';
+        row.innerHTML = `<div class="pico-title">${c.name || 'Cart ' + (idx + 1)}</div><div class="pico-url">${c.url}</div>`;
+        const actions = document.createElement('div');
+        actions.className = 'pico-actions';
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'btn btn-sm';
+        loadBtn.innerText = 'LOAD';
+        loadBtn.onclick = () => loadSavedPico(idx);
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-sm btn-red';
+        delBtn.innerText = 'DEL';
+        delBtn.onclick = () => removePicoEntry(idx);
+        actions.appendChild(loadBtn);
+        actions.appendChild(delBtn);
+        row.appendChild(actions);
+        box.appendChild(row);
+    });
+}
+
+window.savePicoEntry = function () {
+    const nameInput = document.getElementById('pico-name');
+    const urlInput = document.getElementById('pico-url');
+    const url = urlInput && urlInput.value ? urlInput.value.trim() : '';
+    const name = nameInput && nameInput.value ? nameInput.value.trim() : 'Cart';
+    if (!url) { showModal({ title: 'No URL', body: 'Paste a PICO-8 cart URL first.' }); return; }
+    if (!Array.isArray(systemData.picoCarts)) systemData.picoCarts = [];
+    systemData.picoCarts.push({ name, url });
+    saveData();
+    renderPicoList();
+    showToast('PICO-8 cart saved', 'success');
+};
+
+window.loadSavedPico = function (idx) {
+    if (!Array.isArray(systemData.picoCarts)) return;
+    const cart = systemData.picoCarts[idx];
+    if (!cart) return;
+    const input = document.getElementById('pico-url');
+    if (input) input.value = cart.url;
+    loadPicoCart();
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = `Loaded ${cart.name || 'cart'}`;
+};
+
+window.removePicoEntry = function (idx) {
+    if (!Array.isArray(systemData.picoCarts)) return;
+    systemData.picoCarts.splice(idx, 1);
+    saveData();
+    renderPicoList();
+};
+
 /** gameInterval - Інтервал активної гри для коректної зупинки */
 var gameInterval = null; // Renamed from gameInt to match new code
 var gameCleanup = null;
@@ -2448,6 +2564,19 @@ function stopGames() {
     if (status) status.innerText = 'Game stopped';
     // stopScreensaver(); // Just in case - assuming this function exists elsewhere or is a placeholder
 }
+
+function sizeGameCanvas() {
+    const area = document.getElementById('game-area');
+    const canvas = document.getElementById('game-canvas');
+    if (!area || !canvas) return;
+    const baseW = 640, baseH = 480;
+    const maxW = area.parentElement ? area.parentElement.clientWidth - 20 : baseW;
+    const scale = Math.min(1, maxW / baseW);
+    canvas.style.width = Math.floor(baseW * scale) + 'px';
+    canvas.style.height = Math.floor(baseH * scale) + 'px';
+}
+
+window.addEventListener('resize', sizeGameCanvas);
 
 // --- BUILT-IN MINI GAMES (SAFE DEFAULTS) ---
 
@@ -2660,8 +2789,20 @@ function startTetris(canvas, ctx) {
       }
 
       area.style.display = 'block';
+      sizeGameCanvas();
       const status = document.getElementById('game-status');
       if (status) status.innerText = `Running ${id.toUpperCase()}`;
+
+      const customGame = (Array.isArray(systemData.games) ? systemData.games : []).find(g => g.id === id);
+      if (customGame && customGame.code) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#fff';
+          ctx.textAlign = 'center';
+          ctx.font = '16px monospace';
+          ctx.fillText('Custom game slot loaded', canvas.width / 2, canvas.height / 2 - 10);
+          ctx.fillText('Run external code from admin panel if needed.', canvas.width / 2, canvas.height / 2 + 10);
+          return;
+      }
 
       const handlers = {
           snake: typeof window.startSnake === 'function' ? window.startSnake : startSnake,

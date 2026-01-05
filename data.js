@@ -376,6 +376,7 @@ const defaultData = {
             "name": "IDLE_CLICKER",
             "code": "const a=document.getElementById('arena'); let pts=0,pps=0,upgrades=[{n:'Auto-Clicker',c:10,b:1,o:0},{n:'Bot Farm',c:100,b:10,o:0},{n:'AI Miner',c:1000,b:100,o:0},{n:'Quantum Computer',c:10000,b:1000,o:0}]; function fmt(n){if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n)} function render(){let h='<div class=\"game-area\" style=\"text-align:center;\"><h3 style=\"margin:0;\">$'+fmt(pts)+'</h3><p style=\"font-size:0.7rem;margin:5px 0;\">'+fmt(pps)+' $/sec</p><button class=\"btn\" style=\"font-size:1.5rem;padding:20px 40px;\" onclick=\"click1()\">💰 CLICK</button><div style=\"margin-top:15px;text-align:left;\">';upgrades.forEach((u,i)=>{h+=`<div style=\"display:flex;justify-content:space-between;align-items:center;padding:5px;border-bottom:1px solid var(--dim);\"><span>${u.n} (${u.o})</span><button class=\"btn btn-sm\" onclick=\"buyUp(${i})\" ${pts>=u.c?'':'disabled'}>$${fmt(u.c)}</button></div>`});h+='</div></div>';a.innerHTML=h} window.click1=()=>{pts++;playSfx(400,'sine',0.02,0.02);render()}; window.buyUp=(i)=>{if(pts>=upgrades[i].c){pts-=upgrades[i].c;upgrades[i].o++;pps+=upgrades[i].b;upgrades[i].c=Math.floor(upgrades[i].c*1.5);playSfx(800);render()}}; window.gameInt=setInterval(()=>{pts+=pps/10;render()},100); render();"
         }
-    ]
+    ],
+    "picoCarts": []
 };
 /* --- DATA END --- */

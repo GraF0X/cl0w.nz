@@ -844,6 +844,13 @@
             border-style: dashed;
         }
 
+        .theme-toggle-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -962,6 +969,15 @@
             display: inline-block;
             position: relative;
             box-shadow: 0 0 15px var(--dim);
+            width: min(100%, 720px);
+            margin: 0 auto;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
         }
 
         .game-hint {
@@ -972,7 +988,7 @@
             opacity: 0.7;
         }
 
-        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
         .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 
         .pico-panel {
@@ -983,6 +999,29 @@
             flex-direction: column;
             gap: 8px;
         }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
 
         .game-toolbar {
             display: flex;
