@@ -1389,11 +1389,6 @@ function renderObsidian() {
     const obs = (systemData && systemData.obsidian && typeof systemData.obsidian === 'object') ? systemData.obsidian : {};
     const cats = Array.isArray(obs.cats) ? obs.cats : [];
 
-    if (!dataReady) {
-        v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading Obsidian data...</div>';
-        return;
-    }
-
     // Ensure current category is valid
     if (!cats.includes(currentObsCat)) {
         currentObsCat = cats.length ? cats[0] : '';
@@ -1410,7 +1405,7 @@ function renderObsidian() {
 
     const content = displayFile && currentCatFiles[displayFile]
         ? String(currentCatFiles[displayFile]).replace(/\\\\/g, '\\')
-        : (cats.length ? "Оберіть нотатку для зчитування або створіть нову..." : "Немає доступних категорій нотаток.");
+        : "Оберіть нотатку для зчитування або створіть нову...";
 
     v.innerHTML = `<h2>Obsidian.Vault</h2>
         <div class="obs-container">
