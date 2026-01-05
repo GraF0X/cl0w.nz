@@ -1317,16 +1317,16 @@
             left: 0;
             background: var(--bg);
             border: 2px solid var(--text);
-            padding: 5px;
+            padding: 10px;
             display: none;
-            width: 240px;
+            width: 320px;
             z-index: 100;
             box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.5);
             margin-bottom: 10px;
-            max-height: 300px;
+            max-height: 420px;
             overflow-y: auto;
             flex-direction: column;
-            gap: 2px;
+            gap: 6px;
         }
 
         .theme-popup.show {

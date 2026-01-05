@@ -489,6 +489,7 @@ function initData() {
     }
     applyMenuVisibility();
     applyEffects();
+    resetIdleTimer();
     renderDynamicLogo();
     dataReady = true;
     if (pendingNavId) {
@@ -581,8 +582,9 @@ function updateCustomThemeCSS() {
 /** toggleThemeMenu - Відкриває/закриває меню тем */
 function toggleThemeMenu() {
     const pop = document.getElementById('theme-popup');
-    if (pop.style.display === 'block') {
-        pop.style.display = 'none';
+    const isOpen = pop.classList.contains('show');
+    if (isOpen) {
+        pop.classList.remove('show');
         return;
     }
 
@@ -596,7 +598,11 @@ function toggleThemeMenu() {
 
     // EFFECTS SECTION
     const fx = systemData.effects || { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
-    const fxBtn = (key, label) => `<button class="btn btn-sm ${fx[key] ? 'active' : 'btn-ghost'}" onclick="toggleEffect('${key}')">${label}: ${fx[key] ? 'ON' : 'OFF'}</button>`;
+    const fxBtn = (key, label) => {
+        const on = !!fx[key];
+        const indicator = on ? '✔' : '✖';
+        return `<button class="btn btn-sm ${on ? 'active' : 'btn-ghost'}" onclick="toggleEffect('${key}')">${label}: ${indicator}</button>`;
+    };
 
     const fontChoice = (systemData.themes && systemData.themes.font) ? systemData.themes.font : 'modern';
     html += `<div class="theme-extras">
@@ -604,9 +610,9 @@ function toggleThemeMenu() {
             ${fxBtn('glow', 'Glow')}
             ${fxBtn('flicker', 'Flicker')}
             ${fxBtn('scanline', 'Scanlines')}
-            ${fxBtn('svgGlow', 'SVG Glow')}
+            ${fxBtn('svgGlow', 'SVG Icons')}
             ${fxBtn('screenPulse', 'Screen Pulse')}
-            <button class="btn btn-sm ${systemData.home.showIcons !== false ? 'active' : 'btn-ghost'}" onclick="toggleIcons()">Icons: ${systemData.home.showIcons !== false ? 'ON' : 'OFF'}</button>
+            <button class="btn btn-sm ${systemData.home.showIcons !== false ? 'active' : 'btn-ghost'}" onclick="toggleIcons()">Icons: ${systemData.home.showIcons !== false ? '✔' : '✖'}</button>
         </div>
         <div class="font-switcher">
             <div style="font-size:0.75rem; opacity:0.75;">Font</div>
@@ -616,7 +622,31 @@ function toggleThemeMenu() {
     </div>`;
 
     pop.innerHTML = html;
-    pop.style.display = 'block';
+    pop.classList.add('show');
+}
+
+/**
+ * setTheme - Встановлює тему оформлення
+ * @param {string} t - ID теми
+ */
+function setTheme(t) {
+    document.body.className = `theme-${t}`;
+    playSfx(1000, 'sine', 0.05);
+    localStorage.setItem('vvs_theme_v13', t);
+
+    // USE CUSTOM ADMIN TRIGGER THEME
+    if (t === systemData.themes.adminTriggerTheme) {
+        mintEvaClicks++; checkAdminUnlock();
+    }
+    if (t === 'eva') {
+        evaCount++;
+        if (evaCount >= 5) {
+            const sound = new Audio('xero.wav');
+            sound.play().catch(e => console.log(e));
+            evaCount = 0;
+        }
+    }
+    document.getElementById('theme-popup').classList.remove('show');
 }
 
 /** toggleEffect - Перемикає візуальні ефекти */
@@ -741,6 +771,8 @@ window.startScreensaver = function (previewType) {
     systemData.screensaver.type = type;
     saveData();
 
+    if (ssReq) cancelAnimationFrame(ssReq);
+
     let overlay = document.getElementById('screensaver-overlay');
     if (!overlay) {
         overlay = document.createElement('div');
@@ -756,6 +788,11 @@ window.startScreensaver = function (previewType) {
     ssCanvas.width = window.innerWidth;
     ssCanvas.height = window.innerHeight;
 
+    if (!ssCanvas || !ssCtx) {
+        showToast('Screensaver canvas unavailable', 'error');
+        return;
+    }
+
     ssActive = true;
 
     if (type === 'matrix') runMatrixSS();
@@ -770,7 +807,14 @@ window.stopScreensaver = function () {
     cancelAnimationFrame(ssReq);
     const overlay = document.getElementById('screensaver-overlay');
     if (overlay) overlay.style.display = 'none';
-}
+};
+
+window.addEventListener('resize', () => {
+    if (ssActive && ssCanvas) {
+        ssCanvas.width = window.innerWidth;
+        ssCanvas.height = window.innerHeight;
+    }
+});
 
 function runMatrixSS() {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
@@ -2999,30 +3043,6 @@ function renderLinks() {
     document.getElementById('view').innerHTML = `<h2>NODE_NETWORK</h2><div class="node-grid"><div class="node-card"><div class="node-status">ONLINE</div><h3>[ ME ]</h3>${linksHtml}</div><div class="node-card"><div class="node-status">NET_SCAN</div><h3>[ FRIENDS ]</h3>${friendsHtml || '<div class="node-link" style="opacity:0.5">Scanning... No peers found.</div>'}</div></div>${hireHtml}`;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// #SECTION_GAMES - Ігровий центр
-// ═══════════════════════════════════════════════════════════════════════════════
-
-
-
-/** toggleThemeMenu - Відкриває/закриває меню вибору тем */
-function toggleThemeMenu() { const popup = document.getElementById('theme-popup'); popup.innerHTML = ''; themesList.forEach(t => { const el = document.createElement('div'); el.className = 'theme-item'; el.innerHTML = `<div class="color-preview" style="background:${t.c}"></div> ${t.name}`; el.onclick = () => setTheme(t.id); popup.appendChild(el); }); popup.classList.toggle('show'); playSfx(400); }
-/** 
- * setTheme - Встановлює тему оформлення
- * @param {string} t - ID теми
- */
-function setTheme(t) {
-    document.body.className = `theme-${t}`;
-    playSfx(1000, 'sine', 0.05);
-    localStorage.setItem('vvs_theme_v12', t);
-
-    // USE CUSTOM ADMIN TRIGGER THEME
-    if (t === systemData.themes.adminTriggerTheme) {
-        mintEvaClicks++; checkAdminUnlock();
-    }
-    if (t === 'eva') { evaCount++; if (evaCount >= 5) { const sound = new Audio('xero.wav'); sound.play().catch(e => console.log(e)); evaCount = 0; } }
-    document.getElementById('theme-popup').classList.remove('show');
-}
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_EASTER - Великодні яйця (Easter Eggs)
 // ═══════════════════════════════════════════════════════════════════════════════
