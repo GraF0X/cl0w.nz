@@ -382,6 +382,10 @@ function initData() {
     applyMenuVisibility();
     applyEffects();
     renderDynamicLogo();
+    dataReady = true;
+    if (pendingNavId) {
+        const next = pendingNavId; pendingNavId = null; nav(next);
+    }
 }
 
 /** saveData - Зберігає systemData в localStorage */
@@ -814,6 +818,8 @@ let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0;
 let currentLang = 'uk'; let adminAuth = false;
 let admNoteCat = ''; let admNoteFile = '';
 let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
+let dataReady = false;
+let pendingNavId = null;
 
 /**
  * nav - Головна функція навігації між секціями
@@ -822,6 +828,13 @@ let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
  */
 function nav(id) {
     if (isTyping) return;
+
+    if (!dataReady) {
+        pendingNavId = id;
+        const v = document.getElementById('view');
+        if (v) v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading data...</div>';
+        return;
+    }
 
     // Dynamic Title Update
     const baseTitle = systemData.home.browserTitle || "vvs@cl0w.nz";
@@ -1370,33 +1383,86 @@ window.genMD = function () {
  * Підтримує категорії, файли та захист паролем
  */
 function renderObsidian() {
-    const v = document.getElementById('view'); const content = currentObsFile ? systemData.obsidian[currentObsCat][currentObsFile].replace(/\\\\/g, '\\') : "Оберіть нотатку для зчитування..."; v.innerHTML = `<h2>Obsidian.Vault</h2><div class="obs-container"><div class="obs-tabs" id="o-t"></div><div class="obs-main"><div class="obs-files" id="o-f"></div><div class="obs-viewer" id="o-v"><pre>${content}</pre></div></div></div>`; const tabBox = document.getElementById('o-t');
-    systemData.obsidian.cats.forEach(c => {
-        const b = document.createElement('button');
-        b.className = `obs-tab-btn ${c === currentObsCat ? 'active' : ''}`;
-        // Lock icon in tab
-        const isLocked = systemData.obsidian.catAuth && systemData.obsidian.catAuth[c];
-        b.innerText = (isLocked ? '🔒 ' : '') + c;
+    const v = document.getElementById('view');
+    if (!v) return;
 
-        b.onclick = () => {
-            if (isLocked) { // Check lock existence first
-                if (!adminAuth) {
-                    const p = prompt("ENTER PASSWORD for " + c + ":");
-                    if (p !== systemData.obsidian.catAuth[c]) {
-                        playSfx(100, 'sawtooth', 0.5); alert("ACCESS DENIED"); return;
+    const obs = (systemData && systemData.obsidian && typeof systemData.obsidian === 'object') ? systemData.obsidian : {};
+    const cats = Array.isArray(obs.cats) ? obs.cats : [];
+
+    if (!dataReady) {
+        v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading Obsidian data...</div>';
+        return;
+    }
+
+    // Ensure current category is valid
+    if (!cats.includes(currentObsCat)) {
+        currentObsCat = cats.length ? cats[0] : '';
+        currentObsFile = '';
+    }
+
+    const currentCatFiles = currentObsCat && obs[currentObsCat] && typeof obs[currentObsCat] === 'object'
+        ? obs[currentObsCat]
+        : {};
+    const fileKeys = Object.keys(currentCatFiles);
+
+    if (currentObsFile && !fileKeys.includes(currentObsFile)) currentObsFile = '';
+    const displayFile = currentObsFile || fileKeys[0] || '';
+
+    const content = displayFile && currentCatFiles[displayFile]
+        ? String(currentCatFiles[displayFile]).replace(/\\\\/g, '\\')
+        : (cats.length ? "Оберіть нотатку для зчитування або створіть нову..." : "Немає доступних категорій нотаток.");
+
+    v.innerHTML = `<h2>Obsidian.Vault</h2>
+        <div class="obs-container">
+            <div class="obs-tabs" id="o-t"></div>
+            <div class="obs-main">
+                <div class="obs-files" id="o-f"></div>
+                <div class="obs-viewer" id="o-v"><pre>${content}</pre></div>
+            </div>
+        </div>`;
+
+    const tabBox = document.getElementById('o-t');
+    if (tabBox && cats.length) {
+        cats.forEach(c => {
+            const b = document.createElement('button');
+            b.className = `obs-tab-btn ${c === currentObsCat ? 'active' : ''}`;
+            const isLocked = obs.catAuth && obs.catAuth[c];
+            b.innerText = (isLocked ? '🔒 ' : '') + c;
+
+            b.onclick = () => {
+                if (isLocked) {
+                    if (!adminAuth) {
+                        const p = prompt("ENTER PASSWORD for " + c + ":");
+                        if (p !== obs.catAuth[c]) {
+                            playSfx(100, 'sawtooth', 0.5); alert("ACCESS DENIED"); return;
+                        }
+                    } else {
+                        playSfx(800, 'sine', 0.1);
+                        alert("ADMIN: PASSWORD BYPASSED");
                     }
-                } else {
-                    // Admin feedback
-                    playSfx(800, 'sine', 0.1);
-                    alert("ADMIN: PASSWORD BYPASSED");
                 }
-            }
-            currentObsCat = c; currentObsFile = ''; renderObsidian();
-        };
-        tabBox.appendChild(b);
-    });
+                currentObsCat = c; currentObsFile = ''; renderObsidian();
+            };
+            tabBox.appendChild(b);
+        });
+    } else if (tabBox) {
+        tabBox.innerHTML = '<div style="opacity:0.6; padding:8px;">No note categories</div>';
+    }
 
-    const fileBox = document.getElementById('o-f'); Object.keys(systemData.obsidian[currentObsCat]).forEach(f => { const b = document.createElement('button'); b.className = `obs-file-item ${f === currentObsFile ? 'active' : ''}`; b.innerText = '> ' + f; b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); }; fileBox.appendChild(b); });
+    const fileBox = document.getElementById('o-f');
+    if (fileBox) {
+        if (!fileKeys.length) {
+            fileBox.innerHTML = '<div style="opacity:0.6; padding:8px;">No files in this category</div>';
+        } else {
+            fileKeys.forEach(f => {
+                const b = document.createElement('button');
+                b.className = `obs-file-item ${f === displayFile ? 'active' : ''}`;
+                b.innerText = '> ' + f;
+                b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); };
+                fileBox.appendChild(b);
+            });
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1718,7 +1784,8 @@ function removeTodoItem(i) {
 function renderGameMenu() {
     const v = document.getElementById('view');
     // MERGED RENDER GAME MENU
-    const customGames = systemData.games.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
+    const gameList = Array.isArray(systemData.games) ? systemData.games : [];
+    const customGames = gameList.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
 
     v.innerHTML = `<h2>GAME_CENTER</h2>
     <div class="game-hub">
@@ -1762,8 +1829,9 @@ function runGame(id) {
     const area = document.getElementById('game-area');
     const pico = document.getElementById('pico-area');
     const canvas = document.getElementById('game-canvas');
-    if (!canvas) return; // Error safety
+    if (!area || !pico || !canvas) return; // Error safety
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     stopGames(); // Clear previous
 
@@ -1779,10 +1847,23 @@ function runGame(id) {
 
     area.style.display = 'block';
 
-    // Assuming startSnake, startTetris, startPong functions exist
-    if (id === 'snake') startSnake(canvas, ctx);
-    else if (id === 'tetris') startTetris(canvas, ctx);
-    else if (id === 'pong') startPong(canvas, ctx);
+    const handlers = {
+        snake: typeof window.startSnake === 'function' ? window.startSnake : null,
+        tetris: typeof window.startTetris === 'function' ? window.startTetris : null,
+        pong: typeof window.startPong === 'function' ? window.startPong : null,
+    };
+
+    if (handlers[id]) {
+        handlers[id](canvas, ctx);
+        return;
+    }
+
+    // Graceful fallback for unknown/missing games
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#fff';
+    ctx.textAlign = 'center';
+    ctx.font = '16px monospace';
+    ctx.fillText('Game not available', canvas.width / 2, canvas.height / 2);
 }
 
 /**
