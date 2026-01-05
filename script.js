@@ -1602,6 +1602,11 @@ function renderObsidian() {
     const obs = (systemData && systemData.obsidian && typeof systemData.obsidian === 'object') ? systemData.obsidian : {};
     const cats = Array.isArray(obs.cats) ? obs.cats : [];
 
+    if (!dataReady) {
+        v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading Obsidian data...</div>';
+        return;
+    }
+
     // Ensure current category is valid
     if (!cats.includes(currentObsCat)) {
         currentObsCat = cats.length ? cats[0] : '';
@@ -1618,7 +1623,7 @@ function renderObsidian() {
 
     const content = displayFile && currentCatFiles[displayFile]
         ? String(currentCatFiles[displayFile]).replace(/\\\\/g, '\\')
-        : "Оберіть нотатку для зчитування або створіть нову...";
+        : (cats.length ? "Оберіть нотатку для зчитування або створіть нову..." : "Немає доступних категорій нотаток.");
 
     v.innerHTML = `<h2>Obsidian.Vault</h2>
         <div class="obs-container">
@@ -2081,48 +2086,6 @@ function stopGames() {
     // stopScreensaver(); // Just in case - assuming this function exists elsewhere or is a placeholder
 }
 
-/** runGame - Запускає обрану гру */
-function runGame(id) {
-    const area = document.getElementById('game-area');
-    const pico = document.getElementById('pico-area');
-    const canvas = document.getElementById('game-canvas');
-    if (!area || !pico || !canvas) return; // Error safety
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    stopGames(); // Clear previous
-
-    if (id === 'pico8') {
-        pico.style.display = 'block';
-        // Use a generic placeholder or allow input
-        const url = prompt("Enter PICO-8 Web Cart URL (or cancel for demo):", "https://www.lexaloffle.com/bbs/widget.php?pid=celeste");
-        if (url) {
-            document.getElementById('pico-frame').src = url;
-        }
-        return;
-    }
-
-    area.style.display = 'block';
-
-    const handlers = {
-        snake: typeof window.startSnake === 'function' ? window.startSnake : null,
-        tetris: typeof window.startTetris === 'function' ? window.startTetris : null,
-        pong: typeof window.startPong === 'function' ? window.startPong : null,
-    };
-
-    if (handlers[id]) {
-        handlers[id](canvas, ctx);
-        return;
-    }
-
-    // Graceful fallback for unknown/missing games
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#fff';
-    ctx.textAlign = 'center';
-    ctx.font = '16px monospace';
-    ctx.fillText('Game not available', canvas.width / 2, canvas.height / 2);
-}
-
 // --- BUILT-IN MINI GAMES (SAFE DEFAULTS) ---
 
 function startSnake(canvas, ctx) {
@@ -2223,10 +2186,10 @@ function startPong(canvas, ctx) {
     };
 }
 
-function startTetris(canvas, ctx) {
-    const cols = 10, rows = 20, size = 24;
-    canvas.width = cols * size;
-    canvas.height = rows * size;
+  function startTetris(canvas, ctx) {
+      const cols = 10, rows = 20, size = 24;
+      canvas.width = cols * size;
+      canvas.height = rows * size;
     const shapes = [
         [[1, 1, 1, 1]],
         [[1, 1], [1, 1]],
@@ -2306,14 +2269,62 @@ function startTetris(canvas, ctx) {
         draw();
     };
 
-    draw();
-    gameInterval = setInterval(tick, 450);
-    gameCleanup = () => document.removeEventListener('keydown', keyHandler);
-}
+      draw();
+      gameInterval = setInterval(tick, 450);
+      gameCleanup = () => document.removeEventListener('keydown', keyHandler);
+  }
 
-window.startSnake = startSnake;
-window.startPong = startPong;
-window.startTetris = startTetris;
+  /** runGame - Запускає обрану гру */
+  function runGame(id) {
+      const area = document.getElementById('game-area');
+      const pico = document.getElementById('pico-area');
+      const canvas = document.getElementById('game-canvas');
+      if (!area || !pico || !canvas) return; // Error safety
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      stopGames(); // Clear previous
+
+      if (id === 'pico8') {
+          pico.style.display = 'block';
+          // Use a generic placeholder or allow input
+          const url = prompt("Enter PICO-8 Web Cart URL (or cancel for demo):", "https://www.lexaloffle.com/bbs/widget.php?pid=celeste");
+          if (url) {
+              document.getElementById('pico-frame').src = url;
+          }
+          return;
+      }
+
+      area.style.display = 'block';
+
+      const builtInHandlers = {
+          snake: typeof startSnake === 'function' ? startSnake : null,
+          tetris: typeof startTetris === 'function' ? startTetris : null,
+          pong: typeof startPong === 'function' ? startPong : null,
+      };
+
+      const handlers = {
+          snake: typeof window.startSnake === 'function' ? window.startSnake : builtInHandlers.snake,
+          tetris: typeof window.startTetris === 'function' ? window.startTetris : builtInHandlers.tetris,
+          pong: typeof window.startPong === 'function' ? window.startPong : builtInHandlers.pong,
+      };
+
+      if (typeof handlers[id] === 'function') {
+          handlers[id](canvas, ctx);
+          return;
+      }
+
+      // Graceful fallback for unknown/missing games
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '16px monospace';
+      ctx.fillText('Game not available', canvas.width / 2, canvas.height / 2);
+  }
+
+  window.startSnake = typeof window.startSnake === 'function' ? window.startSnake : startSnake;
+  window.startPong = typeof window.startPong === 'function' ? window.startPong : startPong;
+  window.startTetris = typeof window.startTetris === 'function' ? window.startTetris : startTetris;
 
 /**
  * renderGallery - Рендерить сітку галереї
