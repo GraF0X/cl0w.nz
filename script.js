@@ -2088,6 +2088,12 @@ function stopGames() {
 
 // --- BUILT-IN MINI GAMES (SAFE DEFAULTS) ---
 
+// Predeclare handlers to avoid ReferenceErrors during resolution
+let startSnake;
+let startPong;
+let startTetris;
+
+startSnake = function (canvas, ctx) {
 function startSnake(canvas, ctx) {
     const gridSize = 20;
     const cols = Math.floor(canvas.width / gridSize);
@@ -2142,6 +2148,7 @@ function startSnake(canvas, ctx) {
     gameCleanup = () => document.removeEventListener('keydown', keyHandler);
 }
 
+startPong = function (canvas, ctx) {
 function startPong(canvas, ctx) {
     let ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: 2 };
     let paddle = { x: canvas.width / 2 - 40, y: canvas.height - 20, w: 80, h: 8 };
@@ -2186,6 +2193,7 @@ function startPong(canvas, ctx) {
     };
 }
 
+startTetris = function (canvas, ctx) {
   function startTetris(canvas, ctx) {
       const cols = 10, rows = 20, size = 24;
       canvas.width = cols * size;
@@ -2297,6 +2305,10 @@ function startPong(canvas, ctx) {
 
       area.style.display = 'block';
 
+      const handlers = {
+          snake: typeof window.startSnake === 'function' ? window.startSnake : startSnake,
+          tetris: typeof window.startTetris === 'function' ? window.startTetris : startTetris,
+          pong: typeof window.startPong === 'function' ? window.startPong : startPong,
       const builtInHandlers = {
           snake: typeof startSnake === 'function' ? startSnake : null,
           tetris: typeof startTetris === 'function' ? startTetris : null,
