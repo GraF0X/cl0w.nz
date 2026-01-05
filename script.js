@@ -228,7 +228,9 @@ function showPrompt({ title = 'Input', message = '', placeholder = '', defaultVa
                 { label: 'Save', variant: 'success', onClick: () => resolve(input.value) }
             ]
         });
-        setTimeout(() => input?.focus(), 20);
+        setTimeout(() => {
+            if (input && typeof input.focus === 'function') input.focus();
+        }, 20);
     });
 }
 
@@ -592,7 +594,7 @@ function toggleThemeMenu() {
     // EFFECTS SECTION
     const fx = systemData.effects || { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
 
-    const fontChoice = systemData.themes?.font || 'modern';
+    const fontChoice = (systemData.themes && systemData.themes.font) ? systemData.themes.font : 'modern';
     html += `<div class="theme-extras">
         <label class="opt-check"><input type="checkbox" ${fx.glow ? 'checked' : ''} onchange="toggleEffect('glow')"> Glow FX</label>
         <label class="opt-check"><input type="checkbox" ${fx.flicker ? 'checked' : ''} onchange="toggleEffect('flicker')"> Flicker</label>
@@ -941,7 +943,7 @@ function runTreesSS() {
 function renderScreensaverMenu() {
     const v = document.getElementById('view');
     const current = (systemData.screensaver && systemData.screensaver.type) || 'matrix';
-    const timeout = systemData.screensaver?.timeout || 60;
+    const timeout = systemData.screensaver && systemData.screensaver.timeout ? systemData.screensaver.timeout : 60;
     const list = [
         { id: 'matrix', name: 'Matrix Rain', desc: 'Green code rain inspired by classic terminals.' },
         { id: 'fire', name: 'Pixel Fire', desc: 'Retro fire simulation with palette cycling.' },
@@ -961,7 +963,7 @@ function renderScreensaverMenu() {
         <div class="saver-grid">${cards}</div>
         <div class="saver-actions">
             <label class="opt-check">
-                <input type="checkbox" id="saver-enabled" ${systemData.screensaver?.enabled !== false ? 'checked' : ''}>
+                <input type="checkbox" id="saver-enabled" ${(systemData.screensaver && systemData.screensaver.enabled !== false) ? 'checked' : ''}>
                 Enable idle trigger (${timeout}s)
             </label>
             <div class="saver-action-buttons">
@@ -979,15 +981,18 @@ function renderScreensaverMenu() {
 }
 
 window.previewSaver = function () {
-    const type = document.querySelector('input[name="saver-type"]:checked')?.value || 'matrix';
+    const typeEl = document.querySelector('input[name="saver-type"]:checked');
+    const type = typeEl && typeEl.value ? typeEl.value : 'matrix';
     startScreensaver(type);
 };
 
 window.applySaverChoice = function () {
-    const type = document.querySelector('input[name="saver-type"]:checked')?.value || 'matrix';
+    const typeEl = document.querySelector('input[name="saver-type"]:checked');
+    const type = typeEl && typeEl.value ? typeEl.value : 'matrix';
     if (!systemData.screensaver) systemData.screensaver = { enabled: true, timeout: 60, type: 'matrix' };
     systemData.screensaver.type = type;
-    systemData.screensaver.enabled = document.getElementById('saver-enabled')?.checked !== false;
+    const saverToggle = document.getElementById('saver-enabled');
+    systemData.screensaver.enabled = saverToggle ? saverToggle.checked !== false : true;
     saveData();
     resetIdleTimer();
     startScreensaver(type);
@@ -1612,9 +1617,12 @@ function matrixToSVG(matrix, size) {
 
 function autoPreviewQR() { setTimeout(generateQR, 10); }
 function generateQR() {
-    const txt = document.getElementById('qr-text')?.value || '';
-    const size = parseInt(document.getElementById('qr-size')?.value || '256');
-    const format = document.getElementById('qr-format')?.value || 'png';
+    const txtEl = document.getElementById('qr-text');
+    const sizeEl = document.getElementById('qr-size');
+    const formatEl = document.getElementById('qr-format');
+    const txt = txtEl && typeof txtEl.value === 'string' ? txtEl.value : '';
+    const size = parseInt((sizeEl && sizeEl.value) ? sizeEl.value : '256');
+    const format = formatEl && formatEl.value ? formatEl.value : 'png';
     lastQRFormat = format; lastQRSize = size; lastQRText = txt;
     if (!txt.trim()) { const canvas = document.getElementById('qr-canvas'); if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillText('Enter text', 10, 20); } return; }
     if (txt.length > 256) {
@@ -2215,7 +2223,10 @@ window.openCalDate = function (date) {
     };
 
     renderList();
-    setTimeout(() => overlay?.querySelector('input')?.focus(), 30);
+    setTimeout(() => {
+        const firstInput = overlay ? overlay.querySelector('input') : null;
+        if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+    }, 30);
 };
 
 // IMPORT / EXPORT
@@ -2279,8 +2290,10 @@ window.importTodoData = function (acc) {
 function addTodoItem() {
     const inp = document.getElementById('new-todo-input');
     if (!inp || !inp.value.trim()) return;
-    const dueDate = document.getElementById('new-todo-date')?.value || '';
-    const dueTime = document.getElementById('new-todo-time')?.value || '';
+    const dueInput = document.getElementById('new-todo-date');
+    const timeInput = document.getElementById('new-todo-time');
+    const dueDate = dueInput && dueInput.value ? dueInput.value : '';
+    const dueTime = timeInput && timeInput.value ? timeInput.value : '';
     const item = { t: inp.value.trim(), d: false };
     if (dueDate) item.due = dueDate;
     if (dueTime) item.time = dueTime;
@@ -2402,7 +2415,7 @@ function renderGameMenu() {
 
 window.loadPicoCart = function () {
     const input = document.getElementById('pico-url');
-    const url = input?.value?.trim();
+    const url = input && input.value ? input.value.trim() : '';
     if (!url) { showModal({ title: 'No URL', body: 'Paste a PICO-8 web cart URL first.' }); return; }
     document.getElementById('pico-frame').src = url;
     const status = document.getElementById('game-status');
@@ -2638,8 +2651,8 @@ function startTetris(canvas, ctx) {
 
       if (id === 'pico8') {
           pico.style.display = 'flex';
-          const input = document.getElementById('pico-url');
-          const url = input?.value || 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
+            const input = document.getElementById('pico-url');
+            const url = input && input.value ? input.value : 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
           document.getElementById('pico-frame').src = url;
           const status = document.getElementById('game-status');
           if (status) status.innerText = 'PICO-8 web player ready';
