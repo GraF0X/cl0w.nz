@@ -2094,6 +2094,7 @@ let startPong;
 let startTetris;
 
 startSnake = function (canvas, ctx) {
+function startSnake(canvas, ctx) {
     const gridSize = 20;
     const cols = Math.floor(canvas.width / gridSize);
     const rows = Math.floor(canvas.height / gridSize);
@@ -2148,6 +2149,7 @@ startSnake = function (canvas, ctx) {
 }
 
 startPong = function (canvas, ctx) {
+function startPong(canvas, ctx) {
     let ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: 2 };
     let paddle = { x: canvas.width / 2 - 40, y: canvas.height - 20, w: 80, h: 8 };
     const keyState = { left: false, right: false };
@@ -2192,6 +2194,7 @@ startPong = function (canvas, ctx) {
 }
 
 startTetris = function (canvas, ctx) {
+  function startTetris(canvas, ctx) {
       const cols = 10, rows = 20, size = 24;
       canvas.width = cols * size;
       canvas.height = rows * size;
@@ -2306,6 +2309,16 @@ startTetris = function (canvas, ctx) {
           snake: typeof window.startSnake === 'function' ? window.startSnake : startSnake,
           tetris: typeof window.startTetris === 'function' ? window.startTetris : startTetris,
           pong: typeof window.startPong === 'function' ? window.startPong : startPong,
+      const builtInHandlers = {
+          snake: typeof startSnake === 'function' ? startSnake : null,
+          tetris: typeof startTetris === 'function' ? startTetris : null,
+          pong: typeof startPong === 'function' ? startPong : null,
+      };
+
+      const handlers = {
+          snake: typeof window.startSnake === 'function' ? window.startSnake : builtInHandlers.snake,
+          tetris: typeof window.startTetris === 'function' ? window.startTetris : builtInHandlers.tetris,
+          pong: typeof window.startPong === 'function' ? window.startPong : builtInHandlers.pong,
       };
 
       if (typeof handlers[id] === 'function') {
