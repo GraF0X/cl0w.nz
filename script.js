@@ -1602,11 +1602,6 @@ function renderObsidian() {
     const obs = (systemData && systemData.obsidian && typeof systemData.obsidian === 'object') ? systemData.obsidian : {};
     const cats = Array.isArray(obs.cats) ? obs.cats : [];
 
-    if (!dataReady) {
-        v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading Obsidian data...</div>';
-        return;
-    }
-
     // Ensure current category is valid
     if (!cats.includes(currentObsCat)) {
         currentObsCat = cats.length ? cats[0] : '';
@@ -1623,7 +1618,7 @@ function renderObsidian() {
 
     const content = displayFile && currentCatFiles[displayFile]
         ? String(currentCatFiles[displayFile]).replace(/\\\\/g, '\\')
-        : (cats.length ? "Оберіть нотатку для зчитування або створіть нову..." : "Немає доступних категорій нотаток.");
+        : "Оберіть нотатку для зчитування або створіть нову...";
 
     v.innerHTML = `<h2>Obsidian.Vault</h2>
         <div class="obs-container">
@@ -2109,19 +2104,13 @@ function runGame(id) {
 
     area.style.display = 'block';
 
-    const builtInHandlers = {
-        snake: typeof startSnake === 'function' ? startSnake : null,
-        tetris: typeof startTetris === 'function' ? startTetris : null,
-        pong: typeof startPong === 'function' ? startPong : null,
-    };
-
     const handlers = {
-        snake: typeof window.startSnake === 'function' ? window.startSnake : builtInHandlers.snake,
-        tetris: typeof window.startTetris === 'function' ? window.startTetris : builtInHandlers.tetris,
-        pong: typeof window.startPong === 'function' ? window.startPong : builtInHandlers.pong,
+        snake: typeof window.startSnake === 'function' ? window.startSnake : null,
+        tetris: typeof window.startTetris === 'function' ? window.startTetris : null,
+        pong: typeof window.startPong === 'function' ? window.startPong : null,
     };
 
-    if (typeof handlers[id] === 'function') {
+    if (handlers[id]) {
         handlers[id](canvas, ctx);
         return;
     }
