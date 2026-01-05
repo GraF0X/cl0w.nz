@@ -28,10 +28,10 @@ function openIRC() {
         <div id="irc-header" style="background:var(--text); color:var(--bg); padding:5px; font-weight:bold; cursor:grab; display:flex; justify-content:space-between; align-items:center;">
             <span>[ #general ]</span>
             <div style="display:flex; gap:5px;">
-                <input id="irc-nick-set" placeholder="Nick" value="${systemData.resume.name || ''}" 
+                <input id="irc-nick-set" placeholder="Nick" value="${systemData.resume.name || ''}"
                        style="background:var(--bg); color:var(--text); border:1px solid var(--bg); width:80px; padding:2px; font-size:0.8rem;"
                        onchange="systemData.resume.name=this.value; saveData(); addIRCMessage('System', 'Nick changed to '+this.value, 'yellow');">
-                <button onclick="closeIRC()" style="background:none; border:none; cursor:pointer; font-weight:bold; color: var(--bg);">X</button>
+                <button onclick="closeIRC()" class="btn btn-sm btn-ghost">X</button>
             </div>
         </div>
         <div id="irc-log" style="flex-grow:1; overflow-y:auto; padding:5px; font-size:0.85rem; font-family:monospace;">
@@ -42,7 +42,7 @@ function openIRC() {
         </div>
         <div style="display:flex; border-top:1px solid var(--text);">
             <input type="text" id="irc-input" style="flex-grow:1; background:rgba(0,0,0,0.1); border:none; color:var(--text); padding:5px; font-family:inherit; outline:none;" placeholder="Type /help..." onkeypress="if(event.key==='Enter') sendIRC()">
-            <button onclick="sendIRC()" style="background:var(--dim); border:none; color:var(--text); padding:0 10px; cursor:pointer;">SEND</button>
+            <button onclick="sendIRC()" class="btn btn-sm">SEND</button>
         </div>
     `;
 
@@ -144,6 +144,94 @@ function dragElement(elmnt) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_DIALOGS - Уніфіковані модальні вікна/нотифікації
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ensureModalRoot() {
+    let root = document.getElementById('ui-modal-root');
+    if (!root) {
+        root = document.createElement('div');
+        root.id = 'ui-modal-root';
+        document.body.appendChild(root);
+    }
+    return root;
+}
+
+function showModal({ title = 'Notice', body = '', actions = [{ label: 'OK', variant: 'primary', onClick: null }] }) {
+    const root = ensureModalRoot();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.tabIndex = -1;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-window';
+    modal.innerHTML = `<div class="modal-header"><span>${title}</span><button class="btn btn-sm" aria-label="Close" onclick="this.closest('.modal-overlay').remove()">✕</button></div>`;
+
+    const bodyWrap = document.createElement('div');
+    bodyWrap.className = 'modal-body';
+    if (typeof body === 'string') bodyWrap.innerHTML = body; else bodyWrap.appendChild(body);
+    modal.appendChild(bodyWrap);
+
+    const actionsBar = document.createElement('div');
+    actionsBar.className = 'modal-actions';
+    actions.forEach((a, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `btn btn-sm ${a.variant === 'danger' ? 'btn-red' : a.variant === 'success' ? 'btn-green' : ''}`;
+        btn.innerText = a.label || 'OK';
+        btn.onclick = () => {
+            overlay.remove();
+            if (typeof a.onClick === 'function') a.onClick();
+        };
+        if (idx === 0) btn.autofocus = true;
+        actionsBar.appendChild(btn);
+    });
+    modal.appendChild(actionsBar);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    root.appendChild(overlay);
+    return overlay;
+}
+
+function showToast(message, tone = 'info') {
+    const root = ensureModalRoot();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tone}`;
+    toast.innerText = message;
+    root.appendChild(toast);
+    setTimeout(() => toast.remove(), 2600);
+}
+
+function showConfirm(message, title = 'Confirm') {
+    return new Promise((resolve) => {
+        showModal({
+            title,
+            body: message,
+            actions: [
+                { label: 'Cancel', onClick: () => resolve(false) },
+                { label: 'Confirm', variant: 'success', onClick: () => resolve(true) }
+            ]
+        });
+    });
+}
+
+function showPrompt({ title = 'Input', message = '', placeholder = '', defaultValue = '' }) {
+    return new Promise((resolve) => {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = `${message ? `<div style="margin-bottom:8px;">${message}</div>` : ''}<input type="text" class="form-control" style="width:100%;" placeholder="${placeholder}" value="${defaultValue}">`;
+        const input = wrapper.querySelector('input');
+        showModal({
+            title,
+            body: wrapper,
+            actions: [
+                { label: 'Cancel', onClick: () => resolve(null) },
+                { label: 'Save', variant: 'success', onClick: () => resolve(input.value) }
+            ]
+        });
+        setTimeout(() => input?.focus(), 20);
+    });
+}
+
 // Add Keyboard Shortcut for IRC (Alt+I)
 document.addEventListener('keydown', (e) => {
     if (e.altKey && e.code === 'KeyI') openIRC();
@@ -221,11 +309,13 @@ let adIsDrawing = false;
 window.adSetMode = function (m) { adMode = m; renderAsciiDraw(); }
 window.adSetBrush = function (b) { adBrush = b; adMode = 'draw'; renderAsciiDraw(); }
 window.adClear = function () {
-    if (confirm('Clear canvas?')) {
-        adGrid = [];
-        renderAsciiDraw();
-        playSfx(100, 'sawtooth', 0.3);
-    }
+    showConfirm('Clear canvas?').then((ok) => {
+        if (ok) {
+            adGrid = [];
+            renderAsciiDraw();
+            playSfx(100, 'sawtooth', 0.3);
+        }
+    });
 }
 
 window.adStart = function (el) {
@@ -288,8 +378,8 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-window.saveAsciiArt = function () {
-    const name = prompt("Name your artwork:", "Untitled");
+window.saveAsciiArt = async function () {
+    const name = await showPrompt({ title: 'Save ASCII Art', placeholder: 'Untitled' });
     if (!name) return;
 
     const artStr = adGrid.map(row => row.join('')).join('\n');
@@ -304,7 +394,7 @@ window.saveAsciiArt = function () {
     });
 
     saveData();
-    alert("Saved to /gallery > ASCII_ART");
+    showToast("Saved to /gallery > ASCII_ART", 'success');
     playSfx(600, 'square', 0.2);
 }
 /**
@@ -363,6 +453,11 @@ function initData() {
             if (!systemData.password) systemData.password = defaultData.password;
             if (!systemData.games) systemData.games = defaultData.games;
             if (typeof systemData.todoEditable === 'undefined') systemData.todoEditable = defaultData.todoEditable;
+
+            if (!systemData.effects) systemData.effects = JSON.parse(JSON.stringify(defaultData.effects));
+            else {
+                systemData.effects = Object.assign({}, JSON.parse(JSON.stringify(defaultData.effects)), systemData.effects);
+            }
 
             if (!systemData.home.logoText) systemData.home.logoText = defaultData.home.logoText;
             if (!systemData.home.browserTitle) systemData.home.browserTitle = defaultData.home.browserTitle || systemData.home.logoText.replace(':~$', '');
@@ -495,13 +590,15 @@ function toggleThemeMenu() {
     });
 
     // EFFECTS SECTION
-    const fx = systemData.effects || { glow: false, flicker: false, scanline: false };
+    const fx = systemData.effects || { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
 
     const fontChoice = systemData.themes?.font || 'modern';
     html += `<div class="theme-extras">
         <label class="opt-check"><input type="checkbox" ${fx.glow ? 'checked' : ''} onchange="toggleEffect('glow')"> Glow FX</label>
         <label class="opt-check"><input type="checkbox" ${fx.flicker ? 'checked' : ''} onchange="toggleEffect('flicker')"> Flicker</label>
         <label class="opt-check"><input type="checkbox" ${fx.scanline ? 'checked' : ''} onchange="toggleEffect('scanline')"> Scanline+</label>
+        <label class="opt-check"><input type="checkbox" ${fx.svgGlow ? 'checked' : ''} onchange="toggleEffect('svgGlow')"> SVG Glow/Flicker</label>
+        <label class="opt-check"><input type="checkbox" ${fx.screenPulse ? 'checked' : ''} onchange="toggleEffect('screenPulse')"> Screen Pulse</label>
         <label class="opt-check"><input type="checkbox" ${systemData.home.showIcons !== false ? 'checked' : ''} onchange="toggleIcons(this.checked)"> Show Menu Icons</label>
         <div class="font-switcher">
             <div style="font-size:0.75rem; opacity:0.75;">Font</div>
@@ -516,7 +613,7 @@ function toggleThemeMenu() {
 
 /** toggleEffect - Перемикає візуальні ефекти */
 window.toggleEffect = function (type) {
-    if (!systemData.effects) systemData.effects = { glow: false, flicker: false, scanline: false };
+    if (!systemData.effects) systemData.effects = { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
     systemData.effects[type] = !systemData.effects[type];
     applyEffects();
     saveData();
@@ -528,6 +625,8 @@ function applyEffects() {
     document.body.classList.toggle('fx-glow', systemData.effects.glow);
     document.body.classList.toggle('fx-flicker', systemData.effects.flicker);
     document.body.classList.toggle('fx-scanline', systemData.effects.scanline);
+    document.body.classList.toggle('fx-svg', systemData.effects.svgGlow !== false);
+    document.body.classList.toggle('fx-screen-pulse', !!systemData.effects.screenPulse);
 
     // Apply Icons (OnInit)
     document.body.classList.toggle('no-icons', systemData.home.showIcons === false);
@@ -839,6 +938,62 @@ function runTreesSS() {
     draw();
 }
 
+function renderScreensaverMenu() {
+    const v = document.getElementById('view');
+    const current = (systemData.screensaver && systemData.screensaver.type) || 'matrix';
+    const timeout = systemData.screensaver?.timeout || 60;
+    const list = [
+        { id: 'matrix', name: 'Matrix Rain', desc: 'Green code rain inspired by classic terminals.' },
+        { id: 'fire', name: 'Pixel Fire', desc: 'Retro fire simulation with palette cycling.' },
+        { id: 'pipes', name: 'Pipes', desc: 'Colorful wandering pipes across the screen.' },
+        { id: 'dvd', name: 'DVD', desc: 'Bouncing DVD logo with rainbow tints.' },
+        { id: 'trees', name: 'Fractal Trees', desc: 'Procedural trees growing across the canvas.' }
+    ];
+
+    const cards = list.map(l => `<label class="saver-card ${current === l.id ? 'active' : ''}">
+        <input type="radio" name="saver-type" value="${l.id}" ${current === l.id ? 'checked' : ''}>
+        <div class="saver-name">${l.name}</div>
+        <div class="saver-desc">${l.desc}</div>
+        <div class="saver-badge">${l.id}</div>
+    </label>`).join('');
+
+    v.innerHTML = `<h2>SCREENSAVER</h2>
+        <div class="saver-grid">${cards}</div>
+        <div class="saver-actions">
+            <label class="opt-check">
+                <input type="checkbox" id="saver-enabled" ${systemData.screensaver?.enabled !== false ? 'checked' : ''}>
+                Enable idle trigger (${timeout}s)
+            </label>
+            <div class="saver-action-buttons">
+                <button class="btn" onclick="previewSaver()">PREVIEW</button>
+                <button class="btn btn-green" onclick="applySaverChoice()">APPLY & START</button>
+            </div>
+        </div>`;
+
+    v.querySelectorAll('.saver-card input').forEach(inp => {
+        inp.addEventListener('change', () => {
+            v.querySelectorAll('.saver-card').forEach(c => c.classList.remove('active'));
+            inp.closest('.saver-card').classList.add('active');
+        });
+    });
+}
+
+window.previewSaver = function () {
+    const type = document.querySelector('input[name="saver-type"]:checked')?.value || 'matrix';
+    startScreensaver(type);
+};
+
+window.applySaverChoice = function () {
+    const type = document.querySelector('input[name="saver-type"]:checked')?.value || 'matrix';
+    if (!systemData.screensaver) systemData.screensaver = { enabled: true, timeout: 60, type: 'matrix' };
+    systemData.screensaver.type = type;
+    systemData.screensaver.enabled = document.getElementById('saver-enabled')?.checked !== false;
+    saveData();
+    resetIdleTimer();
+    startScreensaver(type);
+    showToast(`Screensaver ${type.toUpperCase()} launched`, 'success');
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_NAVIGATION - Навігація та глобальні змінні
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -887,7 +1042,7 @@ function nav(id) {
     else if (id === 'gallery') renderGallery();
     else if (id === 'draw') renderAsciiDraw();
     else if (id === 'pc') renderAboutPC();
-    else if (id === 'screensaver') startScreensaver(); // Direct trigger
+    else if (id === 'screensaver') renderScreensaverMenu();
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
     else if (id === 'admin') renderAdmin();
@@ -1190,16 +1345,16 @@ async function selectHomeProfile(id) {
 
     if (hasPass) {
         if (!adminAuth) {
-            const att = prompt("ENTER PASSWORD:");
-            const hash = await hashPass(att);
+            const att = await showPrompt({ title: 'ENTER PASSWORD', placeholder: '********' });
+            const hash = await hashPass(att || '');
             if (hash !== profile.password) {
                 playSfx(100, 'sawtooth', 0.5);
-                alert("ACCESS DENIED");
+                showModal({ title: 'ACCESS DENIED', body: 'Wrong password for this profile.' });
                 return;
             }
         } else {
             playSfx(800, 'sine', 0.1);
-            alert("ADMIN: PASSWORD BYPASSED");
+            showToast('ADMIN: PASSWORD BYPASSED', 'info');
         }
     }
 
@@ -1233,7 +1388,70 @@ function selectHomeTag(tag) {
  */
 function renderWork() {
     const v = document.getElementById('view');
-    v.innerHTML = `<h2>WORK_TOOLS</h2><div class="work-grid"><div class="work-card"><h3>SECURE_PASS_GEN</h3><div id="pass-out" class="pass-result">...</div><div class="opts-grid"><label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label><label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label><label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label><label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label></div><div class="form-group" style="margin-bottom:10px;"><label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label><input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value"></div><button class="btn btn-green" onclick="generatePass()">GENERATE</button><button class="btn" onclick="copyPass()">COPY</button></div><div class="work-card"><h3>QR CODE GENERATOR</h3><div class="form-group"><label>Text / URL</label><textarea id="qr-text" class="translit-area" style="height:80px;" placeholder="https://example.com" oninput="autoPreviewQR()"></textarea></div><div class="form-group" style="display:flex; gap:10px; flex-wrap:wrap;"><label class="opt-check">Size: <input type="range" id="qr-size" min="120" max="420" value="256" oninput="document.getElementById('qr-size-val').innerText=this.value; autoPreviewQR();"><span id="qr-size-val">256</span>px</label><label class="opt-check">Format: <select id="qr-format" onchange="autoPreviewQR()"><option value="png">PNG</option><option value="svg">SVG</option></select></label></div><div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;"><button class="btn" onclick="generateQR()">GENERATE</button><button class="btn" onclick="downloadQR()">DOWNLOAD</button></div><div id="qr-preview" class="qr-preview"><canvas id="qr-canvas" width="256" height="256" aria-label="QR preview"></canvas><div id="qr-svg" style="display:none;"></div></div></div><div class="work-card"><h3>TRANSLITERATION (KMU 55)</h3><div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div><textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea><div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div><textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea><div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div></div></div>`;
+    const rememberedQR = lastQRText || '';
+    v.innerHTML = `
+        <h2>WORK_TOOLS</h2>
+        <div class="work-grid">
+            <div class="work-card">
+                <h3>SECURE_PASS_GEN</h3>
+                <div id="pass-out" class="pass-result">...</div>
+                <div class="opts-grid">
+                    <label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label>
+                    <label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label>
+                    <label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label>
+                    <label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label>
+                    <input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value">
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-green" onclick="generatePass()">GENERATE</button>
+                    <button class="btn" onclick="copyPass()">COPY</button>
+                </div>
+            </div>
+
+            <div class="work-card">
+                <h3>QR CODE GENERATOR</h3>
+                <div class="form-group">
+                    <label>Text / URL <span style="opacity:0.6; font-size:0.8rem;">(max 256 chars)</span></label>
+                    <textarea id="qr-text" class="translit-area" style="height:80px;" maxlength="256" placeholder="https://example.com" oninput="autoPreviewQR(); document.getElementById('qr-limit').innerText=this.value.length + '/256';"></textarea>
+                    <div id="qr-limit" style="font-size:0.8rem; opacity:0.6; text-align:right;">0/256</div>
+                </div>
+                <div class="form-group" style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <label class="opt-check">Size:
+                        <input type="range" id="qr-size" min="120" max="420" value="256" oninput="document.getElementById('qr-size-val').innerText=this.value; autoPreviewQR();">
+                        <span id="qr-size-val">256</span>px
+                    </label>
+                    <label class="opt-check">Format:
+                        <select id="qr-format" onchange="autoPreviewQR()"><option value="png">PNG</option><option value="svg">SVG</option></select>
+                    </label>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                    <button class="btn" onclick="generateQR()">GENERATE</button>
+                    <button class="btn" onclick="downloadQR()">DOWNLOAD</button>
+                </div>
+                <div id="qr-preview" class="qr-preview">
+                    <canvas id="qr-canvas" width="256" height="256" aria-label="QR preview"></canvas>
+                    <div id="qr-svg" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div class="work-card">
+                <h3>TRANSLITERATION (KMU 55)</h3>
+                <div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div>
+                <textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea>
+                <div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div>
+                <textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea>
+                <div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div>
+            </div>
+        </div>`;
+
+    const qrInput = document.getElementById('qr-text');
+    if (qrInput) {
+        qrInput.value = rememberedQR;
+        document.getElementById('qr-limit').innerText = `${qrInput.value.length}/256`;
+    }
     generatePass();
     autoPreviewQR();
 }
@@ -1242,7 +1460,13 @@ const words = ["cyber", "secure", "hack", "node", "core", "linux", "root", "admi
 /** generatePass - Генерує випадковий пароль за налаштуваннями */
 function generatePass() { const isPhrase = document.getElementById('p-phrase').checked; const len = parseInt(document.getElementById('p-len').value); const useUp = document.getElementById('p-upper').checked; const useNum = document.getElementById('p-nums').checked; const useSym = document.getElementById('p-syms').checked; let res = ""; if (isPhrase) { let wCount = Math.floor(len / 4); if (wCount < 3) wCount = 3; let arr = []; for (let i = 0; i < wCount; i++) { let w = words[Math.floor(Math.random() * words.length)]; if (useUp) w = w.charAt(0).toUpperCase() + w.slice(1); arr.push(w); } res = arr.join(useSym ? "-" : ""); if (useNum) res += Math.floor(Math.random() * 100); } else { let chars = "abcdefghijklmnopqrstuvwxyz"; if (useUp) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; if (useNum) chars += "0123456789"; if (useSym) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"; for (let i = 0; i < len; i++) res += chars.charAt(Math.floor(Math.random() * chars.length)); } document.getElementById('pass-out').innerText = res; }
 /** copyPass - Копіює згенерований пароль у буфер обміну */
-function copyPass() { const txt = document.getElementById('pass-out').innerText; if (txt !== "...") { navigator.clipboard.writeText(txt); alert("Copied!"); } }
+function copyPass() {
+    const txt = document.getElementById('pass-out').innerText;
+    if (txt !== "...") {
+        navigator.clipboard.writeText(txt);
+        showToast('Password copied', 'success');
+    }
+}
 
 /** mapUA - Таблиця транслітерації українських літер у латинські (КМУ 55) */
 const mapUA = { 'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e', 'ж': 'zh', 'з': 'z', 'и': 'y', 'і': 'i', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ь': '', '\'': '', '’': '', 'ю': 'iu', 'я': 'ia', 'є': 'ie', 'ї': 'i', 'й': 'i' };
@@ -1393,10 +1617,14 @@ function generateQR() {
     const format = document.getElementById('qr-format')?.value || 'png';
     lastQRFormat = format; lastQRSize = size; lastQRText = txt;
     if (!txt.trim()) { const canvas = document.getElementById('qr-canvas'); if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillText('Enter text', 10, 20); } return; }
+    if (txt.length > 256) {
+        showModal({ title: 'QR LIMIT', body: 'Please keep QR content within 256 characters.' });
+        return;
+    }
     try {
         lastQRMatrix = buildQRMatrix(txt.trim());
     } catch (e) {
-        alert(e.message || 'Unable to build QR');
+        showModal({ title: 'QR ERROR', body: e.message || 'Unable to build QR' });
         return;
     }
 
@@ -1417,7 +1645,7 @@ function generateQR() {
 }
 
 function downloadQR() {
-    if (!lastQRMatrix || !lastQRText.trim()) { alert('Generate QR first.'); return; }
+    if (!lastQRMatrix || !lastQRText.trim()) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
     if (lastQRFormat === 'svg') {
         const svg = matrixToSVG(lastQRMatrix, lastQRSize);
         const blob = new Blob([svg], { type: 'image/svg+xml' });
@@ -1645,13 +1873,16 @@ function renderObsidian() {
             b.onclick = () => {
                 if (isLocked) {
                     if (!adminAuth) {
-                        const p = prompt("ENTER PASSWORD for " + c + ":");
-                        if (p !== obs.catAuth[c]) {
-                            playSfx(100, 'sawtooth', 0.5); alert("ACCESS DENIED"); return;
-                        }
+                        showPrompt({ title: 'ENTER PASSWORD', message: `Category ${c} is locked`, placeholder: '********' }).then((p) => {
+                            if (p !== obs.catAuth[c]) {
+                                playSfx(100, 'sawtooth', 0.5); showModal({ title: 'ACCESS DENIED', body: 'Wrong category password.' }); return;
+                            }
+                            currentObsCat = c; currentObsFile = ''; renderObsidian();
+                        });
+                        return;
                     } else {
                         playSfx(800, 'sine', 0.1);
-                        alert("ADMIN: PASSWORD BYPASSED");
+                        showToast('ADMIN: PASSWORD BYPASSED', 'info');
                     }
                 }
                 currentObsCat = c; currentObsFile = ''; renderObsidian();
@@ -1803,7 +2034,17 @@ function renderTodo() {
     // Initialize events
     if (!systemData.calendarEvents) systemData.calendarEvents = [];
 
+    const totalTasks = systemData.todos.length;
+    const doneTasks = systemData.todos.filter(t => t.d).length;
+    const scheduledTasks = systemData.todos.filter(t => t.due).length;
+    const progress = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
     let html = `<h2>TODO_MANAGER ${editable ? '[EDIT_MODE]' : '[READ_ONLY]'}</h2>`;
+    html += `<div class="todo-stats">
+        <div><strong>${doneTasks}/${totalTasks}</strong> completed</div>
+        <div class="progress"><span style="width:${progress}%;"></span></div>
+        <div>${scheduledTasks} scheduled</div>
+    </div>`;
 
     if (editable) {
         html += `<div class="todo-input-group" style="margin-bottom:15px; flex-wrap:wrap;">
@@ -1845,13 +2086,19 @@ function renderTodoList() {
     systemData.todos.forEach((t, i) => {
         const el = document.createElement('div');
         el.className = `todo-item ${t.d ? 'todo-done' : ''}`;
+        const dueInfo = t.due ? `<span class="todo-due">${t.due}${t.time ? ' ' + t.time : ''}</span>` : '<span class="todo-due muted">No date</span>';
         if (editable) {
             el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span>
-                           <span class="todo-text">${t.t}</span>
-                           ${t.due ? `<span style="margin-left:10px; font-size:0.8rem; opacity:0.7;">(${t.due}${t.time ? ' ' + t.time : ''})</span>` : ''}
-                           <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})" style="margin-left:auto">X</button>`;
+                           <div class="todo-meta" onclick="openTodoDetail(${i})">
+                                <div class="todo-text">${t.t}</div>
+                                <div class="todo-meta-line">${dueInfo} <span class="todo-status">${t.d ? 'DONE' : 'ACTIVE'}</span></div>
+                           </div>
+                           <div class="todo-actions">
+                                <button class="btn btn-sm" onclick="openTodoDetail(${i})">DETAILS</button>
+                                <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})">X</button>
+                           </div>`;
         } else {
-            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>${t.due ? `<span style="margin-left:10px; font-size:0.8rem; opacity:0.7;">(${t.due}${t.time ? ' ' + t.time : ''})</span>` : ''}`;
+            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <div class="todo-meta"><div class="todo-text">${t.t}</div><div class="todo-meta-line">${dueInfo}</div></div>`;
         }
         l.appendChild(el);
     });
@@ -1901,43 +2148,75 @@ function renderCalendar() {
 }
 
 window.openCalDate = function (date) {
-    const events = systemData.calendarEvents.filter(e => e.date === date);
-    let l = events.map((e, idx) => `<div>[${e.time}] ${e.title} <button onclick="delCalEvent('${date}',${idx})">x</button></div>`).join('');
+    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.gap = '10px';
 
-    const name = prompt(`EVENTS FOR ${date}\n\n${l.replace(/<[^>]*>/g, '')}\n\nAdd new event (Format: HH:MM Title):`);
-    if (name) {
-        const parts = name.split(' ');
-        const time = parts[0];
-        const title = parts.slice(1).join(' ');
-        systemData.calendarEvents.push({ date: date, time: time, title: title || 'Event' });
-        saveData();
-        renderCalendar();
-    }
-}
+    const listBox = document.createElement('div');
+    listBox.className = 'cal-event-list';
 
-window.delCalEvent = function (date, idx) {
-    if (!confirm("Delete this event?")) return;
-    const globalIdx = systemData.calendarEvents.findIndex((e, i) => e.date === date && i === (systemData.calendarEvents.filter(x => x.date === date).indexOf(e))); // Tricky to find exact index in global array if multiple events on same day. 
-    // Easier approach: Filter out the specific one.
-    // However, the `idx` passed is the index within the *filtered* array for that day.
-
-    // Let's get the event object first
-    const dayEvents = systemData.calendarEvents.filter(e => e.date === date);
-    const eventToDelete = dayEvents[idx];
-
-    if (eventToDelete) {
-        // Find index in main array
-        const realIdx = systemData.calendarEvents.indexOf(eventToDelete);
-        if (realIdx > -1) {
-            systemData.calendarEvents.splice(realIdx, 1);
-            saveData();
-            // Re-open date view
-            openCalDate(date);
-            // Refresh calendar background
-            renderCalendar();
+    const renderList = () => {
+        const events = systemData.calendarEvents.filter(e => e.date === date);
+        if (!events.length) {
+            listBox.innerHTML = '<div style="opacity:0.6;">No events for this date</div>';
+            return;
         }
-    }
-}
+        listBox.innerHTML = '';
+        events.forEach((e, idx) => {
+            const row = document.createElement('div');
+            row.className = 'cal-event-row';
+            row.innerHTML = `<span class="badge">${e.time || 'All Day'}</span><span class="cal-event-title">${e.title}</span>`;
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn btn-sm btn-red';
+            delBtn.innerText = 'Delete';
+            delBtn.onclick = () => {
+                showConfirm('Delete this event?').then((ok) => {
+                    if (!ok) return;
+                    const dayEvents = systemData.calendarEvents.filter(ev => ev.date === date);
+                    const target = dayEvents[idx];
+                    if (!target) return;
+                    const realIdx = systemData.calendarEvents.indexOf(target);
+                    if (realIdx > -1) systemData.calendarEvents.splice(realIdx, 1);
+                    saveData();
+                    renderList();
+                    renderCalendar();
+                });
+            };
+            row.appendChild(delBtn);
+            listBox.appendChild(row);
+        });
+    };
+
+    const form = document.createElement('div');
+    form.style.display = 'flex';
+    form.style.gap = '10px';
+    form.style.flexWrap = 'wrap';
+    form.innerHTML = `
+        <label class="opt-check">Time <input type="time" id="cal-time" class="todo-input" style="max-width:140px;"></label>
+        <input type="text" id="cal-title" class="todo-input" placeholder="Title..." style="flex:1; min-width:180px;">
+        <button class="btn btn-green" id="cal-add-btn">Add</button>
+    `;
+
+    wrapper.appendChild(listBox);
+    wrapper.appendChild(form);
+
+    const overlay = showModal({ title: `Events for ${date}`, body: wrapper, actions: [{ label: 'Close' }] });
+    const addBtn = form.querySelector('#cal-add-btn');
+    addBtn.onclick = () => {
+        const time = form.querySelector('#cal-time').value || 'All Day';
+        const title = form.querySelector('#cal-title').value.trim() || 'Event';
+        systemData.calendarEvents.push({ date, time, title });
+        saveData();
+        form.querySelector('#cal-title').value = '';
+        renderList();
+        renderCalendar();
+    };
+
+    renderList();
+    setTimeout(() => overlay?.querySelector('input')?.focus(), 30);
+};
 
 // IMPORT / EXPORT
 window.exportTodoData = function () {
@@ -1987,10 +2266,10 @@ window.importTodoData = function (acc) {
             if (d.todos) systemData.todos = d.todos;
             if (d.calendar) systemData.calendarEvents = d.calendar;
             saveData();
-            alert("Tasks Imported!");
+            showToast('Tasks Imported!', 'success');
             renderTodo();
         } catch (err) {
-            alert("Error parsing JSON");
+            showModal({ title: 'Import Error', body: 'Error parsing JSON' });
         }
     };
     r.readAsText(file);
@@ -2026,12 +2305,61 @@ function toggleTodoDone(i) {
 }
 /** removeTodoItem - Видаляє елемент зі списку справ */
 function removeTodoItem(i) {
-    if (confirm("Delete this task?")) {
+    showConfirm('Delete this task?').then((ok) => {
+        if (!ok) return;
         systemData.todos.splice(i, 1);
         saveData();
         renderTodoList();
         playSfx(400);
-    }
+    });
+}
+
+function openTodoDetail(i) {
+    const item = systemData.todos[i];
+    if (!item) return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+        <div class="form-group"><label>Title</label><input type="text" id="todo-edit-title" class="form-control" value="${item.t}"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <label class="opt-check">Due <input type="date" id="todo-edit-date" value="${item.due || ''}" class="todo-input" style="max-width:180px;"></label>
+            <label class="opt-check">Time <input type="time" id="todo-edit-time" value="${item.time || ''}" class="todo-input" style="max-width:140px;"></label>
+            <label class="opt-check"><input type="checkbox" id="todo-edit-done" ${item.d ? 'checked' : ''}> Done</label>
+        </div>
+    `;
+
+    showModal({
+        title: 'Task Details',
+        body: wrapper,
+        actions: [
+            { label: 'Delete', variant: 'danger', onClick: () => removeTodoItem(i) },
+            {
+                label: 'Save', variant: 'success', onClick: () => {
+                    const title = wrapper.querySelector('#todo-edit-title').value.trim() || 'Task';
+                    const due = wrapper.querySelector('#todo-edit-date').value;
+                    const time = wrapper.querySelector('#todo-edit-time').value;
+                    const done = wrapper.querySelector('#todo-edit-done').checked;
+
+                    const prevDue = item.due;
+                    const prevTitle = item.t;
+                    item.t = title;
+                    item.due = due || undefined;
+                    item.time = time || undefined;
+                    item.d = done;
+
+                    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+                    if (prevDue) {
+                        systemData.calendarEvents = systemData.calendarEvents.filter(ev => !(ev.title === prevTitle && ev.date === prevDue));
+                    }
+                    if (item.due) {
+                        systemData.calendarEvents.push({ date: item.due, time: item.time || 'All Day', title: item.t });
+                    }
+
+                    saveData();
+                    renderTodoList();
+                }
+            }
+        ]
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2052,22 +2380,42 @@ function renderGameMenu() {
         <div class="game-card" onclick="runGame('pico8')">PICO-8 (WEB)</div>
         ${customGames}
     </div>
-    <div id="game-area" class="game-area" style="display:none; width:640px; height:480px;">
-        <canvas id="game-canvas" width="640" height="480"></canvas>
+    <div class="game-panels">
+        <div id="game-area" class="game-area" style="display:none; width:640px; height:480px;">
+            <canvas id="game-canvas" width="640" height="480"></canvas>
+            <div class="game-hint">Arrows to move. Space/Enter to rotate. Esc to exit.</div>
+        </div>
+        <div id="pico-area" class="pico-panel" style="display:none;">
+            <div class="game-toolbar">
+                <input id="pico-url" class="todo-input" placeholder="PICO-8 widget URL" value="https://www.lexaloffle.com/bbs/widget.php?pid=celeste" aria-label="PICO-8 cart url">
+                <button class="btn" onclick="loadPicoCart()">LOAD CART</button>
+                <button class="btn" onclick="playPicoDemo()">PLAY CELESTE</button>
+            </div>
+            <iframe id="pico-frame" src="" style="width:100%; height:70vh; border:1px solid var(--text); background:#000;"></iframe>
+        </div>
     </div>
-    <div id="pico-area" style="display:none; width:100%; height:80vh; flex-direction:column;">
-         <div style="margin-bottom:5px; display:flex; gap:10px;">
-            <button class="btn" onclick="loadPicoCart()">LOAD CART URL</button>
-            <button class="btn" onclick="document.getElementById('pico-frame').src='https://www.lexaloffle.com/bbs/widget.php?pid=celeste'">PLAY CELESTE</button>
-         </div>
-        <iframe id="pico-frame" src="" style="width:100%; height:100%; border:none; background:#000;"></iframe>
-    </div>
-    <div style="margin-top:10px;"><button class="btn btn-red" onclick="stopGames()">EXIT_GAME</button></div>`;
+    <div class="game-footer">
+        <div id="game-status" aria-live="polite">Select a game to start.</div>
+        <button class="btn btn-red" onclick="stopGames()">EXIT_GAME</button>
+    </div>`;
 }
 
 window.loadPicoCart = function () {
-    const url = prompt("Enter PICO-8 Web/Widget URL:");
-    if (url) document.getElementById('pico-frame').src = url;
+    const input = document.getElementById('pico-url');
+    const url = input?.value?.trim();
+    if (!url) { showModal({ title: 'No URL', body: 'Paste a PICO-8 web cart URL first.' }); return; }
+    document.getElementById('pico-frame').src = url;
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Loading PICO-8 cart...';
+}
+
+window.playPicoDemo = function () {
+    const demo = 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
+    const input = document.getElementById('pico-url');
+    if (input) input.value = demo;
+    document.getElementById('pico-frame').src = demo;
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Playing Celeste demo';
 }
 
 /** gameInterval - Інтервал активної гри для коректної зупинки */
@@ -2083,17 +2431,14 @@ function stopGames() {
     if (gameArea) gameArea.style.display = 'none';
     const picoArea = document.getElementById('pico-area');
     if (picoArea) picoArea.style.display = 'none';
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Game stopped';
     // stopScreensaver(); // Just in case - assuming this function exists elsewhere or is a placeholder
 }
 
 // --- BUILT-IN MINI GAMES (SAFE DEFAULTS) ---
 
 // Predeclare handlers to avoid ReferenceErrors during resolution
-let startSnake;
-let startPong;
-let startTetris;
-
-startSnake = function (canvas, ctx) {
 function startSnake(canvas, ctx) {
     const gridSize = 20;
     const cols = Math.floor(canvas.width / gridSize);
@@ -2148,7 +2493,6 @@ function startSnake(canvas, ctx) {
     gameCleanup = () => document.removeEventListener('keydown', keyHandler);
 }
 
-startPong = function (canvas, ctx) {
 function startPong(canvas, ctx) {
     let ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: 2 };
     let paddle = { x: canvas.width / 2 - 40, y: canvas.height - 20, w: 80, h: 8 };
@@ -2193,8 +2537,7 @@ function startPong(canvas, ctx) {
     };
 }
 
-startTetris = function (canvas, ctx) {
-  function startTetris(canvas, ctx) {
+function startTetris(canvas, ctx) {
       const cols = 10, rows = 20, size = 24;
       canvas.width = cols * size;
       canvas.height = rows * size;
@@ -2294,31 +2637,23 @@ startTetris = function (canvas, ctx) {
       stopGames(); // Clear previous
 
       if (id === 'pico8') {
-          pico.style.display = 'block';
-          // Use a generic placeholder or allow input
-          const url = prompt("Enter PICO-8 Web Cart URL (or cancel for demo):", "https://www.lexaloffle.com/bbs/widget.php?pid=celeste");
-          if (url) {
-              document.getElementById('pico-frame').src = url;
-          }
+          pico.style.display = 'flex';
+          const input = document.getElementById('pico-url');
+          const url = input?.value || 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
+          document.getElementById('pico-frame').src = url;
+          const status = document.getElementById('game-status');
+          if (status) status.innerText = 'PICO-8 web player ready';
           return;
       }
 
       area.style.display = 'block';
+      const status = document.getElementById('game-status');
+      if (status) status.innerText = `Running ${id.toUpperCase()}`;
 
       const handlers = {
           snake: typeof window.startSnake === 'function' ? window.startSnake : startSnake,
           tetris: typeof window.startTetris === 'function' ? window.startTetris : startTetris,
           pong: typeof window.startPong === 'function' ? window.startPong : startPong,
-      const builtInHandlers = {
-          snake: typeof startSnake === 'function' ? startSnake : null,
-          tetris: typeof startTetris === 'function' ? startTetris : null,
-          pong: typeof startPong === 'function' ? startPong : null,
-      };
-
-      const handlers = {
-          snake: typeof window.startSnake === 'function' ? window.startSnake : builtInHandlers.snake,
-          tetris: typeof window.startTetris === 'function' ? window.startTetris : builtInHandlers.tetris,
-          pong: typeof window.startPong === 'function' ? window.startPong : builtInHandlers.pong,
       };
 
       if (typeof handlers[id] === 'function') {
@@ -2543,7 +2878,7 @@ function easterEggLogo() {
 function checkAdminUnlock() {
     if (glitchTriggered && mintEvaClicks >= 10) {
         const btn = document.getElementById('nav-admin');
-        if (btn.style.display !== 'block') { btn.style.display = 'block'; playSfx(800, 'square', 0.5); alert("SYSTEM OVERRIDE: ADMIN ACCESS UNLOCKED"); }
+        if (btn.style.display !== 'block') { btn.style.display = 'block'; playSfx(800, 'square', 0.5); showToast('SYSTEM OVERRIDE: ADMIN ACCESS UNLOCKED', 'success'); }
     }
 }
 /** easterEggClown - Секретний оверлей з клоуном */

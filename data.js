@@ -7,6 +7,13 @@ const defaultData = {
         "font": "modern",
         "custom": []
     },
+    "effects": {
+        "glow": false,
+        "flicker": false,
+        "scanline": false,
+        "svgGlow": true,
+        "screenPulse": false
+    },
     "todoEditable": false,
     "home": {
         "ascii": "        .      ______    __\\/\\____            _.------. \n        |\\___/_  __/____)  __  /  _____.--.(      .: | \n   .----|__   /  \\__   /  _  _/--/   _      _)   l___/ \n   |         /      |   |  |      |   (    |__   __/   \n   | ::. ___/|__    .: |__|  .:: | ::.  _  /|   |     \n   l____ ( x0! \\_______l  l______l______)\\/ |___|     \n       \\/\n",
