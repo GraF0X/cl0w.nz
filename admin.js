@@ -429,6 +429,20 @@ window.saveJob = function (i) { const j = systemData.resume.jobs[i]; j.co = docu
 
 // --- EDUCATION ---
 /** renderAdminEdu - Рендерить список освіти */
+window.renderAdminEdu = function () {
+    const l = document.getElementById('adm-edu-list');
+    if (!l) return;
+
+    const education = (systemData.resume && Array.isArray(systemData.resume.education)) ? systemData.resume.education : [];
+    if (!education.length) {
+        l.innerHTML = '<div class="item-row" style="opacity:0.6;">No education records</div>';
+        return;
+    }
+
+    l.innerHTML = education.map((e, i) =>
+        `<div class="item-row"><span>${e.inst || 'Institution'}</span> <div><button class="btn btn-sm" onclick="editEdu(${i})">EDIT</button> <button class="btn btn-red btn-sm" onclick="delEdu(${i})">DEL</button></div></div>`
+    ).join('');
+};
 window.addEdu = function () { systemData.resume.education.unshift({ inst: "University", year: "2020-2024", deg: "Degree" }); saveData(); renderAdminEdu(); editEdu(0); }
 window.delEdu = function (i) { if (confirm("Delete?")) { systemData.resume.education.splice(i, 1); saveData(); renderAdminEdu(); document.getElementById('edu-editor-area').style.display = 'none'; } }
 window.editEdu = function (i) { const e = systemData.resume.education[i]; const area = document.getElementById('edu-editor-area'); area.style.display = 'block'; area.innerHTML = `<h4>Editing: ${e.inst}</h4><div class="form-group"><label>Institution:</label><input class="form-control" id="ee-inst" value="${e.inst}"></div><div class="form-group"><label>Year:</label><input class="form-control" id="ee-year" value="${e.year}"></div><div class="form-group"><label>Degree:</label><input class="form-control" id="ee-deg" value="${e.deg}"></div><button class="btn btn-green" onclick="saveEdu(${i})">SAVE EDU</button> <button class="btn" onclick="document.getElementById('edu-editor-area').style.display='none'">CLOSE</button>`; }
@@ -593,11 +607,34 @@ window.renderAdminGameList = function () { const l = document.getElementById('ad
 /** createNewGame - Створює нову гру з шаблоном коду */
 window.createNewGame = function () { editingGameId = 'game_' + Date.now(); document.getElementById('game-editor-area').style.display = 'block'; document.getElementById('ge-heading').innerText = 'Creating New Game'; document.getElementById('ge-name').value = 'My New Game'; document.getElementById('ge-code').value = `// Game Code Here. \n// Container: document.getElementById('arena')\n\nconst arena = document.getElementById('arena');\narena.innerHTML = '<div style="padding:20px">Hello World</div>';`; }
 /** editGame - Відкриває редактор коду гри */
-window.editGame = function (id) { const g = systemData.games.find(x => x.id === id); if (!g) return; editingGameId = id; document.getElementById('game-editor-area').style.display = 'block'; document.getElementById('ge-heading').innerText = 'Editing: ' + g.name; document.getElementById('ge-name').value = g.name; document.getElementById('ge-code').value = g.code; }
+window.editGame = function (id) { const g = systemData.games.find(x => x.id === id); if (!g) return; editingGameId = id; document.getElementById('game-editor-area').style.display = 'block'; document.getElementById('ge-heading').innerText = 'Editing: ' + g.name; document.getElementById('ge-name').value = g.name; document.getElementById('ge-code').value = g.code || ''; document.getElementById('ge-name').focus(); }
 /** saveGameCode - Зберігає код гри */
-window.saveGameCode = function () { if (!editingGameId) return; const name = document.getElementById('ge-name').value; const code = document.getElementById('ge-code').value; const existingIndex = systemData.games.findIndex(x => x.id === editingGameId); if (existingIndex >= 0) { systemData.games[existingIndex].name = name; systemData.games[existingIndex].code = code; } else { systemData.games.push({ id: editingGameId, name: name, code: code }); } saveData(); renderAdminGameList(); alert("Game Saved!"); }
+window.saveGameCode = function () {
+    if (!editingGameId) return;
+    const name = document.getElementById('ge-name').value;
+    const code = document.getElementById('ge-code').value;
+    const existingIndex = systemData.games.findIndex(x => x.id === editingGameId);
+    if (existingIndex >= 0) {
+        systemData.games[existingIndex].name = name;
+        systemData.games[existingIndex].code = code;
+    } else {
+        systemData.games.push({ id: editingGameId, name: name, code: code });
+    }
+    saveData();
+    renderAdminGameList();
+    showToast('Game saved', 'success');
+};
 /** delGame - Видаляє гру */
-window.delGame = function (id) { if (confirm("Delete Game?")) { systemData.games = systemData.games.filter(x => x.id !== id); saveData(); renderAdminGameList(); closeGameEditor(); } }
+window.delGame = function (id) {
+    showConfirm('Delete this game?').then((ok) => {
+        if (!ok) return;
+        systemData.games = systemData.games.filter(x => x.id !== id);
+        saveData();
+        renderAdminGameList();
+        closeGameEditor();
+        showToast('Game removed', 'info');
+    });
+};
 /** closeGameEditor - Закриває редактор гри */
 window.closeGameEditor = function () { document.getElementById('game-editor-area').style.display = 'none'; editingGameId = null; }
 
