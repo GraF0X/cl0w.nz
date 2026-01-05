@@ -585,6 +585,7 @@ function toggleThemeMenu() {
     const isOpen = pop.classList.contains('show');
     if (isOpen) {
         pop.classList.remove('show');
+        pop.style.display = '';
         return;
     }
 
@@ -622,6 +623,7 @@ function toggleThemeMenu() {
     </div>`;
 
     pop.innerHTML = html;
+    pop.style.display = '';
     pop.classList.add('show');
 }
 
@@ -709,7 +711,8 @@ document.addEventListener('keydown', (e) => {
     // CLOSE OVERLAYS
     if (e.key === 'Escape') {
         // Close Theme Menu
-        document.getElementById('theme-popup').style.display = 'none';
+        const pop = document.getElementById('theme-popup');
+        if (pop) { pop.classList.remove('show'); pop.style.display = ''; }
         // Close Gallery Overlay
         const overlay = document.querySelector('div[style*="position:fixed; top:0; left:0; width:100%; height:100%"]');
         if (overlay) overlay.click();
@@ -765,7 +768,7 @@ document.addEventListener('keydown', resetIdleTimer);
 document.addEventListener('click', resetIdleTimer);
 
 window.startScreensaver = function (previewType) {
-    if (ssActive) return;
+    if (ssActive) stopScreensaver();
     if (!systemData.screensaver) systemData.screensaver = { enabled: true, timeout: 60, type: 'matrix' };
     const type = previewType || (systemData.screensaver ? systemData.screensaver.type : 'matrix');
     systemData.screensaver.type = type;
@@ -784,7 +787,11 @@ window.startScreensaver = function (previewType) {
 
     overlay.style.display = 'flex';
     ssCanvas = document.getElementById('screensaver-canvas');
-    ssCtx = ssCanvas.getContext('2d');
+    if (!ssCanvas) {
+        overlay.innerHTML = '<canvas id="screensaver-canvas"></canvas>';
+        ssCanvas = document.getElementById('screensaver-canvas');
+    }
+    ssCtx = ssCanvas ? ssCanvas.getContext('2d') : null;
     ssCanvas.width = window.innerWidth;
     ssCanvas.height = window.innerHeight;
 

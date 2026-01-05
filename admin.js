@@ -185,11 +185,23 @@ function loadAdminEditor(sec) {
         el.innerHTML = `<h3>Todo List Manager</h3>
                 <div style="margin-bottom:20px; border:1px solid var(--dim); padding:10px;">
                     <label class="opt-check" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                        <input type="checkbox" id="adm-todo-editable" ${systemData.todoEditable ? 'checked' : ''} onchange="saveTodoSettings()"> 
+                        <input type="checkbox" id="adm-todo-editable" ${systemData.todoEditable ? 'checked' : ''} onchange="saveTodoSettings()">
                         <span><b>Allow User edit ToDo (Дозволити користувачам редагувати список)</b></span>
                     </label>
                 </div>
-                <div class="todo-input-group"><input type="text" id="adm-new-todo" class="todo-input" placeholder="Admin task..." onkeypress="if(event.key==='Enter') addAdminTodo()"><button class="btn" onclick="addAdminTodo()">ADD</button></div><div class="item-list" id="adm-todo-list"></div>`;
+                <div class="todo-input-group" style="flex-wrap:wrap; gap:8px; align-items:flex-end;">
+                    <input type="text" id="adm-new-todo" class="todo-input" placeholder="Admin task..." onkeypress="if(event.key==='Enter') addAdminTodo()" style="flex:1; min-width:200px;">
+                    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
+                        <span>Due Date</span>
+                        <input type="date" id="adm-new-todo-date" class="todo-input" style="max-width:180px;">
+                    </label>
+                    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
+                        <span>Time</span>
+                        <input type="time" id="adm-new-todo-time" class="todo-input" style="max-width:140px;">
+                    </label>
+                    <button class="btn" onclick="addAdminTodo()">ADD</button>
+                </div>
+                <div class="item-list" id="adm-todo-list"></div>`;
         renderAdminTodo();
     } else if (sec === 'gallery') {
         el.innerHTML = `<h3>Manage Gallery (Images)</h3><div class="form-group"><label class="form-label">Upload Image:</label><input type="file" id="adm-img-upload" accept="image/*" class="form-control"></div><div class="form-group"><label class="form-label">Name:</label><input class="form-control" id="adm-img-name" placeholder="IMG_NAME"></div><button class="btn btn-green" onclick="uploadImage()">UPLOAD</button><hr><div class="item-list" id="adm-gal-list"></div>
@@ -539,8 +551,44 @@ window.delBlog = function (i) { if (confirm("Delete?")) { systemData.blog.splice
 
 /** renderAdminTodo - Рендерить список завдань */
 // TODO
-window.renderAdminTodo = function () { const l = document.getElementById('adm-todo-list'); l.innerHTML = systemData.todos.map((t, i) => `<div class="item-row" style="${t.d ? 'opacity:0.5' : ''}"><span><input type="checkbox" ${t.d ? 'checked' : ''} onchange="toggleTodo(${i})"> ${t.t}</span><button class="btn btn-red btn-sm" onclick="delTodo(${i})">DEL</button></div>`).join(''); }
-window.addAdminTodo = function () { const inp = document.getElementById('adm-new-todo'); if (inp.value.trim()) { systemData.todos.push({ t: inp.value.trim(), d: false }); saveData(); renderAdminTodo(); inp.value = ''; } }
+window.renderAdminTodo = function () {
+    const l = document.getElementById('adm-todo-list');
+    const rows = systemData.todos.map((t, i) => {
+        const dueVal = t.due ? t.due : '';
+        const timeVal = t.time ? t.time : '';
+        return `<div class="item-row" style="gap:10px; align-items:center; ${t.d ? 'opacity:0.6' : ''}">
+            <input type="checkbox" ${t.d ? 'checked' : ''} onchange="toggleTodo(${i})" aria-label="Mark done">
+            <input type="text" class="form-control" style="flex:1;" value="${t.t}" onchange="editAdminTodo(${i}, 't', this.value)">
+            <input type="date" class="form-control" style="max-width:170px;" value="${dueVal}" onchange="editAdminTodo(${i}, 'due', this.value)">
+            <input type="time" class="form-control" style="max-width:130px;" value="${timeVal}" onchange="editAdminTodo(${i}, 'time', this.value)">
+            <button class="btn btn-red btn-sm" onclick="delTodo(${i})">DEL</button>
+        </div>`;
+    });
+    l.innerHTML = rows.join('');
+};
+window.addAdminTodo = function () {
+    const inp = document.getElementById('adm-new-todo');
+    const date = document.getElementById('adm-new-todo-date');
+    const time = document.getElementById('adm-new-todo-time');
+    const title = inp && inp.value ? inp.value.trim() : '';
+    if (!title) return;
+    const item = { t: title, d: false };
+    if (date && date.value) item.due = date.value;
+    if (time && time.value) item.time = time.value;
+    systemData.todos.push(item);
+    saveData();
+    renderAdminTodo();
+    if (inp) inp.value = '';
+    if (date) date.value = '';
+    if (time) time.value = '';
+};
+window.editAdminTodo = function (i, key, value) {
+    if (!systemData.todos[i]) return;
+    if (key === 't') systemData.todos[i].t = value.trim();
+    if (key === 'due') systemData.todos[i].due = value ? value : undefined;
+    if (key === 'time') systemData.todos[i].time = value ? value : undefined;
+    saveData();
+};
 window.toggleTodo = function (i) { systemData.todos[i].d = !systemData.todos[i].d; saveData(); renderAdminTodo(); }
 window.delTodo = function (i) { systemData.todos.splice(i, 1); saveData(); renderAdminTodo(); }
 window.saveTodoSettings = function () { systemData.todoEditable = document.getElementById('adm-todo-editable').checked; saveData(); }
