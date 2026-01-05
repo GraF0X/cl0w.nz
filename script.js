@@ -2123,6 +2123,194 @@ function runGame(id) {
     ctx.fillText('Game not available', canvas.width / 2, canvas.height / 2);
 }
 
+// --- BUILT-IN MINI GAMES (SAFE DEFAULTS) ---
+
+function startSnake(canvas, ctx) {
+    const gridSize = 20;
+    const cols = Math.floor(canvas.width / gridSize);
+    const rows = Math.floor(canvas.height / gridSize);
+    let snake = [{ x: 5, y: 5 }];
+    let dir = { x: 1, y: 0 };
+    let food = { x: 10, y: 10 };
+    let alive = true;
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowUp' && dir.y === 0) dir = { x: 0, y: -1 };
+        if (e.key === 'ArrowDown' && dir.y === 0) dir = { x: 0, y: 1 };
+        if (e.key === 'ArrowLeft' && dir.x === 0) dir = { x: -1, y: 0 };
+        if (e.key === 'ArrowRight' && dir.x === 0) dir = { x: 1, y: 0 };
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const spawnFood = () => {
+        food = {
+            x: Math.floor(Math.random() * cols),
+            y: Math.floor(Math.random() * rows)
+        };
+    };
+
+    const loop = () => {
+        if (!alive) return;
+        const head = { x: (snake[0].x + dir.x + cols) % cols, y: (snake[0].y + dir.y + rows) % rows };
+        // Collision with self
+        if (snake.some((s) => s.x === head.x && s.y === head.y)) {
+            alive = false;
+            ctx.fillStyle = '#f55';
+            ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+        snake.unshift(head);
+        if (head.x === food.x && head.y === food.y) {
+            playSfx(900, 'square', 0.05);
+            spawnFood();
+        } else {
+            snake.pop();
+        }
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        snake.forEach((s) => ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize - 2, gridSize - 2));
+        ctx.fillStyle = '#f50';
+        ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+    };
+
+    gameInterval = setInterval(loop, 120);
+    gameCleanup = () => document.removeEventListener('keydown', keyHandler);
+}
+
+function startPong(canvas, ctx) {
+    let ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: 2 };
+    let paddle = { x: canvas.width / 2 - 40, y: canvas.height - 20, w: 80, h: 8 };
+    const keyState = { left: false, right: false };
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowLeft') keyState.left = e.type === 'keydown';
+        if (e.key === 'ArrowRight') keyState.right = e.type === 'keydown';
+    };
+    document.addEventListener('keydown', keyHandler);
+    document.addEventListener('keyup', keyHandler);
+
+    const loop = () => {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        if (ball.x < 5 || ball.x > canvas.width - 5) ball.vx *= -1;
+        if (ball.y < 5) ball.vy *= -1;
+
+        if (ball.y > paddle.y - 5 && ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
+            ball.vy *= -1;
+            playSfx(700, 'square', 0.05);
+        }
+        if (ball.y > canvas.height) {
+            ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: -2 };
+        }
+
+        if (keyState.left) paddle.x = Math.max(0, paddle.x - 5);
+        if (keyState.right) paddle.x = Math.min(canvas.width - paddle.w, paddle.x + 5);
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        ctx.fillRect(ball.x - 4, ball.y - 4, 8, 8);
+        ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    };
+
+    gameInterval = setInterval(loop, 16);
+    gameCleanup = () => {
+        document.removeEventListener('keydown', keyHandler);
+        document.removeEventListener('keyup', keyHandler);
+    };
+}
+
+function startTetris(canvas, ctx) {
+    const cols = 10, rows = 20, size = 24;
+    canvas.width = cols * size;
+    canvas.height = rows * size;
+    const shapes = [
+        [[1, 1, 1, 1]],
+        [[1, 1], [1, 1]],
+        [[0, 1, 0], [1, 1, 1]],
+        [[1, 0, 0], [1, 1, 1]],
+        [[0, 0, 1], [1, 1, 1]],
+    ];
+    const board = Array.from({ length: rows }, () => Array(cols).fill(0));
+    let current = { shape: shapes[Math.floor(Math.random() * shapes.length)], x: 3, y: 0 };
+
+    const canMove = (dx, dy, shape = current.shape) => {
+        for (let y = 0; y < shape.length; y++) {
+            for (let x = 0; x < shape[0].length; x++) {
+                if (!shape[y][x]) continue;
+                const nx = current.x + dx + x;
+                const ny = current.y + dy + y;
+                if (nx < 0 || nx >= cols || ny >= rows) return false;
+                if (ny >= 0 && board[ny][nx]) return false;
+            }
+        }
+        return true;
+    };
+
+    const mergePiece = () => {
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+            if (val) board[current.y + y][current.x + x] = 1;
+        }));
+        clearLines();
+        current = { shape: shapes[Math.floor(Math.random() * shapes.length)], x: 3, y: 0 };
+    };
+
+    const clearLines = () => {
+        for (let y = rows - 1; y >= 0; y--) {
+            if (board[y].every((v) => v)) {
+                board.splice(y, 1);
+                board.unshift(Array(cols).fill(0));
+                playSfx(800, 'sine', 0.05);
+            }
+        }
+    };
+
+    const rotate = () => {
+        const rotated = current.shape[0].map((_, idx) => current.shape.map((row) => row[idx]).reverse());
+        if (canMove(0, 0, rotated)) current.shape = rotated;
+    };
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowLeft' && canMove(-1, 0)) current.x -= 1;
+        if (e.key === 'ArrowRight' && canMove(1, 0)) current.x += 1;
+        if (e.key === 'ArrowDown' && canMove(0, 1)) current.y += 1;
+        if (e.key === 'ArrowUp') rotate();
+        if (e.key === ' ') {
+            while (canMove(0, 1)) current.y += 1;
+            mergePiece();
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const draw = () => {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        board.forEach((row, y) => row.forEach((val, x) => {
+            if (val) ctx.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+        }));
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+            if (val) ctx.fillRect((current.x + x) * size + 1, (current.y + y) * size + 1, size - 2, size - 2);
+        }));
+    };
+
+    const tick = () => {
+        if (canMove(0, 1)) {
+            current.y += 1;
+        } else {
+            mergePiece();
+        }
+        draw();
+    };
+
+    draw();
+    gameInterval = setInterval(tick, 450);
+    gameCleanup = () => document.removeEventListener('keydown', keyHandler);
+}
+
 window.startSnake = startSnake;
 window.startPong = startPong;
 window.startTetris = startTetris;
