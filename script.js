@@ -382,6 +382,10 @@ function initData() {
     applyMenuVisibility();
     applyEffects();
     renderDynamicLogo();
+    dataReady = true;
+    if (pendingNavId) {
+        const next = pendingNavId; pendingNavId = null; nav(next);
+    }
 }
 
 /** saveData - Зберігає systemData в localStorage */
@@ -814,6 +818,8 @@ let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0;
 let currentLang = 'uk'; let adminAuth = false;
 let admNoteCat = ''; let admNoteFile = '';
 let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
+let dataReady = false;
+let pendingNavId = null;
 
 /**
  * nav - Головна функція навігації між секціями
@@ -822,6 +828,13 @@ let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
  */
 function nav(id) {
     if (isTyping) return;
+
+    if (!dataReady) {
+        pendingNavId = id;
+        const v = document.getElementById('view');
+        if (v) v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading data...</div>';
+        return;
+    }
 
     // Dynamic Title Update
     const baseTitle = systemData.home.browserTitle || "vvs@cl0w.nz";
@@ -1766,7 +1779,8 @@ function removeTodoItem(i) {
 function renderGameMenu() {
     const v = document.getElementById('view');
     // MERGED RENDER GAME MENU
-    const customGames = systemData.games.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
+    const gameList = Array.isArray(systemData.games) ? systemData.games : [];
+    const customGames = gameList.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
 
     v.innerHTML = `<h2>GAME_CENTER</h2>
     <div class="game-hub">
@@ -1812,6 +1826,7 @@ function runGame(id) {
     const canvas = document.getElementById('game-canvas');
     if (!area || !pico || !canvas) return; // Error safety
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
     stopGames(); // Clear previous
 
