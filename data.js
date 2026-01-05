@@ -4,7 +4,15 @@ const defaultData = {
     "themes": {
         "defaultId": "amber",
         "adminTriggerTheme": "mix-eva",
+        "font": "modern",
         "custom": []
+    },
+    "effects": {
+        "glow": false,
+        "flicker": false,
+        "scanline": false,
+        "svgGlow": true,
+        "screenPulse": false
     },
     "todoEditable": false,
     "home": {
