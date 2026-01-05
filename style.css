@@ -359,6 +359,10 @@
             gap: 10px;
         }
 
+        nav button .nav-label {
+            margin-left: 4px;
+        }
+
         .nav-icon {
             width: 16px;
             height: 16px;

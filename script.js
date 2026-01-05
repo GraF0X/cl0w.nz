@@ -252,11 +252,13 @@ let adMode = 'draw'; // draw, erase
 let adGrid = [];
 let adCx = 0; let adCy = 0; // Cursor pos
 const adW = 40; const adH = 15;
+const adCellSize = 16;
 // QR STATE
 let lastQRMatrix = null;
 let lastQRFormat = 'png';
 let lastQRSize = 256;
 let lastQRText = '';
+let pcScrollCleanup = null;
 
 /** renderAsciiDraw - Рендерить інтерфейс малювання */
 function renderAsciiDraw() {
@@ -293,14 +295,14 @@ function renderAsciiDraw() {
         for (let x = 0; x < adW; x++) {
             const isCursor = (x === adCx && y === adCy);
             const cursorStyle = isCursor ? 'background:var(--dim); outline:1px solid var(--text);' : '';
-            gridHtml += `<div class="ascii-cell" data-x="${x}" data-y="${y}" onmousedown="adStart(this)" onmouseenter="adEnter(this)" style="width:15px; height:20px; display:flex; justify-content:center; align-items:center; font-family:'JetBrains Mono', monospace; ${cursorStyle}">${adGrid[y][x]}</div>`;
+            gridHtml += `<div class="ascii-cell" data-x="${x}" data-y="${y}" onmousedown="adStart(this)" onmouseenter="adEnter(this)" style="width:${adCellSize}px; height:${adCellSize}px; display:flex; justify-content:center; align-items:center; font-family:'JetBrains Mono', monospace; font-size:${adCellSize}px; line-height:${adCellSize}px; ${cursorStyle}">${adGrid[y][x]}</div>`;
         }
         gridHtml += `</div>`;
     }
     gridHtml += `</div>
     <div style="margin-top:10px; font-size:0.8rem; opacity:0.7;">
         [Mouse]: Shift+Click=Pick, Drag=Paint. <br>
-        [Keyboard]: Arrows=Move, Space/Enter=PaintChar, Backspace=Erase.
+        [Keyboard]: Arrows/WASD=Move, Space/Enter=PaintChar, Backspace=Erase.
     </div>`;
 
     v.innerHTML = `<h2>ASCII_DRAW STUDIO</h2>${toolsHtml}${gridHtml}`;
@@ -364,10 +366,10 @@ document.addEventListener('keydown', (e) => {
     // We just check if nav buttons aren't focused.
     if (document.activeElement.tagName === 'BUTTON' || document.activeElement.tagName === 'INPUT') return;
 
-    if (e.key === 'ArrowUp') { if (adCy > 0) adCy--; renderAsciiDraw(); }
-    else if (e.key === 'ArrowDown') { if (adCy < adH - 1) adCy++; renderAsciiDraw(); }
-    else if (e.key === 'ArrowLeft') { if (adCx > 0) adCx--; renderAsciiDraw(); }
-    else if (e.key === 'ArrowRight') { if (adCx < adW - 1) adCx++; renderAsciiDraw(); }
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { if (adCy > 0) adCy--; renderAsciiDraw(); }
+    else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { if (adCy < adH - 1) adCy++; renderAsciiDraw(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { if (adCx > 0) adCx--; renderAsciiDraw(); }
+    else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { if (adCx < adW - 1) adCx++; renderAsciiDraw(); }
     else if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         adApply(adCx, adCy);
@@ -683,6 +685,11 @@ document.addEventListener('keydown', (e) => {
         if (overlay) overlay.click();
         return;
     }
+
+    const modalOpen = document.querySelector('.modal-window');
+    const gameActive = (() => { const area = document.getElementById('game-area'); return area && area.style.display !== 'none'; })();
+    const drawActive = !!document.getElementById('ascii-canvas');
+    if (modalOpen || gameActive || drawActive) return;
 
     // MENU NAV
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -1035,6 +1042,11 @@ function nav(id) {
         return;
     }
 
+    if (typeof pcScrollCleanup === 'function') {
+        pcScrollCleanup();
+        pcScrollCleanup = null;
+    }
+
     // Dynamic Title Update
     const baseTitle = systemData.home.browserTitle || "vvs@cl0w.nz";
     const dir = id === 'home' ? ':~$' : ':~/' + id;
@@ -1073,7 +1085,7 @@ function renderAboutPC() {
     let physicsHtml = `
     <div id="pc-physics-world" style="height:150px; border:1px solid var(--text); position:relative; overflow:hidden; margin-bottom:20px; background:rgba(0,0,0,0.2);">
         <div style="position:absolute; top:5px; left:5px; opacity:0.6; font-size:0.7rem;">[ SCROLLME: UP=PORTAL, DOWN=CRASH ]</div>
-        <div id="pc-avatar" style="font-size:3rem; position:absolute; top:50px; left:50%; transform:translateX(-50%); transition: top 0.1s;">💻</div>
+        <div id="pc-avatar" style="font-size:3rem; position:absolute; top:50px; left:50%; transform:translate(-50%, 0); will-change: transform;">💻</div>
         <div id="pc-portal" style="font-size:3rem; position:absolute; top:-40px; left:50%; transform:translateX(-50%) rotate(180deg); color:cyan; display:none;">🌀</div>
         <div id="pc-fire" style="font-size:3rem; position:absolute; bottom:-40px; left:50%; transform:translateX(-50%); color:orange; display:none;">🔥</div>
     </div>`;
@@ -1127,61 +1139,61 @@ function initPhysics() {
     const fire = document.getElementById('pc-fire');
     if (!av) return;
 
-    const view = document.getElementById('view'); // Scroll container? 
-    // Wait, scroll happens on 'main' usually. 
-
     const main = document.querySelector('main');
+    if (!main) return;
 
     let lastScroll = main.scrollTop;
+    let offset = 0;
+    let ticking = false;
 
-    main.onscroll = function () {
-        if (!document.getElementById('pc-avatar')) return; // Exit if changed view
+    const applyMotion = () => {
+        ticking = false;
+        if (!document.getElementById('pc-avatar') || !port || !fire) {
+            return;
+        }
 
         const diff = main.scrollTop - lastScroll;
         lastScroll = main.scrollTop;
+        offset += diff * 1.5;
 
-        let currentTop = parseInt(av.style.top || 50);
+        const currentPos = 50 + offset;
+        av.style.transform = `translate(-50%, ${offset}px)`;
 
-        // Inverse physics: Scroll Down -> Object goes Up? Or normal?
-        // Let's do Scroll Down -> Object Falls (Goes Down)
-        // Scroll Up -> Object Flies (Goes Up)
-
-        // Actually user said: scroll UP -> Portal (Up), Scroll DOWN -> Crash (Down)
-
-        // When we scroll down, scrollTop increases. diff > 0.
-        // We want avatar to go down (increase top).
-        currentTop += diff * 1.5;
-
-        av.style.top = currentTop + 'px';
-
-        // Bounds Check
-        if (currentTop < -20) {
-            // PORTAL
+        if (currentPos < -20) {
             port.style.display = 'block';
-            port.style.top = '10px';
-            if (currentTop < -50) {
-                // Teleport
+            port.style.transform = 'translate(-50%, 10px) rotate(180deg)';
+            if (currentPos < -50) {
                 playSfx(1000, 'sawtooth', 0.2);
-                av.style.top = '140px';
+                offset = 90; // 50 base + 90 => 140px
+                av.style.transform = `translate(-50%, ${offset}px)`;
                 port.style.display = 'none';
             }
         } else {
             port.style.display = 'none';
         }
 
-        if (currentTop > 140) {
-            // FIRE
+        if (currentPos > 140) {
             fire.style.display = 'block';
-            fire.style.bottom = '10px';
-            if (currentTop > 170) {
-                // Crash
+            fire.style.transform = 'translate(-50%, -10px)';
+            if (currentPos > 170) {
                 playSfx(100, 'noise', 0.3);
                 av.innerText = '💥';
-                setTimeout(() => { av.innerText = '💻'; av.style.top = '50px'; fire.style.display = 'none'; }, 1000);
+                setTimeout(() => { av.innerText = '💻'; offset = 0; av.style.transform = 'translate(-50%, 0px)'; fire.style.display = 'none'; }, 1000);
             }
         } else {
             fire.style.display = 'none';
         }
+    };
+
+    const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(applyMotion);
+    };
+
+    main.addEventListener('scroll', onScroll, { passive: true });
+    pcScrollCleanup = () => {
+        main.removeEventListener('scroll', onScroll);
     };
 }
 
@@ -1262,13 +1274,20 @@ function generateFakeProcesses() {
 
 function updateTreeVisuals() {
     const contactBtn = document.getElementById('nav-contact');
-    if (adminAuth) {
-        contactBtn.innerHTML = '/link';
-        document.getElementById('nav-admin').style.display = 'block';
-    } else {
-        contactBtn.innerHTML = '/link';
-        document.getElementById('nav-admin').style.display = 'none';
+    if (contactBtn) {
+        let label = contactBtn.querySelector('.nav-label');
+        if (!label) {
+            label = document.createElement('span');
+            label.className = 'nav-label';
+            label.textContent = ' /link';
+            contactBtn.appendChild(label);
+        } else {
+            label.textContent = ' /link';
+        }
     }
+
+    const adminBtn = document.getElementById('nav-admin');
+    if (adminBtn) adminBtn.style.display = adminAuth ? 'block' : 'none';
 }
 
 
@@ -2094,11 +2113,6 @@ window.addBlogComment = function (postId) {
 function renderTodo() {
     const v = document.getElementById('view');
     const editable = systemData.todoEditable;
-
-    const totalTasks = systemData.todos.length;
-    const doneTasks = systemData.todos.filter(t => t.d).length;
-    const scheduledTasks = systemData.todos.filter(t => t.due).length;
-    const progress = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
     const totalTasks = systemData.todos.length;
     const doneTasks = systemData.todos.filter(t => t.d).length;
