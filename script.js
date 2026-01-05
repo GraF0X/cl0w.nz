@@ -162,6 +162,11 @@ let adMode = 'draw'; // draw, erase
 let adGrid = [];
 let adCx = 0; let adCy = 0; // Cursor pos
 const adW = 40; const adH = 15;
+// QR STATE
+let lastQRMatrix = null;
+let lastQRFormat = 'png';
+let lastQRSize = 256;
+let lastQRText = '';
 
 /** renderAsciiDraw - Рендерить інтерфейс малювання */
 function renderAsciiDraw() {
@@ -364,6 +369,7 @@ function initData() {
 
             if (!systemData.themes) systemData.themes = JSON.parse(JSON.stringify(defaultData.themes));
             if (!systemData.themes.adminTriggerTheme) systemData.themes.adminTriggerTheme = 'mix-eva';
+            if (!systemData.themes.font) systemData.themes.font = 'modern';
 
             updateCustomThemeCSS();
 
@@ -373,11 +379,13 @@ function initData() {
             } else {
                 setTheme(systemData.themes.defaultId);
             }
+            applyFontChoice(systemData.themes.font);
 
         } catch (e) { systemData = JSON.parse(JSON.stringify(defaultData)); }
     } else {
         systemData = JSON.parse(JSON.stringify(defaultData));
         setTheme(systemData.themes.defaultId);
+        applyFontChoice(systemData.themes.font);
     }
     applyMenuVisibility();
     applyEffects();
@@ -489,11 +497,17 @@ function toggleThemeMenu() {
     // EFFECTS SECTION
     const fx = systemData.effects || { glow: false, flicker: false, scanline: false };
 
+    const fontChoice = systemData.themes?.font || 'modern';
     html += `<div class="theme-extras">
         <label class="opt-check"><input type="checkbox" ${fx.glow ? 'checked' : ''} onchange="toggleEffect('glow')"> Glow FX</label>
         <label class="opt-check"><input type="checkbox" ${fx.flicker ? 'checked' : ''} onchange="toggleEffect('flicker')"> Flicker</label>
         <label class="opt-check"><input type="checkbox" ${fx.scanline ? 'checked' : ''} onchange="toggleEffect('scanline')"> Scanline+</label>
         <label class="opt-check"><input type="checkbox" ${systemData.home.showIcons !== false ? 'checked' : ''} onchange="toggleIcons(this.checked)"> Show Menu Icons</label>
+        <div class="font-switcher">
+            <div style="font-size:0.75rem; opacity:0.75;">Font</div>
+            <button class="btn btn-sm ${fontChoice === 'modern' ? 'active' : ''}" onclick="setFontChoice('modern')">Mono</button>
+            <button class="btn btn-sm ${fontChoice === 'pixel' ? 'active' : ''}" onclick="setFontChoice('pixel')">Pixel</button>
+        </div>
     </div>`;
 
     pop.innerHTML = html;
@@ -518,6 +532,23 @@ function applyEffects() {
     // Apply Icons (OnInit)
     document.body.classList.toggle('no-icons', systemData.home.showIcons === false);
 }
+
+/** applyFontChoice - Застосовує вибір шрифту до документа */
+function applyFontChoice(fontId) {
+    const target = fontId === 'pixel'
+        ? "'Press Start 2P', 'VT323', 'Courier New', monospace"
+        : "'JetBrains Mono', 'Fira Code', monospace";
+    document.documentElement.style.setProperty('--font-main', target);
+    document.body.classList.toggle('pixel-font', fontId === 'pixel');
+}
+
+/** setFontChoice - Змінює вибір шрифту в темах */
+window.setFontChoice = function (fontId) {
+    if (!systemData.themes) systemData.themes = { font: 'modern', defaultId: 'amber', custom: [] };
+    systemData.themes.font = fontId;
+    applyFontChoice(fontId);
+    saveData();
+};
 
 window.toggleIcons = function (show) {
     if (!systemData.home) systemData.home = {};
@@ -1202,8 +1233,9 @@ function selectHomeTag(tag) {
  */
 function renderWork() {
     const v = document.getElementById('view');
-    v.innerHTML = `<h2>WORK_TOOLS</h2><div class="work-grid"><div class="work-card"><h3>SECURE_PASS_GEN</h3><div id="pass-out" class="pass-result">...</div><div class="opts-grid"><label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label><label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label><label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label><label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label></div><div class="form-group" style="margin-bottom:10px;"><label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label><input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value"></div><button class="btn btn-green" onclick="generatePass()">GENERATE</button><button class="btn" onclick="copyPass()">COPY</button></div><div class="work-card"><h3>TRANSLITERATION (KMU 55)</h3><div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div><textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea><div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div><textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea><div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div></div></div>`;
+    v.innerHTML = `<h2>WORK_TOOLS</h2><div class="work-grid"><div class="work-card"><h3>SECURE_PASS_GEN</h3><div id="pass-out" class="pass-result">...</div><div class="opts-grid"><label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label><label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label><label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label><label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label></div><div class="form-group" style="margin-bottom:10px;"><label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label><input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value"></div><button class="btn btn-green" onclick="generatePass()">GENERATE</button><button class="btn" onclick="copyPass()">COPY</button></div><div class="work-card"><h3>QR CODE GENERATOR</h3><div class="form-group"><label>Text / URL</label><textarea id="qr-text" class="translit-area" style="height:80px;" placeholder="https://example.com" oninput="autoPreviewQR()"></textarea></div><div class="form-group" style="display:flex; gap:10px; flex-wrap:wrap;"><label class="opt-check">Size: <input type="range" id="qr-size" min="120" max="420" value="256" oninput="document.getElementById('qr-size-val').innerText=this.value; autoPreviewQR();"><span id="qr-size-val">256</span>px</label><label class="opt-check">Format: <select id="qr-format" onchange="autoPreviewQR()"><option value="png">PNG</option><option value="svg">SVG</option></select></label></div><div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;"><button class="btn" onclick="generateQR()">GENERATE</button><button class="btn" onclick="downloadQR()">DOWNLOAD</button></div><div id="qr-preview" class="qr-preview"><canvas id="qr-canvas" width="256" height="256" aria-label="QR preview"></canvas><div id="qr-svg" style="display:none;"></div></div></div><div class="work-card"><h3>TRANSLITERATION (KMU 55)</h3><div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div><textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea><div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div><textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea><div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div></div></div>`;
     generatePass();
+    autoPreviewQR();
 }
 /** words - Слова для генерації парольних фраз */
 const words = ["cyber", "secure", "hack", "node", "core", "linux", "root", "admin", "flux", "neon", "grid", "data", "byte", "bit", "net", "web", "cloud", "void", "null", "zero"];
@@ -1221,6 +1253,187 @@ const mapUA_Start = { 'є': 'ye', 'ї': 'yi', 'й': 'y', 'ю': 'yu', 'я': 'ya' 
  * @param {string} dir - Напрямок ('ua' - UA→EN, 'en' - EN→UA)
  */
 function doTranslit(dir) { if (dir === 'ua') { let src = document.getElementById('tr-ua').value; let out = ""; let temp = src.replace(/зг/g, "zgh").replace(/Зг/g, "Zgh").replace(/ЗГ/g, "ZGH"); for (let i = 0; i < temp.length; i++) { const c = temp[i]; const low = c.toLowerCase(); const isUp = c !== low; const isStart = (i === 0 || /[\s\n\t\.,!?]/.test(temp[i - 1])); let tr = ""; if (isStart && mapUA_Start[low]) tr = mapUA_Start[low]; else if (mapUA[low] !== undefined) tr = mapUA[low]; else tr = c; if (tr.length > 0) { if (isUp) { if (tr.length > 1 && temp[i + 1] && temp[i + 1] === temp[i + 1].toUpperCase()) tr = tr.toUpperCase(); else tr = tr.charAt(0).toUpperCase() + tr.slice(1); } } out += tr; } document.getElementById('tr-en').value = out; } else { let src = document.getElementById('tr-en').value; src = src.replace(/zgh/gi, "зг"); const revMapMulti = [{ k: 'shch', v: 'щ' }, { k: 'zh', v: 'ж' }, { k: 'kh', v: 'х' }, { k: 'ts', v: 'ц' }, { k: 'ch', v: 'ч' }, { k: 'sh', v: 'ш' }, { k: 'ye', v: 'є' }, { k: 'yi', v: 'ї' }, { k: 'yu', v: 'ю' }, { k: 'ya', v: 'я' }, { k: 'ia', v: 'я' }, { k: 'ie', v: 'є' }, { k: 'iu', v: 'ю' }]; for (let pair of revMapMulti) { const reg = new RegExp(pair.k, "gi"); src = src.replace(reg, (match) => { const isUp = match[0] === match[0].toUpperCase(); return isUp ? pair.v.toUpperCase() : pair.v; }); } const revMapSingle = { 'a': 'а', 'b': 'б', 'v': 'в', 'h': 'г', 'g': 'ґ', 'd': 'д', 'e': 'е', 'z': 'з', 'y': 'и', 'i': 'і', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф' }; let out = ""; for (let i = 0; i < src.length; i++) { const c = src[i]; const low = c.toLowerCase(); const isUp = c !== low; if (revMapSingle[low]) out += isUp ? revMapSingle[low].toUpperCase() : revMapSingle[low]; else out += c; } document.getElementById('tr-ua').value = out; } }
+
+// --- QR GENERATOR (VERSION 1-L, OFFLINE) ---
+const gfExp = new Array(512);
+const gfLog = new Array(256);
+(function initGalois() {
+    let x = 1;
+    for (let i = 0; i < 255; i++) {
+        gfExp[i] = x;
+        gfLog[x] = i;
+        x <<= 1;
+        if (x & 0x100) x ^= 0x11d;
+    }
+    for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
+})();
+function gfMul(a, b) { if (a === 0 || b === 0) return 0; return gfExp[gfLog[a] + gfLog[b]]; }
+function rsGeneratorPoly(ec) {
+    let poly = [1];
+    for (let i = 0; i < ec; i++) {
+        poly = polyMultiply(poly, [1, gfExp[i]]);
+    }
+    return poly;
+}
+function polyMultiply(p, q) {
+    const res = new Array(p.length + q.length - 1).fill(0);
+    for (let i = 0; i < p.length; i++) {
+        for (let j = 0; j < q.length; j++) res[i + j] ^= gfMul(p[i], q[j]);
+    }
+    return res;
+}
+function reedSolomon(data, ec) {
+    const gen = rsGeneratorPoly(ec);
+    const res = new Array(ec).fill(0);
+    data.forEach((byte) => {
+        const factor = byte ^ res[0];
+        res.shift(); res.push(0);
+        gen.slice(1).forEach((coef, idx) => { res[idx] ^= gfMul(coef, factor); });
+    });
+    return res;
+}
+
+function encodeQRBytes(text) {
+    const bytes = Array.from(new TextEncoder().encode(text));
+    if (bytes.length > 17) throw new Error('Text too long for offline QR (17 bytes max).');
+    const bits = [];
+    const pushBits = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
+    pushBits(0b0100, 4); // Byte mode
+    pushBits(bytes.length, 8);
+    bytes.forEach((b) => pushBits(b, 8));
+    pushBits(0, Math.min(4, 152 - bits.length));
+    while (bits.length % 8 !== 0) bits.push(0);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+    const pad = [0xec, 0x11]; let padIdx = 0;
+    while (data.length < 19) { data.push(pad[padIdx % 2]); padIdx++; }
+    return data;
+}
+
+function buildQRMatrix(text) {
+    const data = encodeQRBytes(text);
+    const ecc = reedSolomon(data, 7);
+    const codewords = data.concat(ecc);
+    const size = 21;
+    const m = Array.from({ length: size }, () => Array(size).fill(null));
+
+    const placeFinder = (x, y) => {
+        for (let dy = 0; dy < 7; dy++) {
+            for (let dx = 0; dx < 7; dx++) {
+                const on = (dx === 0 || dx === 6 || dy === 0 || dy === 6) || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
+                m[y + dy][x + dx] = on;
+            }
+        }
+    };
+    placeFinder(0, 0); placeFinder(size - 7, 0); placeFinder(0, size - 7);
+    for (let i = 0; i < 8; i++) { m[7][i] = false; m[i][7] = false; m[7][size - 1 - i] = false; m[size - 1 - i][7] = false; m[i][size - 8] = false; m[size - 8][i] = false; }
+    for (let i = 0; i < size; i++) { if (m[6][i] === null) m[6][i] = i % 2 === 0; if (m[i][6] === null) m[i][6] = i % 2 === 0; }
+    m[size - 8][8] = true; // Dark module
+
+    const dataBits = [];
+    codewords.forEach((cw) => { for (let i = 7; i >= 0; i--) dataBits.push((cw >> i) & 1); });
+    let bitIdx = 0; let upward = true;
+    for (let col = size - 1; col > 0; col -= 2) {
+        if (col === 6) col--;
+        for (let rowOffset = 0; rowOffset < size; rowOffset++) {
+            const row = upward ? size - 1 - rowOffset : rowOffset;
+            for (let dx = 0; dx < 2; dx++) {
+                const c = col - dx;
+                if (m[row][c] !== null) continue;
+                const bit = bitIdx < dataBits.length ? dataBits[bitIdx++] : 0;
+                const masked = bit ^ ((row + c) % 2 === 0 ? 1 : 0);
+                m[row][c] = !!masked;
+            }
+        }
+        upward = !upward;
+    }
+
+    const formatBits = 0b111011111000100; // Level L + mask 0
+    const fmtCoordsA = [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]];
+    const fmtCoordsB = [[20, 8], [19, 8], [18, 8], [17, 8], [16, 8], [15, 8], [14, 8], [13, 8], [8, 13], [8, 14], [8, 15], [8, 16], [8, 17], [8, 18], [8, 19]];
+    const fmtBit = (idx) => ((formatBits >> (14 - idx)) & 1) === 1;
+    fmtCoordsA.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+    fmtCoordsB.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+    return m;
+}
+
+function drawQRToCanvas(matrix, size, canvas) {
+    const ctx = canvas.getContext('2d');
+    const dim = matrix.length;
+    const scale = Math.floor(size / dim);
+    const pad = 2 * scale;
+    const finalSize = dim * scale + pad * 2;
+    canvas.width = finalSize; canvas.height = finalSize;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, finalSize, finalSize);
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < dim; y++) {
+        for (let x = 0; x < dim; x++) {
+            if (matrix[y][x]) ctx.fillRect(pad + x * scale, pad + y * scale, scale, scale);
+        }
+    }
+}
+
+function matrixToSVG(matrix, size) {
+    const dim = matrix.length;
+    const scale = size / dim;
+    let path = '';
+    for (let y = 0; y < dim; y++) {
+        for (let x = 0; x < dim; x++) {
+            if (matrix[y][x]) path += `M${(x * scale).toFixed(2)} ${(y * scale).toFixed(2)}h${scale.toFixed(2)}v${scale.toFixed(2)}h-${scale.toFixed(2)}z`;
+        }
+    }
+    const view = size.toFixed(2);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${view} ${view}" width="${view}" height="${view}"><rect width="100%" height="100%" fill="white"/>${path ? `<path d="${path}" fill="black"/>` : ''}</svg>`;
+}
+
+function autoPreviewQR() { setTimeout(generateQR, 10); }
+function generateQR() {
+    const txt = document.getElementById('qr-text')?.value || '';
+    const size = parseInt(document.getElementById('qr-size')?.value || '256');
+    const format = document.getElementById('qr-format')?.value || 'png';
+    lastQRFormat = format; lastQRSize = size; lastQRText = txt;
+    if (!txt.trim()) { const canvas = document.getElementById('qr-canvas'); if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillText('Enter text', 10, 20); } return; }
+    try {
+        lastQRMatrix = buildQRMatrix(txt.trim());
+    } catch (e) {
+        alert(e.message || 'Unable to build QR');
+        return;
+    }
+
+    const canvas = document.getElementById('qr-canvas');
+    const svgBox = document.getElementById('qr-svg');
+    if (canvas) drawQRToCanvas(lastQRMatrix, size, canvas);
+    if (svgBox) {
+        if (format === 'svg') {
+            svgBox.style.display = 'block';
+            canvas.style.display = 'none';
+            svgBox.innerHTML = matrixToSVG(lastQRMatrix, size);
+        } else {
+            svgBox.style.display = 'none';
+            canvas.style.display = 'block';
+            svgBox.innerHTML = '';
+        }
+    }
+}
+
+function downloadQR() {
+    if (!lastQRMatrix || !lastQRText.trim()) { alert('Generate QR first.'); return; }
+    if (lastQRFormat === 'svg') {
+        const svg = matrixToSVG(lastQRMatrix, lastQRSize);
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'qr.svg'; a.click(); URL.revokeObjectURL(url);
+    } else {
+        const canvas = document.getElementById('qr-canvas');
+        drawQRToCanvas(lastQRMatrix, lastQRSize, canvas);
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'qr.png'; a.click(); URL.revokeObjectURL(url);
+        });
+    }
+}
 
 // --- CRYPTO HELPER ---
 /**
@@ -1590,15 +1803,23 @@ function renderTodo() {
     if (editable) {
         html += `<div class="todo-input-group" style="margin-bottom:15px; flex-wrap:wrap;">
             <input type="text" id="new-todo-input" class="todo-input" placeholder="New task..." onkeypress="if(event.key==='Enter') addTodoItem()">
+            <input type="date" id="new-todo-date" class="todo-input" style="max-width:180px;" aria-label="Due date">
+            <input type="time" id="new-todo-time" class="todo-input" style="max-width:140px;" aria-label="Due time">
             <button class="btn" onclick="addTodoItem()">ADD_TASK</button>
             <button class="btn" onclick="renderCalendar()" style="margin-left:auto;">[ CALENDAR_VIEW ]</button>
             <button class="btn" onclick="renderTodoList()" id="list-view-btn" style="display:none;">[ LIST_VIEW ]</button>
         </div>
         <div style="margin-bottom:15px; display:flex; gap:10px;">
              <button class="btn" onclick="exportTodoData()">EXPORT (JSON)</button>
+             <button class="btn" onclick="exportTodoICS()">EXPORT (ICS)</button>
              <label class="btn" style="cursor:pointer;">
                 IMPORT (JSON) <input type="file" id="todo-imp" style="display:none" onchange="importTodoData(this)">
              </label>
+        </div>`;
+    } else {
+        html += `<div style="margin-bottom:15px; display:flex; gap:10px;">
+            <button class="btn" onclick="renderCalendar()">[ CALENDAR_VIEW ]</button>
+            <button class="btn" onclick="exportTodoICS()">EXPORT (ICS)</button>
         </div>`;
     }
     html += `<div class="todo-container" id="todo-main-box"><div class="todo-list" id="todo-list"></div></div>`;
@@ -1620,11 +1841,12 @@ function renderTodoList() {
         const el = document.createElement('div');
         el.className = `todo-item ${t.d ? 'todo-done' : ''}`;
         if (editable) {
-            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span> 
+            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span>
                            <span class="todo-text">${t.t}</span>
+                           ${t.due ? `<span style="margin-left:10px; font-size:0.8rem; opacity:0.7;">(${t.due}${t.time ? ' ' + t.time : ''})</span>` : ''}
                            <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})" style="margin-left:auto">X</button>`;
         } else {
-            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>`;
+            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>${t.due ? `<span style="margin-left:10px; font-size:0.8rem; opacity:0.7;">(${t.due}${t.time ? ' ' + t.time : ''})</span>` : ''}`;
         }
         l.appendChild(el);
     });
@@ -1726,6 +1948,30 @@ window.exportTodoData = function () {
     link.click();
 }
 
+window.exportTodoICS = function () {
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//cl0w.nz//tasks//EN'];
+    const pushEvent = (title, date, time) => {
+        if (!date) return;
+        const uid = `${title}-${date}-${time || 'allday'}@cl0w.nz`;
+        const dt = date.replace(/-/g, '') + (time ? 'T' + time.replace(/:/g, '') + '00' : '');
+        lines.push('BEGIN:VEVENT');
+        lines.push('UID:' + uid);
+        lines.push('DTSTAMP:' + stamp);
+        lines.push('DTSTART:' + dt);
+        lines.push('SUMMARY:' + title);
+        lines.push('END:VEVENT');
+    };
+    (systemData.calendarEvents || []).forEach((ev) => pushEvent(ev.title || 'Event', ev.date, ev.time && ev.time !== 'All Day' ? ev.time : ''));
+    (systemData.todos || []).forEach((t) => pushEvent(t.t, t.due, t.time));
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tasks.ics'; a.click(); URL.revokeObjectURL(url);
+};
+
 window.importTodoData = function (acc) {
     const file = acc.files[0];
     if (!file) return;
@@ -1749,10 +1995,21 @@ window.importTodoData = function (acc) {
 function addTodoItem() {
     const inp = document.getElementById('new-todo-input');
     if (!inp || !inp.value.trim()) return;
-    systemData.todos.push({ t: inp.value.trim(), d: false });
+    const dueDate = document.getElementById('new-todo-date')?.value || '';
+    const dueTime = document.getElementById('new-todo-time')?.value || '';
+    const item = { t: inp.value.trim(), d: false };
+    if (dueDate) item.due = dueDate;
+    if (dueTime) item.time = dueTime;
+    systemData.todos.push(item);
+    if (dueDate) {
+        if (!systemData.calendarEvents) systemData.calendarEvents = [];
+        systemData.calendarEvents.push({ date: dueDate, time: dueTime || 'All Day', title: item.t });
+    }
     saveData();
     renderTodoList();
     inp.value = '';
+    const dIn = document.getElementById('new-todo-date'); if (dIn) dIn.value = '';
+    const tIn = document.getElementById('new-todo-time'); if (tIn) tIn.value = '';
     playSfx(800);
 }
 /** toggleTodoDone - Змінює статус виконання завдання */
@@ -1810,8 +2067,13 @@ window.loadPicoCart = function () {
 
 /** gameInterval - Інтервал активної гри для коректної зупинки */
 var gameInterval = null; // Renamed from gameInt to match new code
+var gameCleanup = null;
 function stopGames() {
     if (gameInterval) clearInterval(gameInterval);
+    if (typeof gameCleanup === 'function') {
+        try { gameCleanup(); } catch (e) { }
+    }
+    gameCleanup = null;
     const gameArea = document.getElementById('game-area');
     if (gameArea) gameArea.style.display = 'none';
     const picoArea = document.getElementById('pico-area');
@@ -1860,6 +2122,10 @@ function runGame(id) {
     ctx.font = '16px monospace';
     ctx.fillText('Game not available', canvas.width / 2, canvas.height / 2);
 }
+
+window.startSnake = startSnake;
+window.startPong = startPong;
+window.startTetris = startTetris;
 
 /**
  * renderGallery - Рендерить сітку галереї
