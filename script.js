@@ -2100,6 +2100,11 @@ function renderTodo() {
     const scheduledTasks = systemData.todos.filter(t => t.due).length;
     const progress = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
+    const totalTasks = systemData.todos.length;
+    const doneTasks = systemData.todos.filter(t => t.d).length;
+    const scheduledTasks = systemData.todos.filter(t => t.due).length;
+    const progress = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
     let html = `<h2>TODO_MANAGER ${editable ? '[EDIT_MODE]' : '[READ_ONLY]'}</h2>`;
     html += `<div class="todo-stats">
         <div><strong>${doneTasks}/${totalTasks}</strong> completed</div>
