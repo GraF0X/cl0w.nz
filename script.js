@@ -162,6 +162,11 @@ let adMode = 'draw'; // draw, erase
 let adGrid = [];
 let adCx = 0; let adCy = 0; // Cursor pos
 const adW = 40; const adH = 15;
+// QR STATE
+let lastQRMatrix = null;
+let lastQRFormat = 'png';
+let lastQRSize = 256;
+let lastQRText = '';
 
 /** renderAsciiDraw - Рендерить інтерфейс малювання */
 function renderAsciiDraw() {
@@ -364,6 +369,7 @@ function initData() {
 
             if (!systemData.themes) systemData.themes = JSON.parse(JSON.stringify(defaultData.themes));
             if (!systemData.themes.adminTriggerTheme) systemData.themes.adminTriggerTheme = 'mix-eva';
+            if (!systemData.themes.font) systemData.themes.font = 'modern';
 
             updateCustomThemeCSS();
 
@@ -373,15 +379,21 @@ function initData() {
             } else {
                 setTheme(systemData.themes.defaultId);
             }
+            applyFontChoice(systemData.themes.font);
 
         } catch (e) { systemData = JSON.parse(JSON.stringify(defaultData)); }
     } else {
         systemData = JSON.parse(JSON.stringify(defaultData));
         setTheme(systemData.themes.defaultId);
+        applyFontChoice(systemData.themes.font);
     }
     applyMenuVisibility();
     applyEffects();
     renderDynamicLogo();
+    dataReady = true;
+    if (pendingNavId) {
+        const next = pendingNavId; pendingNavId = null; nav(next);
+    }
 }
 
 /** saveData - Зберігає systemData в localStorage */
@@ -485,11 +497,17 @@ function toggleThemeMenu() {
     // EFFECTS SECTION
     const fx = systemData.effects || { glow: false, flicker: false, scanline: false };
 
+    const fontChoice = systemData.themes?.font || 'modern';
     html += `<div class="theme-extras">
         <label class="opt-check"><input type="checkbox" ${fx.glow ? 'checked' : ''} onchange="toggleEffect('glow')"> Glow FX</label>
         <label class="opt-check"><input type="checkbox" ${fx.flicker ? 'checked' : ''} onchange="toggleEffect('flicker')"> Flicker</label>
         <label class="opt-check"><input type="checkbox" ${fx.scanline ? 'checked' : ''} onchange="toggleEffect('scanline')"> Scanline+</label>
         <label class="opt-check"><input type="checkbox" ${systemData.home.showIcons !== false ? 'checked' : ''} onchange="toggleIcons(this.checked)"> Show Menu Icons</label>
+        <div class="font-switcher">
+            <div style="font-size:0.75rem; opacity:0.75;">Font</div>
+            <button class="btn btn-sm ${fontChoice === 'modern' ? 'active' : ''}" onclick="setFontChoice('modern')">Mono</button>
+            <button class="btn btn-sm ${fontChoice === 'pixel' ? 'active' : ''}" onclick="setFontChoice('pixel')">Pixel</button>
+        </div>
     </div>`;
 
     pop.innerHTML = html;
@@ -514,6 +532,23 @@ function applyEffects() {
     // Apply Icons (OnInit)
     document.body.classList.toggle('no-icons', systemData.home.showIcons === false);
 }
+
+/** applyFontChoice - Застосовує вибір шрифту до документа */
+function applyFontChoice(fontId) {
+    const target = fontId === 'pixel'
+        ? "'Press Start 2P', 'VT323', 'Courier New', monospace"
+        : "'JetBrains Mono', 'Fira Code', monospace";
+    document.documentElement.style.setProperty('--font-main', target);
+    document.body.classList.toggle('pixel-font', fontId === 'pixel');
+}
+
+/** setFontChoice - Змінює вибір шрифту в темах */
+window.setFontChoice = function (fontId) {
+    if (!systemData.themes) systemData.themes = { font: 'modern', defaultId: 'amber', custom: [] };
+    systemData.themes.font = fontId;
+    applyFontChoice(fontId);
+    saveData();
+};
 
 window.toggleIcons = function (show) {
     if (!systemData.home) systemData.home = {};
@@ -814,6 +849,8 @@ let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0;
 let currentLang = 'uk'; let adminAuth = false;
 let admNoteCat = ''; let admNoteFile = '';
 let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
+let dataReady = false;
+let pendingNavId = null;
 
 /**
  * nav - Головна функція навігації між секціями
@@ -822,6 +859,13 @@ let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
  */
 function nav(id) {
     if (isTyping) return;
+
+    if (!dataReady) {
+        pendingNavId = id;
+        const v = document.getElementById('view');
+        if (v) v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading data...</div>';
+        return;
+    }
 
     // Dynamic Title Update
     const baseTitle = systemData.home.browserTitle || "vvs@cl0w.nz";
@@ -1189,8 +1233,9 @@ function selectHomeTag(tag) {
  */
 function renderWork() {
     const v = document.getElementById('view');
-    v.innerHTML = `<h2>WORK_TOOLS</h2><div class="work-grid"><div class="work-card"><h3>SECURE_PASS_GEN</h3><div id="pass-out" class="pass-result">...</div><div class="opts-grid"><label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label><label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label><label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label><label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label></div><div class="form-group" style="margin-bottom:10px;"><label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label><input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value"></div><button class="btn btn-green" onclick="generatePass()">GENERATE</button><button class="btn" onclick="copyPass()">COPY</button></div><div class="work-card"><h3>TRANSLITERATION (KMU 55)</h3><div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div><textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea><div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div><textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea><div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div></div></div>`;
+    v.innerHTML = `<h2>WORK_TOOLS</h2><div class="work-grid"><div class="work-card"><h3>SECURE_PASS_GEN</h3><div id="pass-out" class="pass-result">...</div><div class="opts-grid"><label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label><label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label><label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label><label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label></div><div class="form-group" style="margin-bottom:10px;"><label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label><input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value"></div><button class="btn btn-green" onclick="generatePass()">GENERATE</button><button class="btn" onclick="copyPass()">COPY</button></div><div class="work-card"><h3>QR CODE GENERATOR</h3><div class="form-group"><label>Text / URL</label><textarea id="qr-text" class="translit-area" style="height:80px;" placeholder="https://example.com" oninput="autoPreviewQR()"></textarea></div><div class="form-group" style="display:flex; gap:10px; flex-wrap:wrap;"><label class="opt-check">Size: <input type="range" id="qr-size" min="120" max="420" value="256" oninput="document.getElementById('qr-size-val').innerText=this.value; autoPreviewQR();"><span id="qr-size-val">256</span>px</label><label class="opt-check">Format: <select id="qr-format" onchange="autoPreviewQR()"><option value="png">PNG</option><option value="svg">SVG</option></select></label></div><div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;"><button class="btn" onclick="generateQR()">GENERATE</button><button class="btn" onclick="downloadQR()">DOWNLOAD</button></div><div id="qr-preview" class="qr-preview"><canvas id="qr-canvas" width="256" height="256" aria-label="QR preview"></canvas><div id="qr-svg" style="display:none;"></div></div></div><div class="work-card"><h3>TRANSLITERATION (KMU 55)</h3><div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div><textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea><div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div><textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea><div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div></div></div>`;
     generatePass();
+    autoPreviewQR();
 }
 /** words - Слова для генерації парольних фраз */
 const words = ["cyber", "secure", "hack", "node", "core", "linux", "root", "admin", "flux", "neon", "grid", "data", "byte", "bit", "net", "web", "cloud", "void", "null", "zero"];
@@ -1208,6 +1253,187 @@ const mapUA_Start = { 'є': 'ye', 'ї': 'yi', 'й': 'y', 'ю': 'yu', 'я': 'ya' 
  * @param {string} dir - Напрямок ('ua' - UA→EN, 'en' - EN→UA)
  */
 function doTranslit(dir) { if (dir === 'ua') { let src = document.getElementById('tr-ua').value; let out = ""; let temp = src.replace(/зг/g, "zgh").replace(/Зг/g, "Zgh").replace(/ЗГ/g, "ZGH"); for (let i = 0; i < temp.length; i++) { const c = temp[i]; const low = c.toLowerCase(); const isUp = c !== low; const isStart = (i === 0 || /[\s\n\t\.,!?]/.test(temp[i - 1])); let tr = ""; if (isStart && mapUA_Start[low]) tr = mapUA_Start[low]; else if (mapUA[low] !== undefined) tr = mapUA[low]; else tr = c; if (tr.length > 0) { if (isUp) { if (tr.length > 1 && temp[i + 1] && temp[i + 1] === temp[i + 1].toUpperCase()) tr = tr.toUpperCase(); else tr = tr.charAt(0).toUpperCase() + tr.slice(1); } } out += tr; } document.getElementById('tr-en').value = out; } else { let src = document.getElementById('tr-en').value; src = src.replace(/zgh/gi, "зг"); const revMapMulti = [{ k: 'shch', v: 'щ' }, { k: 'zh', v: 'ж' }, { k: 'kh', v: 'х' }, { k: 'ts', v: 'ц' }, { k: 'ch', v: 'ч' }, { k: 'sh', v: 'ш' }, { k: 'ye', v: 'є' }, { k: 'yi', v: 'ї' }, { k: 'yu', v: 'ю' }, { k: 'ya', v: 'я' }, { k: 'ia', v: 'я' }, { k: 'ie', v: 'є' }, { k: 'iu', v: 'ю' }]; for (let pair of revMapMulti) { const reg = new RegExp(pair.k, "gi"); src = src.replace(reg, (match) => { const isUp = match[0] === match[0].toUpperCase(); return isUp ? pair.v.toUpperCase() : pair.v; }); } const revMapSingle = { 'a': 'а', 'b': 'б', 'v': 'в', 'h': 'г', 'g': 'ґ', 'd': 'д', 'e': 'е', 'z': 'з', 'y': 'и', 'i': 'і', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф' }; let out = ""; for (let i = 0; i < src.length; i++) { const c = src[i]; const low = c.toLowerCase(); const isUp = c !== low; if (revMapSingle[low]) out += isUp ? revMapSingle[low].toUpperCase() : revMapSingle[low]; else out += c; } document.getElementById('tr-ua').value = out; } }
+
+// --- QR GENERATOR (VERSION 1-L, OFFLINE) ---
+const gfExp = new Array(512);
+const gfLog = new Array(256);
+(function initGalois() {
+    let x = 1;
+    for (let i = 0; i < 255; i++) {
+        gfExp[i] = x;
+        gfLog[x] = i;
+        x <<= 1;
+        if (x & 0x100) x ^= 0x11d;
+    }
+    for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
+})();
+function gfMul(a, b) { if (a === 0 || b === 0) return 0; return gfExp[gfLog[a] + gfLog[b]]; }
+function rsGeneratorPoly(ec) {
+    let poly = [1];
+    for (let i = 0; i < ec; i++) {
+        poly = polyMultiply(poly, [1, gfExp[i]]);
+    }
+    return poly;
+}
+function polyMultiply(p, q) {
+    const res = new Array(p.length + q.length - 1).fill(0);
+    for (let i = 0; i < p.length; i++) {
+        for (let j = 0; j < q.length; j++) res[i + j] ^= gfMul(p[i], q[j]);
+    }
+    return res;
+}
+function reedSolomon(data, ec) {
+    const gen = rsGeneratorPoly(ec);
+    const res = new Array(ec).fill(0);
+    data.forEach((byte) => {
+        const factor = byte ^ res[0];
+        res.shift(); res.push(0);
+        gen.slice(1).forEach((coef, idx) => { res[idx] ^= gfMul(coef, factor); });
+    });
+    return res;
+}
+
+function encodeQRBytes(text) {
+    const bytes = Array.from(new TextEncoder().encode(text));
+    if (bytes.length > 17) throw new Error('Text too long for offline QR (17 bytes max).');
+    const bits = [];
+    const pushBits = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
+    pushBits(0b0100, 4); // Byte mode
+    pushBits(bytes.length, 8);
+    bytes.forEach((b) => pushBits(b, 8));
+    pushBits(0, Math.min(4, 152 - bits.length));
+    while (bits.length % 8 !== 0) bits.push(0);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+    const pad = [0xec, 0x11]; let padIdx = 0;
+    while (data.length < 19) { data.push(pad[padIdx % 2]); padIdx++; }
+    return data;
+}
+
+function buildQRMatrix(text) {
+    const data = encodeQRBytes(text);
+    const ecc = reedSolomon(data, 7);
+    const codewords = data.concat(ecc);
+    const size = 21;
+    const m = Array.from({ length: size }, () => Array(size).fill(null));
+
+    const placeFinder = (x, y) => {
+        for (let dy = 0; dy < 7; dy++) {
+            for (let dx = 0; dx < 7; dx++) {
+                const on = (dx === 0 || dx === 6 || dy === 0 || dy === 6) || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
+                m[y + dy][x + dx] = on;
+            }
+        }
+    };
+    placeFinder(0, 0); placeFinder(size - 7, 0); placeFinder(0, size - 7);
+    for (let i = 0; i < 8; i++) { m[7][i] = false; m[i][7] = false; m[7][size - 1 - i] = false; m[size - 1 - i][7] = false; m[i][size - 8] = false; m[size - 8][i] = false; }
+    for (let i = 0; i < size; i++) { if (m[6][i] === null) m[6][i] = i % 2 === 0; if (m[i][6] === null) m[i][6] = i % 2 === 0; }
+    m[size - 8][8] = true; // Dark module
+
+    const dataBits = [];
+    codewords.forEach((cw) => { for (let i = 7; i >= 0; i--) dataBits.push((cw >> i) & 1); });
+    let bitIdx = 0; let upward = true;
+    for (let col = size - 1; col > 0; col -= 2) {
+        if (col === 6) col--;
+        for (let rowOffset = 0; rowOffset < size; rowOffset++) {
+            const row = upward ? size - 1 - rowOffset : rowOffset;
+            for (let dx = 0; dx < 2; dx++) {
+                const c = col - dx;
+                if (m[row][c] !== null) continue;
+                const bit = bitIdx < dataBits.length ? dataBits[bitIdx++] : 0;
+                const masked = bit ^ ((row + c) % 2 === 0 ? 1 : 0);
+                m[row][c] = !!masked;
+            }
+        }
+        upward = !upward;
+    }
+
+    const formatBits = 0b111011111000100; // Level L + mask 0
+    const fmtCoordsA = [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]];
+    const fmtCoordsB = [[20, 8], [19, 8], [18, 8], [17, 8], [16, 8], [15, 8], [14, 8], [13, 8], [8, 13], [8, 14], [8, 15], [8, 16], [8, 17], [8, 18], [8, 19]];
+    const fmtBit = (idx) => ((formatBits >> (14 - idx)) & 1) === 1;
+    fmtCoordsA.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+    fmtCoordsB.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+    return m;
+}
+
+function drawQRToCanvas(matrix, size, canvas) {
+    const ctx = canvas.getContext('2d');
+    const dim = matrix.length;
+    const scale = Math.floor(size / dim);
+    const pad = 2 * scale;
+    const finalSize = dim * scale + pad * 2;
+    canvas.width = finalSize; canvas.height = finalSize;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, finalSize, finalSize);
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < dim; y++) {
+        for (let x = 0; x < dim; x++) {
+            if (matrix[y][x]) ctx.fillRect(pad + x * scale, pad + y * scale, scale, scale);
+        }
+    }
+}
+
+function matrixToSVG(matrix, size) {
+    const dim = matrix.length;
+    const scale = size / dim;
+    let path = '';
+    for (let y = 0; y < dim; y++) {
+        for (let x = 0; x < dim; x++) {
+            if (matrix[y][x]) path += `M${(x * scale).toFixed(2)} ${(y * scale).toFixed(2)}h${scale.toFixed(2)}v${scale.toFixed(2)}h-${scale.toFixed(2)}z`;
+        }
+    }
+    const view = size.toFixed(2);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${view} ${view}" width="${view}" height="${view}"><rect width="100%" height="100%" fill="white"/>${path ? `<path d="${path}" fill="black"/>` : ''}</svg>`;
+}
+
+function autoPreviewQR() { setTimeout(generateQR, 10); }
+function generateQR() {
+    const txt = document.getElementById('qr-text')?.value || '';
+    const size = parseInt(document.getElementById('qr-size')?.value || '256');
+    const format = document.getElementById('qr-format')?.value || 'png';
+    lastQRFormat = format; lastQRSize = size; lastQRText = txt;
+    if (!txt.trim()) { const canvas = document.getElementById('qr-canvas'); if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillText('Enter text', 10, 20); } return; }
+    try {
+        lastQRMatrix = buildQRMatrix(txt.trim());
+    } catch (e) {
+        alert(e.message || 'Unable to build QR');
+        return;
+    }
+
+    const canvas = document.getElementById('qr-canvas');
+    const svgBox = document.getElementById('qr-svg');
+    if (canvas) drawQRToCanvas(lastQRMatrix, size, canvas);
+    if (svgBox) {
+        if (format === 'svg') {
+            svgBox.style.display = 'block';
+            canvas.style.display = 'none';
+            svgBox.innerHTML = matrixToSVG(lastQRMatrix, size);
+        } else {
+            svgBox.style.display = 'none';
+            canvas.style.display = 'block';
+            svgBox.innerHTML = '';
+        }
+    }
+}
+
+function downloadQR() {
+    if (!lastQRMatrix || !lastQRText.trim()) { alert('Generate QR first.'); return; }
+    if (lastQRFormat === 'svg') {
+        const svg = matrixToSVG(lastQRMatrix, lastQRSize);
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'qr.svg'; a.click(); URL.revokeObjectURL(url);
+    } else {
+        const canvas = document.getElementById('qr-canvas');
+        drawQRToCanvas(lastQRMatrix, lastQRSize, canvas);
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'qr.png'; a.click(); URL.revokeObjectURL(url);
+        });
+    }
+}
 
 // --- CRYPTO HELPER ---
 /**
@@ -1370,33 +1596,86 @@ window.genMD = function () {
  * Підтримує категорії, файли та захист паролем
  */
 function renderObsidian() {
-    const v = document.getElementById('view'); const content = currentObsFile ? systemData.obsidian[currentObsCat][currentObsFile].replace(/\\\\/g, '\\') : "Оберіть нотатку для зчитування..."; v.innerHTML = `<h2>Obsidian.Vault</h2><div class="obs-container"><div class="obs-tabs" id="o-t"></div><div class="obs-main"><div class="obs-files" id="o-f"></div><div class="obs-viewer" id="o-v"><pre>${content}</pre></div></div></div>`; const tabBox = document.getElementById('o-t');
-    systemData.obsidian.cats.forEach(c => {
-        const b = document.createElement('button');
-        b.className = `obs-tab-btn ${c === currentObsCat ? 'active' : ''}`;
-        // Lock icon in tab
-        const isLocked = systemData.obsidian.catAuth && systemData.obsidian.catAuth[c];
-        b.innerText = (isLocked ? '🔒 ' : '') + c;
+    const v = document.getElementById('view');
+    if (!v) return;
 
-        b.onclick = () => {
-            if (isLocked) { // Check lock existence first
-                if (!adminAuth) {
-                    const p = prompt("ENTER PASSWORD for " + c + ":");
-                    if (p !== systemData.obsidian.catAuth[c]) {
-                        playSfx(100, 'sawtooth', 0.5); alert("ACCESS DENIED"); return;
+    const obs = (systemData && systemData.obsidian && typeof systemData.obsidian === 'object') ? systemData.obsidian : {};
+    const cats = Array.isArray(obs.cats) ? obs.cats : [];
+
+    if (!dataReady) {
+        v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading Obsidian data...</div>';
+        return;
+    }
+
+    // Ensure current category is valid
+    if (!cats.includes(currentObsCat)) {
+        currentObsCat = cats.length ? cats[0] : '';
+        currentObsFile = '';
+    }
+
+    const currentCatFiles = currentObsCat && obs[currentObsCat] && typeof obs[currentObsCat] === 'object'
+        ? obs[currentObsCat]
+        : {};
+    const fileKeys = Object.keys(currentCatFiles);
+
+    if (currentObsFile && !fileKeys.includes(currentObsFile)) currentObsFile = '';
+    const displayFile = currentObsFile || fileKeys[0] || '';
+
+    const content = displayFile && currentCatFiles[displayFile]
+        ? String(currentCatFiles[displayFile]).replace(/\\\\/g, '\\')
+        : (cats.length ? "Оберіть нотатку для зчитування або створіть нову..." : "Немає доступних категорій нотаток.");
+
+    v.innerHTML = `<h2>Obsidian.Vault</h2>
+        <div class="obs-container">
+            <div class="obs-tabs" id="o-t"></div>
+            <div class="obs-main">
+                <div class="obs-files" id="o-f"></div>
+                <div class="obs-viewer" id="o-v"><pre>${content}</pre></div>
+            </div>
+        </div>`;
+
+    const tabBox = document.getElementById('o-t');
+    if (tabBox && cats.length) {
+        cats.forEach(c => {
+            const b = document.createElement('button');
+            b.className = `obs-tab-btn ${c === currentObsCat ? 'active' : ''}`;
+            const isLocked = obs.catAuth && obs.catAuth[c];
+            b.innerText = (isLocked ? '🔒 ' : '') + c;
+
+            b.onclick = () => {
+                if (isLocked) {
+                    if (!adminAuth) {
+                        const p = prompt("ENTER PASSWORD for " + c + ":");
+                        if (p !== obs.catAuth[c]) {
+                            playSfx(100, 'sawtooth', 0.5); alert("ACCESS DENIED"); return;
+                        }
+                    } else {
+                        playSfx(800, 'sine', 0.1);
+                        alert("ADMIN: PASSWORD BYPASSED");
                     }
-                } else {
-                    // Admin feedback
-                    playSfx(800, 'sine', 0.1);
-                    alert("ADMIN: PASSWORD BYPASSED");
                 }
-            }
-            currentObsCat = c; currentObsFile = ''; renderObsidian();
-        };
-        tabBox.appendChild(b);
-    });
+                currentObsCat = c; currentObsFile = ''; renderObsidian();
+            };
+            tabBox.appendChild(b);
+        });
+    } else if (tabBox) {
+        tabBox.innerHTML = '<div style="opacity:0.6; padding:8px;">No note categories</div>';
+    }
 
-    const fileBox = document.getElementById('o-f'); Object.keys(systemData.obsidian[currentObsCat]).forEach(f => { const b = document.createElement('button'); b.className = `obs-file-item ${f === currentObsFile ? 'active' : ''}`; b.innerText = '> ' + f; b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); }; fileBox.appendChild(b); });
+    const fileBox = document.getElementById('o-f');
+    if (fileBox) {
+        if (!fileKeys.length) {
+            fileBox.innerHTML = '<div style="opacity:0.6; padding:8px;">No files in this category</div>';
+        } else {
+            fileKeys.forEach(f => {
+                const b = document.createElement('button');
+                b.className = `obs-file-item ${f === displayFile ? 'active' : ''}`;
+                b.innerText = '> ' + f;
+                b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); };
+                fileBox.appendChild(b);
+            });
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1529,15 +1808,23 @@ function renderTodo() {
     if (editable) {
         html += `<div class="todo-input-group" style="margin-bottom:15px; flex-wrap:wrap;">
             <input type="text" id="new-todo-input" class="todo-input" placeholder="New task..." onkeypress="if(event.key==='Enter') addTodoItem()">
+            <input type="date" id="new-todo-date" class="todo-input" style="max-width:180px;" aria-label="Due date">
+            <input type="time" id="new-todo-time" class="todo-input" style="max-width:140px;" aria-label="Due time">
             <button class="btn" onclick="addTodoItem()">ADD_TASK</button>
             <button class="btn" onclick="renderCalendar()" style="margin-left:auto;">[ CALENDAR_VIEW ]</button>
             <button class="btn" onclick="renderTodoList()" id="list-view-btn" style="display:none;">[ LIST_VIEW ]</button>
         </div>
         <div style="margin-bottom:15px; display:flex; gap:10px;">
              <button class="btn" onclick="exportTodoData()">EXPORT (JSON)</button>
+             <button class="btn" onclick="exportTodoICS()">EXPORT (ICS)</button>
              <label class="btn" style="cursor:pointer;">
                 IMPORT (JSON) <input type="file" id="todo-imp" style="display:none" onchange="importTodoData(this)">
              </label>
+        </div>`;
+    } else {
+        html += `<div style="margin-bottom:15px; display:flex; gap:10px;">
+            <button class="btn" onclick="renderCalendar()">[ CALENDAR_VIEW ]</button>
+            <button class="btn" onclick="exportTodoICS()">EXPORT (ICS)</button>
         </div>`;
     }
     html += `<div class="todo-container" id="todo-main-box"><div class="todo-list" id="todo-list"></div></div>`;
@@ -1559,11 +1846,12 @@ function renderTodoList() {
         const el = document.createElement('div');
         el.className = `todo-item ${t.d ? 'todo-done' : ''}`;
         if (editable) {
-            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span> 
+            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span>
                            <span class="todo-text">${t.t}</span>
+                           ${t.due ? `<span style="margin-left:10px; font-size:0.8rem; opacity:0.7;">(${t.due}${t.time ? ' ' + t.time : ''})</span>` : ''}
                            <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})" style="margin-left:auto">X</button>`;
         } else {
-            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>`;
+            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>${t.due ? `<span style="margin-left:10px; font-size:0.8rem; opacity:0.7;">(${t.due}${t.time ? ' ' + t.time : ''})</span>` : ''}`;
         }
         l.appendChild(el);
     });
@@ -1665,6 +1953,30 @@ window.exportTodoData = function () {
     link.click();
 }
 
+window.exportTodoICS = function () {
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//cl0w.nz//tasks//EN'];
+    const pushEvent = (title, date, time) => {
+        if (!date) return;
+        const uid = `${title}-${date}-${time || 'allday'}@cl0w.nz`;
+        const dt = date.replace(/-/g, '') + (time ? 'T' + time.replace(/:/g, '') + '00' : '');
+        lines.push('BEGIN:VEVENT');
+        lines.push('UID:' + uid);
+        lines.push('DTSTAMP:' + stamp);
+        lines.push('DTSTART:' + dt);
+        lines.push('SUMMARY:' + title);
+        lines.push('END:VEVENT');
+    };
+    (systemData.calendarEvents || []).forEach((ev) => pushEvent(ev.title || 'Event', ev.date, ev.time && ev.time !== 'All Day' ? ev.time : ''));
+    (systemData.todos || []).forEach((t) => pushEvent(t.t, t.due, t.time));
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tasks.ics'; a.click(); URL.revokeObjectURL(url);
+};
+
 window.importTodoData = function (acc) {
     const file = acc.files[0];
     if (!file) return;
@@ -1688,10 +2000,21 @@ window.importTodoData = function (acc) {
 function addTodoItem() {
     const inp = document.getElementById('new-todo-input');
     if (!inp || !inp.value.trim()) return;
-    systemData.todos.push({ t: inp.value.trim(), d: false });
+    const dueDate = document.getElementById('new-todo-date')?.value || '';
+    const dueTime = document.getElementById('new-todo-time')?.value || '';
+    const item = { t: inp.value.trim(), d: false };
+    if (dueDate) item.due = dueDate;
+    if (dueTime) item.time = dueTime;
+    systemData.todos.push(item);
+    if (dueDate) {
+        if (!systemData.calendarEvents) systemData.calendarEvents = [];
+        systemData.calendarEvents.push({ date: dueDate, time: dueTime || 'All Day', title: item.t });
+    }
     saveData();
     renderTodoList();
     inp.value = '';
+    const dIn = document.getElementById('new-todo-date'); if (dIn) dIn.value = '';
+    const tIn = document.getElementById('new-todo-time'); if (tIn) tIn.value = '';
     playSfx(800);
 }
 /** toggleTodoDone - Змінює статус виконання завдання */
@@ -1718,7 +2041,8 @@ function removeTodoItem(i) {
 function renderGameMenu() {
     const v = document.getElementById('view');
     // MERGED RENDER GAME MENU
-    const customGames = systemData.games.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
+    const gameList = Array.isArray(systemData.games) ? systemData.games : [];
+    const customGames = gameList.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
 
     v.innerHTML = `<h2>GAME_CENTER</h2>
     <div class="game-hub">
@@ -1748,8 +2072,13 @@ window.loadPicoCart = function () {
 
 /** gameInterval - Інтервал активної гри для коректної зупинки */
 var gameInterval = null; // Renamed from gameInt to match new code
+var gameCleanup = null;
 function stopGames() {
     if (gameInterval) clearInterval(gameInterval);
+    if (typeof gameCleanup === 'function') {
+        try { gameCleanup(); } catch (e) { }
+    }
+    gameCleanup = null;
     const gameArea = document.getElementById('game-area');
     if (gameArea) gameArea.style.display = 'none';
     const picoArea = document.getElementById('pico-area');
@@ -1757,33 +2086,244 @@ function stopGames() {
     // stopScreensaver(); // Just in case - assuming this function exists elsewhere or is a placeholder
 }
 
-/** runGame - Запускає обрану гру */
-function runGame(id) {
-    const area = document.getElementById('game-area');
-    const pico = document.getElementById('pico-area');
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas) return; // Error safety
-    const ctx = canvas.getContext('2d');
+// --- BUILT-IN MINI GAMES (SAFE DEFAULTS) ---
 
-    stopGames(); // Clear previous
+// Predeclare handlers to avoid ReferenceErrors during resolution
+let startSnake;
+let startPong;
+let startTetris;
 
-    if (id === 'pico8') {
-        pico.style.display = 'block';
-        // Use a generic placeholder or allow input
-        const url = prompt("Enter PICO-8 Web Cart URL (or cancel for demo):", "https://www.lexaloffle.com/bbs/widget.php?pid=celeste");
-        if (url) {
-            document.getElementById('pico-frame').src = url;
+startSnake = function (canvas, ctx) {
+    const gridSize = 20;
+    const cols = Math.floor(canvas.width / gridSize);
+    const rows = Math.floor(canvas.height / gridSize);
+    let snake = [{ x: 5, y: 5 }];
+    let dir = { x: 1, y: 0 };
+    let food = { x: 10, y: 10 };
+    let alive = true;
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowUp' && dir.y === 0) dir = { x: 0, y: -1 };
+        if (e.key === 'ArrowDown' && dir.y === 0) dir = { x: 0, y: 1 };
+        if (e.key === 'ArrowLeft' && dir.x === 0) dir = { x: -1, y: 0 };
+        if (e.key === 'ArrowRight' && dir.x === 0) dir = { x: 1, y: 0 };
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const spawnFood = () => {
+        food = {
+            x: Math.floor(Math.random() * cols),
+            y: Math.floor(Math.random() * rows)
+        };
+    };
+
+    const loop = () => {
+        if (!alive) return;
+        const head = { x: (snake[0].x + dir.x + cols) % cols, y: (snake[0].y + dir.y + rows) % rows };
+        // Collision with self
+        if (snake.some((s) => s.x === head.x && s.y === head.y)) {
+            alive = false;
+            ctx.fillStyle = '#f55';
+            ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+            return;
         }
-        return;
-    }
+        snake.unshift(head);
+        if (head.x === food.x && head.y === food.y) {
+            playSfx(900, 'square', 0.05);
+            spawnFood();
+        } else {
+            snake.pop();
+        }
 
-    area.style.display = 'block';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        snake.forEach((s) => ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize - 2, gridSize - 2));
+        ctx.fillStyle = '#f50';
+        ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+    };
 
-    // Assuming startSnake, startTetris, startPong functions exist
-    if (id === 'snake') startSnake(canvas, ctx);
-    else if (id === 'tetris') startTetris(canvas, ctx);
-    else if (id === 'pong') startPong(canvas, ctx);
+    gameInterval = setInterval(loop, 120);
+    gameCleanup = () => document.removeEventListener('keydown', keyHandler);
 }
+
+startPong = function (canvas, ctx) {
+    let ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: 2 };
+    let paddle = { x: canvas.width / 2 - 40, y: canvas.height - 20, w: 80, h: 8 };
+    const keyState = { left: false, right: false };
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowLeft') keyState.left = e.type === 'keydown';
+        if (e.key === 'ArrowRight') keyState.right = e.type === 'keydown';
+    };
+    document.addEventListener('keydown', keyHandler);
+    document.addEventListener('keyup', keyHandler);
+
+    const loop = () => {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        if (ball.x < 5 || ball.x > canvas.width - 5) ball.vx *= -1;
+        if (ball.y < 5) ball.vy *= -1;
+
+        if (ball.y > paddle.y - 5 && ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
+            ball.vy *= -1;
+            playSfx(700, 'square', 0.05);
+        }
+        if (ball.y > canvas.height) {
+            ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: -2 };
+        }
+
+        if (keyState.left) paddle.x = Math.max(0, paddle.x - 5);
+        if (keyState.right) paddle.x = Math.min(canvas.width - paddle.w, paddle.x + 5);
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        ctx.fillRect(ball.x - 4, ball.y - 4, 8, 8);
+        ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    };
+
+    gameInterval = setInterval(loop, 16);
+    gameCleanup = () => {
+        document.removeEventListener('keydown', keyHandler);
+        document.removeEventListener('keyup', keyHandler);
+    };
+}
+
+startTetris = function (canvas, ctx) {
+      const cols = 10, rows = 20, size = 24;
+      canvas.width = cols * size;
+      canvas.height = rows * size;
+    const shapes = [
+        [[1, 1, 1, 1]],
+        [[1, 1], [1, 1]],
+        [[0, 1, 0], [1, 1, 1]],
+        [[1, 0, 0], [1, 1, 1]],
+        [[0, 0, 1], [1, 1, 1]],
+    ];
+    const board = Array.from({ length: rows }, () => Array(cols).fill(0));
+    let current = { shape: shapes[Math.floor(Math.random() * shapes.length)], x: 3, y: 0 };
+
+    const canMove = (dx, dy, shape = current.shape) => {
+        for (let y = 0; y < shape.length; y++) {
+            for (let x = 0; x < shape[0].length; x++) {
+                if (!shape[y][x]) continue;
+                const nx = current.x + dx + x;
+                const ny = current.y + dy + y;
+                if (nx < 0 || nx >= cols || ny >= rows) return false;
+                if (ny >= 0 && board[ny][nx]) return false;
+            }
+        }
+        return true;
+    };
+
+    const mergePiece = () => {
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+            if (val) board[current.y + y][current.x + x] = 1;
+        }));
+        clearLines();
+        current = { shape: shapes[Math.floor(Math.random() * shapes.length)], x: 3, y: 0 };
+    };
+
+    const clearLines = () => {
+        for (let y = rows - 1; y >= 0; y--) {
+            if (board[y].every((v) => v)) {
+                board.splice(y, 1);
+                board.unshift(Array(cols).fill(0));
+                playSfx(800, 'sine', 0.05);
+            }
+        }
+    };
+
+    const rotate = () => {
+        const rotated = current.shape[0].map((_, idx) => current.shape.map((row) => row[idx]).reverse());
+        if (canMove(0, 0, rotated)) current.shape = rotated;
+    };
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowLeft' && canMove(-1, 0)) current.x -= 1;
+        if (e.key === 'ArrowRight' && canMove(1, 0)) current.x += 1;
+        if (e.key === 'ArrowDown' && canMove(0, 1)) current.y += 1;
+        if (e.key === 'ArrowUp') rotate();
+        if (e.key === ' ') {
+            while (canMove(0, 1)) current.y += 1;
+            mergePiece();
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const draw = () => {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        board.forEach((row, y) => row.forEach((val, x) => {
+            if (val) ctx.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+        }));
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+            if (val) ctx.fillRect((current.x + x) * size + 1, (current.y + y) * size + 1, size - 2, size - 2);
+        }));
+    };
+
+    const tick = () => {
+        if (canMove(0, 1)) {
+            current.y += 1;
+        } else {
+            mergePiece();
+        }
+        draw();
+    };
+
+      draw();
+      gameInterval = setInterval(tick, 450);
+      gameCleanup = () => document.removeEventListener('keydown', keyHandler);
+  }
+
+  /** runGame - Запускає обрану гру */
+  function runGame(id) {
+      const area = document.getElementById('game-area');
+      const pico = document.getElementById('pico-area');
+      const canvas = document.getElementById('game-canvas');
+      if (!area || !pico || !canvas) return; // Error safety
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      stopGames(); // Clear previous
+
+      if (id === 'pico8') {
+          pico.style.display = 'block';
+          // Use a generic placeholder or allow input
+          const url = prompt("Enter PICO-8 Web Cart URL (or cancel for demo):", "https://www.lexaloffle.com/bbs/widget.php?pid=celeste");
+          if (url) {
+              document.getElementById('pico-frame').src = url;
+          }
+          return;
+      }
+
+      area.style.display = 'block';
+
+      const handlers = {
+          snake: typeof window.startSnake === 'function' ? window.startSnake : startSnake,
+          tetris: typeof window.startTetris === 'function' ? window.startTetris : startTetris,
+          pong: typeof window.startPong === 'function' ? window.startPong : startPong,
+      };
+
+      if (typeof handlers[id] === 'function') {
+          handlers[id](canvas, ctx);
+          return;
+      }
+
+      // Graceful fallback for unknown/missing games
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '16px monospace';
+      ctx.fillText('Game not available', canvas.width / 2, canvas.height / 2);
+  }
+
+  window.startSnake = typeof window.startSnake === 'function' ? window.startSnake : startSnake;
+  window.startPong = typeof window.startPong === 'function' ? window.startPong : startPong;
+  window.startTetris = typeof window.startTetris === 'function' ? window.startTetris : startTetris;
 
 /**
  * renderGallery - Рендерить сітку галереї
