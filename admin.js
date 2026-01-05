@@ -1,40 +1,4 @@
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                           ADMIN PANEL MODULE                               ║
-// ║  Модуль адміністративної панелі для керування контентом сайту              ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
-//
-// ┌─────────────────────────────────────────────────────────────────────────────┐
-// │                              ЗМІСТ (ANCHORS)                                │
-// ├─────────────────────────────────────────────────────────────────────────────┤
-// │  #SECTION_HELP        - Система допомоги (HELP_CONTENT, showHelp)          │
-// │  #SECTION_AUTH        - Авторизація (renderAdmin, checkAdmin, logoutAdmin) │
-// │  #SECTION_DASHBOARD   - Головна панель (renderAdminDash, loadAdminEditor)  │
-// │  #SECTION_MENU_CONFIG - Збереження конфігурації меню                       │
-// │  #SECTION_RESUME      - Функції резюме (skills, langs, jobs, edu, rnd)     │
-// │  #SECTION_NOTES       - Менеджер нотаток Obsidian                          │
-// │  #SECTION_BLOG        - Керування блогом                                   │
-// │  #SECTION_TODO        - Список справ                                       │
-// │  #SECTION_GALLERY     - Галерея (фото + ASCII арт)                         │
-// │  #SECTION_GAMES       - Редактор ігор                                      │
-// │  #SECTION_HOME_PROF   - Профілі головної сторінки                          │
-// │  #SECTION_HOME_LINKS  - Посилання головної сторінки                        │
-// │  #SECTION_HOME_SAVE   - Збереження налаштувань Home                        │
-// │  #SECTION_ABOUT_LANG  - Мови розділу About                                 │
-// │  #SECTION_SYSTEM      - Системні налаштування (пароль, glitch, phrases)    │
-// │  #SECTION_CONTACTS    - Контакти та друзі                                  │
-// │  #SECTION_THEMES      - Керування темами                                   │
-// │  #SECTION_DOWNLOAD    - Завантаження data.js                               │
-// └─────────────────────────────────────────────────────────────────────────────┘
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// #SECTION_HELP - Система допомоги адміністратора
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * HELP_CONTENT - Контент довідки для адмін-панелі
- * @property {Object} templates - Опис змінних шаблонів (UA/EN)
- * @property {Object} global - Загальна інструкція адміністратора (UA/EN)
- */
 const HELP_CONTENT = {
     templates: {
         ua: "<h3>Змінні Шаблонів</h3><ul><li>{{name}} - Ім'я</li><li>{{birth}} - Дата народження</li><li>{{email}} - Email</li><li>{{phone}} - Телефон</li><li>{{summary}} - Текст Про Мене</li><li>{{title_summary/skills/langs/jobs/edu/rnd}} - Заголовки секцій</li><li>{{skills_list}} - Список навичок</li><li>{{langs_list}} - Список мов</li><li>{{jobs_list}} - Досвід роботи (HTML/MD)</li><li>{{edu_list}} - Освіта (HTML/MD)</li><li>{{rnd_list}} - Список R&D</li></ul>",
@@ -366,6 +330,9 @@ function loadAdminEditor(sec) {
                     <label class="opt-check"><input type="checkbox" id="mv-todo" ${systemData.menuVisibility.todo ? 'checked' : ''}> Todo</label>
                     <label class="opt-check"><input type="checkbox" id="mv-gallery" ${systemData.menuVisibility.gallery ? 'checked' : ''}> Gallery</label>
                     <label class="opt-check"><input type="checkbox" id="mv-game" ${systemData.menuVisibility.game ? 'checked' : ''}> Game</label>
+                    <label class="opt-check"><input type="checkbox" id="mv-draw" ${systemData.menuVisibility.draw ? 'checked' : ''}> Draw</label>
+                    <label class="opt-check"><input type="checkbox" id="mv-pc" ${systemData.menuVisibility.pc ? 'checked' : ''}> About PC</label>
+                    <label class="opt-check"><input type="checkbox" id="mv-saver" ${systemData.menuVisibility.saver ? 'checked' : ''}> Saver</label>
                 </div>
                 <button class="btn btn-green" style="margin-top:10px" onclick="saveMenuVis()">SAVE MENU CONFIG</button>
 
@@ -393,8 +360,12 @@ window.saveMenuVis = function () {
     systemData.menuVisibility.todo = document.getElementById('mv-todo').checked;
     systemData.menuVisibility.gallery = document.getElementById('mv-gallery').checked;
     systemData.menuVisibility.game = document.getElementById('mv-game').checked;
+    systemData.menuVisibility.draw = document.getElementById('mv-draw').checked;
+    systemData.menuVisibility.pc = document.getElementById('mv-pc').checked;
+    systemData.menuVisibility.saver = document.getElementById('mv-saver').checked;
+
     saveData();
-    applyMenuVisibility();
+    if (typeof applyMenuVisibility === 'function') applyMenuVisibility();
     alert("Menu Configuration Saved!");
 }
 

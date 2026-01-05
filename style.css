@@ -344,6 +344,25 @@
             cursor: pointer;
             text-transform: lowercase;
             white-space: pre;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-icon {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+            transition: transform 0.2s;
+        }
+
+        nav button:hover .nav-icon {
+            transform: scale(1.2) rotate(5deg);
+        }
+
+        /* HIDE ICONS IF TOGGLED */
+        body.no-icons .nav-icon {
+            display: none;
         }
 
         nav button:hover {
@@ -667,6 +686,67 @@
             font-family: 'JetBrains Mono', monospace;
         }
 
+        /* CALENDAR */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-top: 20px;
+        }
+
+        .cal-day:hover {
+            background: var(--dim);
+        }
+
+        /* BUTTON STYLES REFACTOR */
+        .btn {
+            border: 1px solid var(--text);
+            background: rgba(0, 0, 0, 0.2);
+            color: var(--text);
+            padding: 6px 14px;
+            cursor: pointer;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .btn:hover {
+            background: var(--text);
+            color: var(--bg);
+            box-shadow: 0 0 8px var(--dim);
+        }
+
+        .btn-sm {
+            padding: 2px 6px;
+            font-size: 0.8rem;
+        }
+
+        .btn-red {
+            border-color: #ff3333;
+            color: #ff3333;
+        }
+
+        .btn-red:hover {
+            background: #ff3333;
+            color: #fff;
+        }
+
+        .btn-green {
+            border-color: #00ff41;
+            color: #00ff41;
+        }
+
+        .btn-green:hover {
+            background: #00ff41;
+            color: #000;
+        }
+
+
         .opts-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -788,15 +868,82 @@
             padding-bottom: 15px;
         }
 
-        .home-tag-btn {
-            border: 1px solid var(--dim);
-            padding: 5px 12px;
-            cursor: pointer;
-            background: transparent;
-            color: var(--text);
-            font-family: inherit;
-            font-size: 0.85rem;
-            opacity: 0.7;
+        /* KEYBOARD NAV FOCUS */
+        button:focus,
+        a:focus,
+        input:focus,
+        textarea:focus {
+            outline: 2px solid var(--text);
+            background: var(--dim);
+            box-shadow: 0 0 10px var(--text);
+        }
+
+        /* VISUAL EFFECTS */
+        .fx-glow body {
+            text-shadow: 0 0 4px var(--dim), 0 0 2px var(--text);
+        }
+
+        .fx-flicker body::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background: rgba(18, 16, 16, 0.1);
+            opacity: 0;
+            z-index: 998;
+            pointer-events: none;
+            animation: flicker-anim 0.15s infinite;
+        }
+
+        @keyframes flicker-anim {
+            0% {
+                opacity: 0.05;
+            }
+
+            50% {
+                opacity: 0.1;
+            }
+
+            100% {
+                opacity: 0.05;
+            }
+        }
+
+        .fx-scanline .crt-overlay {
+            opacity: 0.5;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 6px 100%;
+        }
+
+        /* SCREENSAVER */
+        #screensaver-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #screensaver-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* THEME MENU EXTRAS */
+        .theme-extras {
+            border-top: 1px dashed var(--dim);
+            padding-top: 10px;
+            margin-top: 10px;
         }
 
         .home-tag-btn:hover {
@@ -1305,4 +1452,64 @@
             to {
                 opacity: 1;
             }
+        }
+
+        /* FX GLOW */
+        .fx-glow body,
+        .fx-glow * {
+            text-shadow: 0 0 5px var(--text), 0 0 10px var(--text);
+        }
+
+        /* FX FLICKER */
+        @keyframes flicker-anim {
+            0% {
+                opacity: 1;
+            }
+
+            5% {
+                opacity: 0.8;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            15% {
+                opacity: 1;
+            }
+
+            20% {
+                opacity: 0.5;
+            }
+
+            25% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            55% {
+                opacity: 0.8;
+            }
+
+            60% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .fx-flicker body {
+            animation: flicker-anim 2s infinite;
+            pointer-events: auto;
+        }
+
+        /* FX SCANLINE is already handled via crt-overlay mostly, but we can enhance it */
+        .fx-scanline .crt-overlay {
+            opacity: 0.5 !important;
+            background-size: 100% 2px, 2px 100%;
         }

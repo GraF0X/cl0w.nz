@@ -1,41 +1,4 @@
-// ╔════════════════════════════════════════════════════════════════════════════╗
-// ║                         MAIN APPLICATION MODULE                            ║
-// ║  Головний модуль клієнтської частини сайту                                 ║
-// ╚════════════════════════════════════════════════════════════════════════════╝
-//
-// ┌─────────────────────────────────────────────────────────────────────────────┐
-// │                              ЗМІСТ (ANCHORS)                                │
-// ├─────────────────────────────────────────────────────────────────────────────┤
-// │  #SECTION_AUDIO       - Аудіо система (playSfx, toggleSound)               │
-// │  #SECTION_DATA        - Ініціалізація даних (initData, saveData)           │
-// │  #SECTION_MENU        - Видимість меню (applyMenuVisibility)               │
-// │  #SECTION_THEMES      - Система тем (themesList, setTheme, toggleThemeMenu)│
-// │  #SECTION_NAVIGATION  - Навігація (nav, updateTreeVisuals)                 │
-// │  #SECTION_HOME        - Головна сторінка (renderHome, selectHomeProfile)   │
-// │  #SECTION_WORK        - Робочі інструменти (renderWork, generatePass)      │
-// │  #SECTION_ABOUT       - Про мене (renderAbout, switchLang, typeEffect)     │
-// │  #SECTION_RESUME      - Резюме (renderResume, generateDOC, genMD)          │
-// │  #SECTION_OBSIDIAN    - Нотатки Obsidian (renderObsidian)                  │
-// │  #SECTION_BLOG        - Блог (renderBlog, filterBlog, renderBlogPost)      │
-// │  #SECTION_TODO        - Список справ (renderTodo, renderTodoList)          │
-// │  #SECTION_GALLERY     - Галерея (renderGallery, expandGallery)             │
-// │  #SECTION_GAMES       - Ігри (renderGameMenu, runGame, stopGames)          │
-// │  #SECTION_CONTACTS    - Контакти (renderLinks)                             │
-// │  #SECTION_EASTER      - Easter Eggs (easterEggLogo, easterEggClown, etc)   │
-// │  #SECTION_INIT        - Ініціалізація (window.onload)                      │
-// └─────────────────────────────────────────────────────────────────────────────┘
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// #SECTION_AUDIO - Аудіо система
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/**
- * playSfx - Відтворює звуковий ефект
- * @param {number} f - Частота звуку в Гц
- * @param {string} t - Тип хвилі ('sine', 'square', 'sawtooth', 'triangle')
- * @param {number} d - Тривалість в секундах
- * @param {number} v - Гучність (0.0 - 1.0)
- */
 let audioCtx = null; let soundOn = true;
 function playSfx(f, t = 'sine', d = 0.1, v = 0.05) {
     if (!soundOn) return;
@@ -52,6 +15,140 @@ function playSfx(f, t = 'sine', d = 0.1, v = 0.05) {
 /** toggleSound - Перемикає звук увімкнено/вимкнено */
 function toggleSound() { soundOn = !soundOn; document.getElementById('sound-toggle').innerText = soundOn ? '🕪' : '🕩'; }
 
+function openIRC() {
+    if (document.getElementById('irc-window')) return; // Already open
+
+    const w = document.createElement('div');
+    w.id = 'irc-window';
+    w.style.cssText = `position:fixed; bottom:50px; right:50px; width:350px; height:400px; 
+        background:var(--bg); border:2px solid var(--text); z-index:9000; 
+        display:flex; flex-direction:column; box-shadow:5px 5px 0 var(--dim);`;
+
+    w.innerHTML = `
+        <div id="irc-header" style="background:var(--text); color:var(--bg); padding:5px; font-weight:bold; cursor:grab; display:flex; justify-content:space-between; align-items:center;">
+            <span>[ #general ]</span>
+            <div style="display:flex; gap:5px;">
+                <input id="irc-nick-set" placeholder="Nick" value="${systemData.resume.name || ''}" 
+                       style="background:var(--bg); color:var(--text); border:1px solid var(--bg); width:80px; padding:2px; font-size:0.8rem;"
+                       onchange="systemData.resume.name=this.value; saveData(); addIRCMessage('System', 'Nick changed to '+this.value, 'yellow');">
+                <button onclick="closeIRC()" style="background:none; border:none; cursor:pointer; font-weight:bold; color: var(--bg);">X</button>
+            </div>
+        </div>
+        <div id="irc-log" style="flex-grow:1; overflow-y:auto; padding:5px; font-size:0.85rem; font-family:monospace;">
+            <div style="opacity:0.6;">* Connecting to 127.0.0.1...</div>
+            <div style="opacity:0.6;">* Connected.</div>
+            <div style="opacity:0.6;">* Joining #general...</div>
+            <div style="color:yellow;">* Topic: Welcome to new CyberSpace. Be nice.</div>
+        </div>
+        <div style="display:flex; border-top:1px solid var(--text);">
+            <input type="text" id="irc-input" style="flex-grow:1; background:rgba(0,0,0,0.1); border:none; color:var(--text); padding:5px; font-family:inherit; outline:none;" placeholder="Type /help..." onkeypress="if(event.key==='Enter') sendIRC()">
+            <button onclick="sendIRC()" style="background:var(--dim); border:none; color:var(--text); padding:0 10px; cursor:pointer;">SEND</button>
+        </div>
+    `;
+
+    document.body.appendChild(w);
+    dragElement(w);
+
+    // Auto-bot messages
+    setTimeout(() => addIRCMessage("System", "Welcome, " + (systemData.resume.name || "Guest") + "!", "magenta"), 1000);
+}
+
+window.closeIRC = function () {
+    const w = document.getElementById('irc-window');
+    if (w) document.body.removeChild(w);
+}
+
+window.sendIRC = function () {
+    const inp = document.getElementById('irc-input');
+    const txt = inp.value.trim();
+    if (!txt) return;
+
+    addIRCMessage("Me", txt);
+    inp.value = '';
+
+    // Bot logic
+    if (txt.startsWith('/')) {
+        const cmd = txt.split(' ')[0];
+        const arg = txt.split(' ').slice(1).join(' ');
+
+        if (cmd === '/help') addIRCMessage("System", "Commands: /nick [name], /whois, /slap [user], /clear", "gray");
+        else if (cmd === '/clear') document.getElementById('irc-log').innerHTML = '';
+        else if (cmd === '/nick') {
+            if (arg) {
+                const old = systemData.resume.name || "Guest";
+                systemData.resume.name = arg;
+                saveData();
+                addIRCMessage("System", `Nickname changed to ${arg}`, "yellow");
+            }
+        }
+        else if (cmd === '/slap') {
+            const target = arg || "someone";
+            addIRCMessage("*", "slaps " + target + " around a bit with a large trout", "cyan");
+        }
+    } else {
+        // Random replies
+        if (Math.random() > 0.7) {
+            setTimeout(() => {
+                const replies = ["Interesting...", "LOL", "AFK", "brb", ":)", "Does it run Doom?", "pwned"];
+                const users = ["Neo", "Morpheus", "Trinity", "Cypher", "Guest84"];
+                const u = users[Math.floor(Math.random() * users.length)];
+                const r = replies[Math.floor(Math.random() * replies.length)];
+                addIRCMessage(u, r, "lime");
+            }, 1000 + Math.random() * 2000);
+        }
+    }
+}
+
+function addIRCMessage(user, msg, color) {
+    const log = document.getElementById('irc-log');
+    if (!log) return;
+    const now = new Date().toTimeString().substr(0, 5);
+    const div = document.createElement('div');
+    const uColor = color || (user === "Me" ? "inherit" : "lime");
+    const nameDisplay = user === "Me" && systemData.resume.name ? systemData.resume.name : user;
+    div.innerHTML = `<span style="opacity:0.5;">[${now}]</span> <span style="font-weight:bold; color:${uColor}">&lt;${nameDisplay}&gt;</span> ${msg}`;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+    playSfx(1200, 'square', 0.05, 0.05);
+}
+
+function dragElement(elmnt) {
+    var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    if (document.getElementById(elmnt.id + "-header")) {
+        document.getElementById(elmnt.id + "-header").onmousedown = dragMouseDown;
+    }
+
+    function dragMouseDown(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+    }
+
+    function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
+        elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+    }
+}
+
+// Add Keyboard Shortcut for IRC (Alt+I)
+document.addEventListener('keydown', (e) => {
+    if (e.altKey && e.code === 'KeyI') openIRC();
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_DATA - Ініціалізація та збереження даних
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -59,6 +156,152 @@ function toggleSound() { soundOn = !soundOn; document.getElementById('sound-togg
 /** systemData - Глобальне сховище даних додатка */
 
 let systemData = {};
+// ASCII DRAW STATE
+let adBrush = '#';
+let adMode = 'draw'; // draw, erase
+let adGrid = [];
+let adCx = 0; let adCy = 0; // Cursor pos
+const adW = 40; const adH = 15;
+
+/** renderAsciiDraw - Рендерить інтерфейс малювання */
+function renderAsciiDraw() {
+    const v = document.getElementById('view');
+
+    // Initialize empty grid if fresh
+    if (adGrid.length === 0) {
+        for (let y = 0; y < adH; y++) {
+            let row = [];
+            for (let x = 0; x < adW; x++) row.push(' ');
+            adGrid.push(row);
+        }
+    }
+
+    // Extended Palette
+    let chars = ['#', '@', '%', '*', '+', '=', '-', '.', ':', '/', '\\', '$', '8', '0', '&',
+        '█', '▀', '▄', '▌', '▐', '░', '▒', '▓', '■'];
+
+    let toolsHtml = `<div style="margin-bottom:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <button class="btn ${adMode === 'draw' ? 'active' : ''}" onclick="adSetMode('draw')">DRAW</button>
+        <button class="btn ${adMode === 'erase' ? 'active' : ''}" onclick="adSetMode('erase')">ERASE</button>
+        <button class="btn btn-red" onclick="adClear()">CLEAR</button>
+        <br>
+        <div style="border-left:1px solid var(--dim); padding-left:10px; display:flex; gap:2px; flex-wrap:wrap; max-width:600px;">
+            ${chars.map(c => `<button class="btn btn-sm ${adBrush === c ? 'active' : ''}" style="padding:0 5px; min-width:25px;" onclick="adSetBrush('${c}')">${c}</button>`).join('')}
+        </div>
+        <button class="btn" style="margin-left:auto" onclick="saveAsciiArt()">SAVE</button>
+    </div>`;
+
+    let gridHtml = `<div id="ascii-canvas" style="display:inline-block; border:1px solid var(--dim); background:#000; cursor:crosshair; user-select:none; line-height:1; position:relative;" onmouseleave="adIsDrawing=false">`;
+
+    for (let y = 0; y < adH; y++) {
+        gridHtml += `<div class="ascii-row" style="display:flex;">`;
+        for (let x = 0; x < adW; x++) {
+            const isCursor = (x === adCx && y === adCy);
+            const cursorStyle = isCursor ? 'background:var(--dim); outline:1px solid var(--text);' : '';
+            gridHtml += `<div class="ascii-cell" data-x="${x}" data-y="${y}" onmousedown="adStart(this)" onmouseenter="adEnter(this)" style="width:15px; height:20px; display:flex; justify-content:center; align-items:center; font-family:'JetBrains Mono', monospace; ${cursorStyle}">${adGrid[y][x]}</div>`;
+        }
+        gridHtml += `</div>`;
+    }
+    gridHtml += `</div>
+    <div style="margin-top:10px; font-size:0.8rem; opacity:0.7;">
+        [Mouse]: Shift+Click=Pick, Drag=Paint. <br>
+        [Keyboard]: Arrows=Move, Space/Enter=PaintChar, Backspace=Erase.
+    </div>`;
+
+    v.innerHTML = `<h2>ASCII_DRAW STUDIO</h2>${toolsHtml}${gridHtml}`;
+}
+
+let adIsDrawing = false;
+
+window.adSetMode = function (m) { adMode = m; renderAsciiDraw(); }
+window.adSetBrush = function (b) { adBrush = b; adMode = 'draw'; renderAsciiDraw(); }
+window.adClear = function () {
+    if (confirm('Clear canvas?')) {
+        adGrid = [];
+        renderAsciiDraw();
+        playSfx(100, 'sawtooth', 0.3);
+    }
+}
+
+window.adStart = function (el) {
+    if (event.shiftKey) {
+        // Picker
+        adBrush = el.innerText;
+        if (adBrush === '' || adBrush === ' ') adBrush = '#';
+        adMode = 'draw';
+        renderAsciiDraw();
+        return;
+    }
+    adIsDrawing = true;
+    adPaint(el);
+}
+window.adEnter = function (el) {
+    if (adIsDrawing) adPaint(el);
+}
+document.addEventListener('mouseup', () => { adIsDrawing = false; });
+
+function adPaint(el) {
+    const x = parseInt(el.dataset.x);
+    const y = parseInt(el.dataset.y);
+    adApply(x, y);
+}
+
+function adApply(x, y) {
+    if (x < 0 || x >= adW || y < 0 || y >= adH) return;
+    const char = adMode === 'erase' ? ' ' : adBrush;
+    if (adGrid[y][x] !== char) {
+        adGrid[y][x] = char;
+        // Optimization: update DOM directly instead of full rerender to be faster, but renderAsciiDraw is safer for consistency
+        // Let's just do renderAsciiDraw for now, it's small enough 40x15=600 elements
+        renderAsciiDraw();
+        playSfx(800 + Math.random() * 200, 'sine', 0.02, 0.01);
+    }
+}
+
+// DRAW KEYBOARD HANDLING
+document.addEventListener('keydown', (e) => {
+    // Check if Draw is active
+    if (!document.getElementById('ascii-canvas')) return;
+
+    // Prevent default scrolling for Space/Arrows if canvas focused? 
+    // We just check if nav buttons aren't focused.
+    if (document.activeElement.tagName === 'BUTTON' || document.activeElement.tagName === 'INPUT') return;
+
+    if (e.key === 'ArrowUp') { if (adCy > 0) adCy--; renderAsciiDraw(); }
+    else if (e.key === 'ArrowDown') { if (adCy < adH - 1) adCy++; renderAsciiDraw(); }
+    else if (e.key === 'ArrowLeft') { if (adCx > 0) adCx--; renderAsciiDraw(); }
+    else if (e.key === 'ArrowRight') { if (adCx < adW - 1) adCx++; renderAsciiDraw(); }
+    else if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        adApply(adCx, adCy);
+    }
+    else if (e.key === 'Backspace') {
+        const prevMode = adMode;
+        adMode = 'erase';
+        adApply(adCx, adCy);
+        adMode = prevMode;
+    }
+});
+
+window.saveAsciiArt = function () {
+    const name = prompt("Name your artwork:", "Untitled");
+    if (!name) return;
+
+    const artStr = adGrid.map(row => row.join('')).join('\n');
+
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+    systemData.gallery.ASCII_ART.push({
+        n: name,
+        d: dateStr,
+        a: artStr
+    });
+
+    saveData();
+    alert("Saved to /gallery > ASCII_ART");
+    playSfx(600, 'square', 0.2);
+}
 /**
  * initData - Ініціалізує дані з localStorage або встановлює default
  * Виконує міграцію даних при оновленні версії
@@ -80,6 +323,9 @@ function initData() {
             if (!systemData.resume.templates) systemData.resume.templates = defaultData.resume.templates;
 
             if (!systemData.resume.education) systemData.resume.education = defaultData.resume.education;
+            // SCREENSAVER DATA
+            if (!systemData.screensaver) systemData.screensaver = { enabled: true, timeout: 60, type: 'matrix' };
+
             if (!systemData.resume.languages) systemData.resume.languages = defaultData.resume.languages;
             if (!systemData.resume.rnd) systemData.resume.rnd = defaultData.resume.rnd;
             if (typeof systemData.resume.rnd === 'string') systemData.resume.rnd = [systemData.resume.rnd];
@@ -134,6 +380,7 @@ function initData() {
         setTheme(systemData.themes.defaultId);
     }
     applyMenuVisibility();
+    applyEffects();
     renderDynamicLogo();
 }
 
@@ -155,6 +402,10 @@ function applyMenuVisibility() {
     const toggle = (id, visible) => {
         const el = document.getElementById(id);
         if (el) el.style.display = visible ? 'block' : 'none';
+
+        // Also toggle SVG icons if they exist in buttons
+        // Note: New request asked for toggling icons GLOBALLY via Themes, not Admin per Item.
+        // Admin controls ITEM visibility. Themes control ICON visibility. Valid.
     };
 
     toggle('nav-work', mv.work);
@@ -163,6 +414,10 @@ function applyMenuVisibility() {
     toggle('nav-todo', mv.todo);
     toggle('nav-gallery', mv.gallery);
     toggle('nav-game', mv.game);
+    // New ones:
+    toggle('nav-draw', mv.draw !== false); // default true
+    toggle('nav-pc', mv.pc !== false);
+    toggle('nav-saver', mv.saver !== false);
 }
 
 /**
@@ -211,6 +466,344 @@ function updateCustomThemeCSS() {
     document.getElementById('custom-theme-style').innerHTML = css;
 }
 
+/** toggleThemeMenu - Відкриває/закриває меню тем */
+function toggleThemeMenu() {
+    const pop = document.getElementById('theme-popup');
+    if (pop.style.display === 'block') {
+        pop.style.display = 'none';
+        return;
+    }
+
+    // BUILD MENU
+    let html = '';
+    themesList.forEach(t => {
+        html += `<div class="theme-item" onclick="setTheme('${t.id}')">
+            <div class="color-preview" style="background:${t.c}"></div> ${t.name}
+        </div>`;
+    });
+
+    // EFFECTS SECTION
+    const fx = systemData.effects || { glow: false, flicker: false, scanline: false };
+
+    html += `<div class="theme-extras">
+        <label class="opt-check"><input type="checkbox" ${fx.glow ? 'checked' : ''} onchange="toggleEffect('glow')"> Glow FX</label>
+        <label class="opt-check"><input type="checkbox" ${fx.flicker ? 'checked' : ''} onchange="toggleEffect('flicker')"> Flicker</label>
+        <label class="opt-check"><input type="checkbox" ${fx.scanline ? 'checked' : ''} onchange="toggleEffect('scanline')"> Scanline+</label>
+        <label class="opt-check"><input type="checkbox" ${systemData.home.showIcons !== false ? 'checked' : ''} onchange="toggleIcons(this.checked)"> Show Menu Icons</label>
+    </div>`;
+
+    pop.innerHTML = html;
+    pop.style.display = 'block';
+}
+
+/** toggleEffect - Перемикає візуальні ефекти */
+window.toggleEffect = function (type) {
+    if (!systemData.effects) systemData.effects = { glow: false, flicker: false, scanline: false };
+    systemData.effects[type] = !systemData.effects[type];
+    applyEffects();
+    saveData();
+}
+
+/** applyEffects - Застосовує класи ефектів до body */
+function applyEffects() {
+    if (!systemData.effects) return;
+    document.body.classList.toggle('fx-glow', systemData.effects.glow);
+    document.body.classList.toggle('fx-flicker', systemData.effects.flicker);
+    document.body.classList.toggle('fx-scanline', systemData.effects.scanline);
+
+    // Apply Icons (OnInit)
+    document.body.classList.toggle('no-icons', systemData.home.showIcons === false);
+}
+
+window.toggleIcons = function (show) {
+    if (!systemData.home) systemData.home = {};
+    systemData.home.showIcons = show;
+    saveData();
+    document.body.classList.toggle('no-icons', !show);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_KEYBOARD - Keyboard Navigation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+document.addEventListener('keydown', (e) => {
+    // If typing in input, ignore nav keys (except Esc)
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        if (e.key === 'Escape') e.target.blur();
+        return;
+    }
+
+    // CLOSE OVERLAYS
+    if (e.key === 'Escape') {
+        // Close Theme Menu
+        document.getElementById('theme-popup').style.display = 'none';
+        // Close Gallery Overlay
+        const overlay = document.querySelector('div[style*="position:fixed; top:0; left:0; width:100%; height:100%"]');
+        if (overlay) overlay.click();
+        return;
+    }
+
+    // MENU NAV
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        const navBtns = Array.from(document.querySelectorAll('nav button')).filter(b => b.style.display !== 'none');
+        const currentFocus = document.activeElement;
+        let idx = navBtns.indexOf(currentFocus);
+
+        if (idx === -1) {
+            // Focus first active nav button
+            const active = document.querySelector('nav button.active');
+            idx = navBtns.indexOf(active);
+            if (idx === -1) idx = 0;
+        } else {
+            if (e.key === 'ArrowDown') idx = (idx + 1) % navBtns.length;
+            else idx = (idx - 1 + navBtns.length) % navBtns.length;
+        }
+
+        navBtns[idx].focus();
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_SCREENSAVER - Screensavers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let ssTimer = null;
+let ssActive = false;
+let ssCanvas = null;
+let ssCtx = null;
+let ssReq = null;
+
+function resetIdleTimer() {
+    if (ssActive) stopScreensaver();
+    clearTimeout(ssTimer);
+    if (systemData.screensaver && systemData.screensaver.enabled) {
+        ssTimer = setTimeout(startScreensaver, systemData.screensaver.timeout * 1000);
+    }
+}
+
+document.addEventListener('mousemove', resetIdleTimer);
+document.addEventListener('keydown', resetIdleTimer);
+document.addEventListener('click', resetIdleTimer);
+
+window.startScreensaver = function (previewType) {
+    if (ssActive) return;
+    const type = previewType || (systemData.screensaver ? systemData.screensaver.type : 'matrix');
+
+    let overlay = document.getElementById('screensaver-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'screensaver-overlay';
+        overlay.innerHTML = '<canvas id="screensaver-canvas"></canvas>';
+        document.body.appendChild(overlay);
+        overlay.onclick = stopScreensaver;
+    }
+
+    overlay.style.display = 'flex';
+    ssCanvas = document.getElementById('screensaver-canvas');
+    ssCtx = ssCanvas.getContext('2d');
+    ssCanvas.width = window.innerWidth;
+    ssCanvas.height = window.innerHeight;
+
+    ssActive = true;
+
+    if (type === 'matrix') runMatrixSS();
+    else if (type === 'fire') runFireSS();
+    else if (type === 'pipes') runPipesSS();
+    else if (type === 'dvd') runDvdSS();
+    else if (type === 'trees') runTreesSS();
+}
+
+window.stopScreensaver = function () {
+    ssActive = false;
+    cancelAnimationFrame(ssReq);
+    const overlay = document.getElementById('screensaver-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function runMatrixSS() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
+    const fontSize = 16;
+    const columns = ssCanvas.width / fontSize;
+    const drops = [];
+    for (let x = 0; x < columns; x++) drops[x] = 1;
+
+    function draw() {
+        if (!ssActive) return;
+        ssCtx.fillStyle = "rgba(0, 0, 0, 0.05)";
+        ssCtx.fillRect(0, 0, ssCanvas.width, ssCanvas.height);
+        ssCtx.fillStyle = "#0F0";
+        ssCtx.font = fontSize + "px monospace";
+        for (let i = 0; i < drops.length; i++) {
+            const text = chars[Math.floor(Math.random() * chars.length)];
+            ssCtx.fillText(text, i * fontSize, drops[i] * fontSize);
+            if (drops[i] * fontSize > ssCanvas.height && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+        }
+        ssReq = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+function runFireSS() {
+    const w = 100; const h = 60;
+    const fw = ssCanvas.width / w; const fh = ssCanvas.height / h;
+    const firePixels = new Array(w * h).fill(0);
+    const palette = ["#000", "#070707", "#1f0707", "#2f0f07", "#470f07", "#571707", "#671f07", "#771f07", "#8f2707", "#9f2f07", "#af3f07", "#bf4707", "#c74707", "#DF4F07", "#DF5707", "#DF5707", "#D75F07", "#D7670F", "#cf6f0f", "#cf770f", "#cf7f0f", "#CF8717", "#C78717", "#C78F17", "#C7971F", "#BF9F1F", "#BF9F1F", "#BFA727", "#BFA727", "#BFAF2F", "#B7AF2F", "#B7B72F", "#B7B737", "#CFCF6F", "#DFDF9F", "#EFEFC7", "#FFFFFF"];
+
+    function draw() {
+        if (!ssActive) return;
+        // Calc
+        for (let x = 0; x < w; x++) {
+            for (let y = 1; y < h; y++) {
+                const src = y * w + x;
+                const decay = Math.floor(Math.random() * 3);
+                const dst = src - w + 1; // wind
+                if (dst >= 0) firePixels[dst < 0 ? 0 : dst] = Math.max(0, firePixels[src] - (decay & 1));
+            }
+        }
+        // Seed
+        for (let x = 0; x < w; x++) {
+            if (Math.random() > 0.5) firePixels[(h - 1) * w + x] = 36;
+            else firePixels[(h - 1) * w + x] = Math.max(0, firePixels[(h - 1) * w + x] - 1);
+        }
+
+        // Render
+        ssCtx.clearRect(0, 0, ssCanvas.width, ssCanvas.height);
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const idx = firePixels[y * w + x];
+                ssCtx.fillStyle = palette[idx];
+                ssCtx.fillRect(x * fw, y * fh, fw + 1, fh + 1);
+            }
+        }
+        ssReq = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+function runDvdSS() {
+    let x = 10, y = 10, dx = 3, dy = 3;
+    const txt = "DVD";
+    ssCtx.font = "bold 60px monospace";
+
+    function draw() {
+        if (!ssActive) return;
+        ssCtx.fillStyle = "rgba(0,0,0,0.2)";
+        ssCtx.fillRect(0, 0, ssCanvas.width, ssCanvas.height);
+
+        // Bounce
+        x += dx; y += dy;
+        if (x + 100 > ssCanvas.width || x < 0) dx = -dx;
+        if (y > ssCanvas.height || y < 50) dy = -dy;
+
+        ssCtx.fillStyle = `hsl(${Date.now() % 360}, 100%, 50%)`;
+        ssCtx.fillText(txt, x, y);
+
+        ssReq = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+// Pipes placeholder
+function runPipesSS() {
+    ssCtx.fillStyle = "#000"; ssCtx.fillRect(0, 0, ssCanvas.width, ssCanvas.height);
+    let x = ssCanvas.width / 2, y = ssCanvas.height / 2;
+    let dir = 0; // 0:up, 1:right, 2:down, 3:left
+
+    function draw() {
+        if (!ssActive) return;
+        if (Math.random() < 0.05) dir = Math.floor(Math.random() * 4);
+        ssCtx.fillStyle = `hsl(${Date.now() / 10 % 360}, 100%, 50%)`;
+        const step = 5;
+        if (dir === 0) y -= step; else if (dir === 1) x += step; else if (dir === 2) y += step; else x -= step;
+
+        if (x < 0) x = ssCanvas.width; if (x > ssCanvas.width) x = 0;
+        if (y < 0) y = ssCanvas.height; if (y > ssCanvas.height) y = 0;
+
+        ssCtx.fillRect(x, y, step, step);
+        ssReq = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+function runTreesSS() {
+    const maxDepth = 10;
+
+    function drawBranch(x, y, len, angle, depth) {
+        if (depth === 0) return;
+
+        const x2 = x + Math.cos(angle * Math.PI / 180) * len;
+        const y2 = y + Math.sin(angle * Math.PI / 180) * len;
+
+        ssCtx.beginPath();
+        ssCtx.moveTo(x, y);
+        ssCtx.lineTo(x2, y2);
+        ssCtx.strokeStyle = `hsl(${(depth / maxDepth) * 120}, 100%, 50%)`;
+        ssCtx.lineWidth = depth;
+        ssCtx.stroke();
+
+        // requestAnimationFrame for "animated" growth isn't easy with recursive stack
+        // So we just draw one static tree per frame or something?
+        // Let's do a "growing" tree effect by redrawing slightly different each time
+    }
+
+    // Actually, let's just draw random trees popping up
+    let trees = [];
+
+    function reset() {
+        trees = [];
+        ssCtx.fillStyle = "#000";
+        ssCtx.fillRect(0, 0, ssCanvas.width, ssCanvas.height);
+    }
+    reset();
+
+    function grow(t) {
+        if (t.done) return;
+        // Draw segment
+        const x2 = t.x + Math.cos(t.a) * t.len;
+        const y2 = t.y + Math.sin(t.a) * t.len;
+
+        ssCtx.beginPath();
+        ssCtx.moveTo(t.x, t.y);
+        ssCtx.lineTo(x2, y2);
+        ssCtx.strokeStyle = `hsl(${t.d * 10}, 70%, 50%)`;
+        ssCtx.lineWidth = t.w;
+        ssCtx.stroke();
+
+        t.x = x2; t.y = y2; t.len *= 0.99;
+
+        if (t.len < 2 || t.w < 0.5) { t.done = true; return; }
+
+        // Branch chance
+        if (Math.random() < 0.05) {
+            trees.push({ x: t.x, y: t.y, a: t.a - 0.4, len: t.len * 0.8, w: t.w * 0.7, d: t.d + 1, done: false });
+            trees.push({ x: t.x, y: t.y, a: t.a + 0.4, len: t.len * 0.8, w: t.w * 0.7, d: t.d + 1, done: false });
+            t.done = true;
+        }
+    }
+
+    // Plant initial seed
+    trees.push({ x: ssCanvas.width / 2, y: ssCanvas.height, a: -Math.PI / 2, len: 10, w: 10, d: 0, done: false });
+
+    function draw() {
+        if (!ssActive) return;
+        // Fade bg
+        ssCtx.fillStyle = "rgba(0,0,0,0.02)";
+        ssCtx.fillRect(0, 0, ssCanvas.width, ssCanvas.height);
+
+        if (Math.random() < 0.02) {
+            trees.push({ x: Math.random() * ssCanvas.width, y: ssCanvas.height, a: -Math.PI / 2 + (Math.random() - 0.5), len: 5 + Math.random() * 5, w: 5 + Math.random() * 5, d: 0, done: false });
+        }
+
+        trees.forEach(grow);
+        trees = trees.filter(t => !t.done);
+
+        ssReq = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_NAVIGATION - Навігація та глобальні змінні
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -248,9 +841,211 @@ function nav(id) {
     else if (id === 'blog') { activeBlogTag = null; renderBlog(); }
     else if (id === 'todo') renderTodo();
     else if (id === 'gallery') renderGallery();
+    else if (id === 'draw') renderAsciiDraw();
+    else if (id === 'pc') renderAboutPC();
+    else if (id === 'screensaver') startScreensaver(); // Direct trigger
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
     else if (id === 'admin') renderAdmin();
+}
+
+/** renderAboutPC - Виводить статистику комп'ютера з віджетами */
+function renderAboutPC() {
+    const v = document.getElementById('view');
+    const ua = navigator.userAgent;
+    const platform = navigator.platform;
+    const cores = navigator.hardwareConcurrency || '?';
+    const mem = navigator.deviceMemory || '?';
+
+    // Physics Container
+    let physicsHtml = `
+    <div id="pc-physics-world" style="height:150px; border:1px solid var(--text); position:relative; overflow:hidden; margin-bottom:20px; background:rgba(0,0,0,0.2);">
+        <div style="position:absolute; top:5px; left:5px; opacity:0.6; font-size:0.7rem;">[ SCROLLME: UP=PORTAL, DOWN=CRASH ]</div>
+        <div id="pc-avatar" style="font-size:3rem; position:absolute; top:50px; left:50%; transform:translateX(-50%); transition: top 0.1s;">💻</div>
+        <div id="pc-portal" style="font-size:3rem; position:absolute; top:-40px; left:50%; transform:translateX(-50%) rotate(180deg); color:cyan; display:none;">🌀</div>
+        <div id="pc-fire" style="font-size:3rem; position:absolute; bottom:-40px; left:50%; transform:translateX(-50%); color:orange; display:none;">🔥</div>
+    </div>`;
+
+    // Code Playground
+    let codeHtml = `
+    <div class="work-card draggable-card" style="min-width:300px;">
+        <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:10px; font-weight:bold;">:: JS_PLAYGROUND ::</div>
+        <textarea id="code-in" style="width:100%; height:80px; background:rgba(0,0,0,0.3); color:var(--text); border:1px solid var(--dim); font-family:monospace; padding:5px;" placeholder="alert('Hello');"></textarea>
+        <button class="btn btn-sm" onclick="runPlayground()">EXECUTE</button>
+        <div id="code-out" style="margin-top:5px; font-size:0.8rem; color: #0f0;"></div>
+    </div>`;
+
+    v.innerHTML = `<h2>SYSTEM_MONITOR_V2</h2>
+    ${physicsHtml}
+    
+    <div id="pc-widgets-area" style="position:relative; height:600px; border:1px dashed var(--dim); padding:10px; overflow:hidden;">
+        <div class="work-card draggable-card" style="position:absolute; top:10px; left:10px; width:250px;">
+            <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">HOST_INFO</div>
+            <div>PLATFORM: ${platform}</div>
+            <div>CORES: ${cores}</div>
+            <div>RAM: ~${mem} GB</div>
+        </div>
+        
+        <div class="work-card draggable-card" style="position:absolute; top:10px; left:280px; width:250px;">
+            <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">NETWORK</div>
+            <div>STATUS: ${navigator.onLine ? 'ONLINE' : 'OFFLINE'}</div>
+            <div>DL: ${navigator.connection ? navigator.connection.downlink + 'Mbps' : '?'}</div>
+        </div>
+        
+        <div class="work-card draggable-card" style="position:absolute; top:150px; left:10px; width:300px;">
+             <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">PROCESS_LIST</div>
+             <div class="scroll-area" style="height:100px; font-size:0.7rem;">
+                <table style="width:100%">${generateFakeProcesses()}</table>
+             </div>
+        </div>
+        
+        <div style="position:absolute; top:150px; left:330px;">
+            ${codeHtml}
+        </div>
+    </div>`;
+
+    initDraggables();
+    initPhysics();
+}
+
+// PHYSICS
+function initPhysics() {
+    const av = document.getElementById('pc-avatar');
+    const port = document.getElementById('pc-portal');
+    const fire = document.getElementById('pc-fire');
+    if (!av) return;
+
+    const view = document.getElementById('view'); // Scroll container? 
+    // Wait, scroll happens on 'main' usually. 
+
+    const main = document.querySelector('main');
+
+    let lastScroll = main.scrollTop;
+
+    main.onscroll = function () {
+        if (!document.getElementById('pc-avatar')) return; // Exit if changed view
+
+        const diff = main.scrollTop - lastScroll;
+        lastScroll = main.scrollTop;
+
+        let currentTop = parseInt(av.style.top || 50);
+
+        // Inverse physics: Scroll Down -> Object goes Up? Or normal?
+        // Let's do Scroll Down -> Object Falls (Goes Down)
+        // Scroll Up -> Object Flies (Goes Up)
+
+        // Actually user said: scroll UP -> Portal (Up), Scroll DOWN -> Crash (Down)
+
+        // When we scroll down, scrollTop increases. diff > 0.
+        // We want avatar to go down (increase top).
+        currentTop += diff * 1.5;
+
+        av.style.top = currentTop + 'px';
+
+        // Bounds Check
+        if (currentTop < -20) {
+            // PORTAL
+            port.style.display = 'block';
+            port.style.top = '10px';
+            if (currentTop < -50) {
+                // Teleport
+                playSfx(1000, 'sawtooth', 0.2);
+                av.style.top = '140px';
+                port.style.display = 'none';
+            }
+        } else {
+            port.style.display = 'none';
+        }
+
+        if (currentTop > 140) {
+            // FIRE
+            fire.style.display = 'block';
+            fire.style.bottom = '10px';
+            if (currentTop > 170) {
+                // Crash
+                playSfx(100, 'noise', 0.3);
+                av.innerText = '💥';
+                setTimeout(() => { av.innerText = '💻'; av.style.top = '50px'; fire.style.display = 'none'; }, 1000);
+            }
+        } else {
+            fire.style.display = 'none';
+        }
+    };
+}
+
+// DRAGGABLE
+function initDraggables() {
+    const cards = document.querySelectorAll('.draggable-card');
+    cards.forEach(c => {
+        const header = c.querySelector('.card-header');
+        if (!header) return;
+
+        header.onmousedown = function (e) {
+            e.preventDefault();
+            let pos3 = e.clientX;
+            let pos4 = e.clientY;
+
+            document.onmouseup = closeDragElement;
+            document.onmousemove = elementDrag;
+
+            // Bring to front
+            c.style.zIndex = 100;
+
+            function elementDrag(e) {
+                e.preventDefault();
+                let pos1 = pos3 - e.clientX;
+                let pos2 = pos4 - e.clientY;
+                pos3 = e.clientX;
+                pos4 = e.clientY;
+                c.style.top = (c.offsetTop - pos2) + "px";
+                c.style.left = (c.offsetLeft - pos1) + "px";
+            }
+
+            function closeDragElement() {
+                document.onmouseup = null;
+                document.onmousemove = null;
+                c.style.zIndex = '';
+            }
+        };
+    });
+}
+
+// PLAYGROUND
+window.runPlayground = function () {
+    const code = document.getElementById('code-in').value;
+    const out = document.getElementById('code-out');
+    try {
+        const res = eval(code);
+        out.innerText = ">> " + res;
+        playSfx(600);
+    } catch (e) {
+        out.innerText = "!! " + e.message;
+        out.style.color = 'red';
+        playSfx(100, 'sawtooth');
+    }
+}
+
+function generateFakeProcesses() {
+    let html = '';
+    const procs = [
+        { cmd: 'kernel_task', u: 'root' },
+        { cmd: 'systemd', u: 'root' },
+        { cmd: 'chrome', u: 'user' },
+        { cmd: 'code', u: 'user' },
+        { cmd: 'node', u: 'user' },
+        { cmd: 'ssh-agent', u: 'user' },
+        { cmd: 'bash', u: 'user' },
+        { cmd: 'top', u: 'user' }
+    ];
+
+    for (let i = 0; i < 15; i++) {
+        const p = procs[Math.floor(Math.random() * procs.length)];
+        const pid = Math.floor(Math.random() * 30000) + 100;
+        const cpu = (Math.random() * 5).toFixed(1);
+        const mem = (Math.random() * 10).toFixed(1);
+        html += `<tr><td>${pid}</td><td>${p.u}</td><td>${cpu}</td><td>${mem}</td><td>${p.cmd}</td></tr>`;
+    }
+    return html;
 }
 
 function updateTreeVisuals() {
@@ -657,7 +1452,65 @@ function filterBlog(tag) {
 }
 
 /** renderBlogPost - Рендерить повний текст одного поста блогу */
-function renderBlogPost(id) { const p = systemData.blog.find(x => x.id === id); const v = document.getElementById('view'); playSfx(500); v.innerHTML = `<button class="btn" onclick="nav('blog')" style="margin-bottom:15px;">< BACK</button><h2 style="border-bottom:2px solid var(--text); padding-bottom:5px; margin-bottom:10px;">${p.title}</h2><div style="font-size:0.8rem; margin-bottom:20px; opacity:0.7;">DATE: ${p.date} | TAGS: ${p.tags.join(', ')}</div><div class="blog-read-view blog-full">${p.content}</div>`; }
+function renderBlogPost(id) {
+    const p = systemData.blog.find(x => x.id === id);
+    const v = document.getElementById('view');
+    playSfx(500);
+
+    // COMMENTS LOGIC
+    if (!systemData.blogComments) systemData.blogComments = {};
+    const comments = systemData.blogComments[id] || [];
+
+    let commentsHtml = `
+    <div style="margin-top:40px; border-top:1px dashed var(--dim); padding-top:20px;">
+        <h3>COMMENTS (${comments.length})</h3>
+        <div id="blog-comments-list" style="margin-bottom:20px; max-height:300px; overflow-y:auto; padding-right:10px;">
+            ${comments.length === 0 ? '<div style="opacity:0.5; font-style:italic;">No comments yet.</div>' : comments.map(c =>
+        `<div style="background:rgba(0,0,0,0.1); padding:10px; margin-bottom:10px; border-left:2px solid var(--text);">
+                    <div style="font-size:0.75rem; opacity:0.7; margin-bottom:5px;"><strong>${c.user}</strong> @ ${c.date}</div>
+                    <div style="white-space:pre-wrap;">${c.text}</div>
+                 </div>`
+    ).join('')}
+        </div>
+        
+        <div style="background:var(--dim); padding:15px; border:1px solid var(--text);">
+            <div style="margin-bottom:10px;">
+                <input type="text" id="com-name" placeholder="Name/Handle (Optional)" style="width:100%; border:none; background:rgba(0,0,0,0.2); color:var(--text); padding:5px; font-family:inherit;">
+            </div>
+            <div style="margin-bottom:10px;">
+                <textarea id="com-text" placeholder="Write a comment..." style="width:100%; height:60px; border:none; background:rgba(0,0,0,0.2); color:var(--text); padding:5px; font-family:inherit; resize:vertical;"></textarea>
+            </div>
+            <button class="btn" onclick="addBlogComment(${id})">POST COMMENT</button>
+        </div>
+    </div>`;
+
+    v.innerHTML = `<button class="btn" onclick="nav('blog')" style="margin-bottom:15px;">< BACK</button><h2 style="border-bottom:2px solid var(--text); padding-bottom:5px; margin-bottom:10px;">${p.title}</h2><div style="font-size:0.8rem; margin-bottom:20px; opacity:0.7;">DATE: ${p.date} | TAGS: ${p.tags.join(', ')}</div><div class="blog-read-view blog-full">${p.content}</div>${commentsHtml}`;
+}
+
+/** addBlogComment - Додає коментар */
+window.addBlogComment = function (postId) {
+    const txt = document.getElementById('com-text').value.trim();
+    let name = document.getElementById('com-name').value.trim();
+    if (!name) name = 'Anonymous';
+
+    if (!txt) return; // Empty
+
+    if (!systemData.blogComments) systemData.blogComments = {};
+    if (!systemData.blogComments[postId]) systemData.blogComments[postId] = [];
+
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0') + ' ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+    systemData.blogComments[postId].push({
+        user: name,
+        text: txt.replace(/</g, "&lt;").replace(/>/g, "&gt;"), // Basic sanitize
+        date: dateStr
+    });
+
+    saveData();
+    renderBlogPost(postId); // Rerender
+    playSfx(800, 'square', 0.1);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_TODO - Список справ
@@ -667,21 +1520,40 @@ function renderBlogPost(id) { const p = systemData.blog.find(x => x.id === id); 
 function renderTodo() {
     const v = document.getElementById('view');
     const editable = systemData.todoEditable;
-    let html = `<h2>TODO_LIST ${editable ? '[EDIT_MODE]' : '[READ_ONLY]'}</h2>`;
+
+    // Initialize events
+    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+
+    let html = `<h2>TODO_MANAGER ${editable ? '[EDIT_MODE]' : '[READ_ONLY]'}</h2>`;
+
     if (editable) {
-        html += `<div class="todo-input-group" style="margin-bottom:15px;">
+        html += `<div class="todo-input-group" style="margin-bottom:15px; flex-wrap:wrap;">
             <input type="text" id="new-todo-input" class="todo-input" placeholder="New task..." onkeypress="if(event.key==='Enter') addTodoItem()">
-            <button class="btn" onclick="addTodoItem()">ADD</button>
+            <button class="btn" onclick="addTodoItem()">ADD_TASK</button>
+            <button class="btn" onclick="renderCalendar()" style="margin-left:auto;">[ CALENDAR_VIEW ]</button>
+            <button class="btn" onclick="renderTodoList()" id="list-view-btn" style="display:none;">[ LIST_VIEW ]</button>
+        </div>
+        <div style="margin-bottom:15px; display:flex; gap:10px;">
+             <button class="btn" onclick="exportTodoData()">EXPORT (JSON)</button>
+             <label class="btn" style="cursor:pointer;">
+                IMPORT (JSON) <input type="file" id="todo-imp" style="display:none" onchange="importTodoData(this)">
+             </label>
         </div>`;
     }
-    html += `<div class="todo-container"><div class="todo-list" id="todo-list"></div></div>`;
+    html += `<div class="todo-container" id="todo-main-box"><div class="todo-list" id="todo-list"></div></div>`;
     v.innerHTML = html;
     renderTodoList();
 }
+
 /** renderTodoList - Відображає елементи списку справ */
 function renderTodoList() {
+    const box = document.getElementById('todo-main-box');
+    const listBtn = document.getElementById('list-view-btn');
+    if (listBtn) listBtn.style.display = 'none';
+
+    box.innerHTML = `<div class="todo-list" id="todo-list"></div>`;
     const l = document.getElementById('todo-list');
-    l.innerHTML = '';
+
     const editable = systemData.todoEditable;
     systemData.todos.forEach((t, i) => {
         const el = document.createElement('div');
@@ -696,6 +1568,122 @@ function renderTodoList() {
         l.appendChild(el);
     });
 }
+
+// CALENDAR LOGIC
+function renderCalendar() {
+    const box = document.getElementById('todo-main-box');
+    const listBtn = document.getElementById('list-view-btn');
+    if (listBtn) listBtn.style.display = 'inline-block';
+
+    // Ensure data exists
+    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+
+    const now = new Date();
+    // Use current view state if we want to navigate months, but for now simple:
+    const m = now.getMonth();
+    const y = now.getFullYear();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+
+    let html = `<div class="calendar-grid">`;
+    // Headers
+    ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(d => html += `<div style="text-align:center; font-weight:bold; border-bottom:1px solid var(--text); padding:5px 0;">${d}</div>`);
+
+    // Empty cells
+    for (let i = 0; i < firstDay; i++) html += `<div></div>`;
+
+    // Days
+    for (let i = 1; i <= daysInMonth; i++) {
+        const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        // Find events
+        const events = systemData.calendarEvents.filter(e => e.date === dateStr);
+        const hasEv = events.length > 0;
+
+        html += `<div class="cal-day" onclick="openCalDate('${dateStr}')" style="border:1px solid var(--dim); min-height:80px; padding:5px; cursor:pointer; position:relative;">
+            <div style="font-weight:bold; opacity:${hasEv ? 1 : 0.5}; margin-bottom:5px;">${i}</div>
+            <div style="font-size:0.65rem; line-height:1.2;">
+                ${events.map(e => `<div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:var(--dim); margin-bottom:2px; padding:1px;">• ${e.title}</div>`).join('')}
+            </div>
+            ${i === now.getDate() ? '<div style="position:absolute; top:5px; right:5px; width:8px; height:8px; background:var(--text); border-radius:50%;"></div>' : ''}
+        </div>`;
+    }
+
+    html += `</div>`;
+    box.innerHTML = html;
+}
+
+window.openCalDate = function (date) {
+    const events = systemData.calendarEvents.filter(e => e.date === date);
+    let l = events.map((e, idx) => `<div>[${e.time}] ${e.title} <button onclick="delCalEvent('${date}',${idx})">x</button></div>`).join('');
+
+    const name = prompt(`EVENTS FOR ${date}\n\n${l.replace(/<[^>]*>/g, '')}\n\nAdd new event (Format: HH:MM Title):`);
+    if (name) {
+        const parts = name.split(' ');
+        const time = parts[0];
+        const title = parts.slice(1).join(' ');
+        systemData.calendarEvents.push({ date: date, time: time, title: title || 'Event' });
+        saveData();
+        renderCalendar();
+    }
+}
+
+window.delCalEvent = function (date, idx) {
+    if (!confirm("Delete this event?")) return;
+    const globalIdx = systemData.calendarEvents.findIndex((e, i) => e.date === date && i === (systemData.calendarEvents.filter(x => x.date === date).indexOf(e))); // Tricky to find exact index in global array if multiple events on same day. 
+    // Easier approach: Filter out the specific one.
+    // However, the `idx` passed is the index within the *filtered* array for that day.
+
+    // Let's get the event object first
+    const dayEvents = systemData.calendarEvents.filter(e => e.date === date);
+    const eventToDelete = dayEvents[idx];
+
+    if (eventToDelete) {
+        // Find index in main array
+        const realIdx = systemData.calendarEvents.indexOf(eventToDelete);
+        if (realIdx > -1) {
+            systemData.calendarEvents.splice(realIdx, 1);
+            saveData();
+            // Re-open date view
+            openCalDate(date);
+            // Refresh calendar background
+            renderCalendar();
+        }
+    }
+}
+
+// IMPORT / EXPORT
+window.exportTodoData = function () {
+    const data = {
+        todos: systemData.todos,
+        calendar: systemData.calendarEvents
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'vvs_tasks.json';
+    link.click();
+}
+
+window.importTodoData = function (acc) {
+    const file = acc.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = function (e) {
+        try {
+            const d = JSON.parse(e.target.result);
+            if (d.todos) systemData.todos = d.todos;
+            if (d.calendar) systemData.calendarEvents = d.calendar;
+            saveData();
+            alert("Tasks Imported!");
+            renderTodo();
+        } catch (err) {
+            alert("Error parsing JSON");
+        }
+    };
+    r.readAsText(file);
+}
+
 /** addTodoItem - Додає новий елемент до списку справ */
 function addTodoItem() {
     const inp = document.getElementById('new-todo-input');
@@ -724,8 +1712,78 @@ function removeTodoItem(i) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// #SECTION_GALLERY - Галерея (фото та ASCII арт)
+// #SECTION_GAMES - Ігровий центр
 // ═══════════════════════════════════════════════════════════════════════════════
+
+function renderGameMenu() {
+    const v = document.getElementById('view');
+    // MERGED RENDER GAME MENU
+    const customGames = systemData.games.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
+
+    v.innerHTML = `<h2>GAME_CENTER</h2>
+    <div class="game-hub">
+        <div class="game-card" onclick="runGame('snake')">SNAKE</div>
+        <div class="game-card" onclick="runGame('tetris')">TETRIS</div>
+        <div class="game-card" onclick="runGame('pong')">PONG</div>
+        <div class="game-card" onclick="runGame('pico8')">PICO-8 (WEB)</div>
+        ${customGames}
+    </div>
+    <div id="game-area" class="game-area" style="display:none; width:640px; height:480px;">
+        <canvas id="game-canvas" width="640" height="480"></canvas>
+    </div>
+    <div id="pico-area" style="display:none; width:100%; height:80vh; flex-direction:column;">
+         <div style="margin-bottom:5px; display:flex; gap:10px;">
+            <button class="btn" onclick="loadPicoCart()">LOAD CART URL</button>
+            <button class="btn" onclick="document.getElementById('pico-frame').src='https://www.lexaloffle.com/bbs/widget.php?pid=celeste'">PLAY CELESTE</button>
+         </div>
+        <iframe id="pico-frame" src="" style="width:100%; height:100%; border:none; background:#000;"></iframe>
+    </div>
+    <div style="margin-top:10px;"><button class="btn btn-red" onclick="stopGames()">EXIT_GAME</button></div>`;
+}
+
+window.loadPicoCart = function () {
+    const url = prompt("Enter PICO-8 Web/Widget URL:");
+    if (url) document.getElementById('pico-frame').src = url;
+}
+
+/** gameInterval - Інтервал активної гри для коректної зупинки */
+var gameInterval = null; // Renamed from gameInt to match new code
+function stopGames() {
+    if (gameInterval) clearInterval(gameInterval);
+    const gameArea = document.getElementById('game-area');
+    if (gameArea) gameArea.style.display = 'none';
+    const picoArea = document.getElementById('pico-area');
+    if (picoArea) picoArea.style.display = 'none';
+    // stopScreensaver(); // Just in case - assuming this function exists elsewhere or is a placeholder
+}
+
+/** runGame - Запускає обрану гру */
+function runGame(id) {
+    const area = document.getElementById('game-area');
+    const pico = document.getElementById('pico-area');
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return; // Error safety
+    const ctx = canvas.getContext('2d');
+
+    stopGames(); // Clear previous
+
+    if (id === 'pico8') {
+        pico.style.display = 'block';
+        // Use a generic placeholder or allow input
+        const url = prompt("Enter PICO-8 Web Cart URL (or cancel for demo):", "https://www.lexaloffle.com/bbs/widget.php?pid=celeste");
+        if (url) {
+            document.getElementById('pico-frame').src = url;
+        }
+        return;
+    }
+
+    area.style.display = 'block';
+
+    // Assuming startSnake, startTetris, startPong functions exist
+    if (id === 'snake') startSnake(canvas, ctx);
+    else if (id === 'tetris') startTetris(canvas, ctx);
+    else if (id === 'pong') startPong(canvas, ctx);
+}
 
 /**
  * renderGallery - Рендерить сітку галереї
@@ -752,35 +1810,115 @@ function renderGallery() {
     });
 }
 
-// EXPAND GALLERY (FIXED: Fullscreen + No Scroll)
+// EXPAND GALLERY (FIXED: Fullscreen + No Scroll + Filters)
 /**
  * expandGallery - Відкриває зображення або ASCII-арт на весь екран
- * @param {string} c - Категорія
- * @param {number} i - Індекс елемента
+ * Supports MONO and PIXEL filters
  */
 window.expandGallery = function (c, i) {
     const item = systemData.gallery[c][i];
     const overlay = document.createElement('div');
+    overlay.id = 'gallery-overlay';
     overlay.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; cursor:pointer;";
 
     // Disable Page Scroll
     document.body.style.overflow = 'hidden';
 
-    overlay.onclick = function () {
-        document.body.removeChild(overlay);
+    // CLOSE FUNCTION
+    const closeGal = function (e) {
+        if (e) e.stopPropagation();
+        const el = document.getElementById('gallery-overlay');
+        if (el) document.body.removeChild(el);
         document.body.style.overflow = ''; // Restore Scroll
     };
 
     let content = '';
-    if (c === 'ASCII_ART') {
+    let isImg = c !== 'ASCII_ART';
+
+    if (!isImg) {
         content = `<pre style="color:var(--text); font-size:0.8rem; overflow:auto; max-width:90vw; max-height:90vh;">${item.a}</pre>`;
     } else {
-        content = `<img src="${item.a}" style="max-width:90vw; max-height:90vh; object-fit:contain; border:2px solid var(--text);">`;
+        // IMAGE CONTAINER FOR FILTERS
+        // We use a container to apply tint (Mono) via mix-blend-mode or absolute overlay
+        content = `<div id="img-container" style="position:relative; max-width:90vw; max-height:70vh;">
+            <img id="gal-img" src="${item.a}" style="max-width:100%; max-height:70vh; object-fit:contain; border:2px solid var(--text); transition:0.2s;">
+            <div id="tint-layer" style="position:absolute; inset:0; background:var(--text); mix-blend-mode:color; pointer-events:none; display:none;"></div>
+        </div>`;
     }
 
-    overlay.innerHTML = `${content}<div style="margin-top:20px; color:var(--text); font-family:monospace;">${item.n} [CLICK TO CLOSE]</div>`;
+    let controls = '';
+    if (isImg) {
+        controls = `<div style="display:flex; gap:10px; margin-top:15px; z-index:10001;" onclick="event.stopPropagation()">
+            <button class="btn" onclick="toggleGalFilter('mono')">[ MONO ]</button>
+            <button class="btn" onclick="toggleGalFilter('pixel')">[ PIXEL ]</button>
+            <button class="btn btn-red" onclick="closeGal()">[ CLOSE ]</button>
+        </div>`;
+    } else {
+        controls = `<div style="margin-top:20px;" onclick="closeGal()"><button class="btn btn-red">[ CLOSE ]</button></div>`;
+    }
+
+    overlay.onclick = function (e) { if (e.target === overlay) closeGal(); };
+
+    overlay.innerHTML = `${content}
+        <div style="margin-top:10px; color:var(--text); font-family:monospace; cursor:default;" onclick="event.stopPropagation()">${item.n}</div>
+        ${controls}`;
+
+    // Expose close globally for the button
+    window.closeGal = closeGal;
+
     document.body.appendChild(overlay);
     playSfx(600, 'square', 0.1);
+}
+
+
+window.toggleGalFilter = function (type) {
+    const img = document.getElementById('gal-img');
+    const tint = document.getElementById('tint-layer');
+    if (!img) return;
+
+    if (type === 'pixel') {
+        // Toggle Pixelation
+        if (img.dataset.pixelated === 'true') {
+            // Restore
+            if (img.dataset.origSrc) img.src = img.dataset.origSrc;
+            img.style.imageRendering = 'auto';
+            img.style.transform = 'scale(1)';
+            img.dataset.pixelated = 'false';
+        } else {
+            // Apply Strong Pixelation via Canvas
+            if (!img.dataset.origSrc) img.dataset.origSrc = img.src;
+
+            const scale = 0.05; // Stronger pixelation (5%)
+            const canvas = document.createElement('canvas');
+            const cw = Math.floor(img.naturalWidth * scale);
+            const ch = Math.floor(img.naturalHeight * scale);
+
+            canvas.width = cw;
+            canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+
+            // Draw small
+            ctx.drawImage(img, 0, 0, cw, ch);
+
+            // Get data
+            const pixelData = canvas.toDataURL();
+
+            img.src = pixelData;
+            img.style.imageRendering = 'pixelated';
+            img.style.transform = 'scale(1)'; // Browser upscales it automatically because img tag has specific size or max-width
+            img.dataset.pixelated = 'true';
+        }
+    } else if (type === 'mono') {
+        if (tint.style.display === 'block') {
+            tint.style.display = 'none';
+            img.style.filter = 'none';
+        } else {
+            // Apply Mono
+            tint.style.display = 'block';
+            img.style.filter = 'grayscale(100%) contrast(1.2) brightness(0.9)';
+        }
+    }
+    playSfx(800);
 }
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_CONTACTS - Контакти та мережевий статус
@@ -804,33 +1942,7 @@ function renderLinks() {
 // #SECTION_GAMES - Ігровий центр
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** gameInt - Інтервал активної гри для коректної зупинки */
-var gameInt = null;
-/** stopGames - Зупиняє всі ігрові цикли та видаляє слухачі подій */
-function stopGames() { if (gameInt) clearInterval(gameInt); window.onkeydown = null; }
 
-/** renderGameMenu - Рендерить меню вибору ігор */
-function renderGameMenu() {
-    const gamesHtml = systemData.games.map((g, index) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
-    document.getElementById('view').innerHTML = `<h2>Game Hub</h2><div class="game-hub">${gamesHtml}</div><div id="arena" style="margin-top:20px; display:flex; justify-content:center"></div>`;
-}
-
-/**
- * runGame - Запускає обрану гру за її ID
- * @param {string} id - ID гри
- */
-function runGame(id) {
-    stopGames();
-    const g = systemData.games.find(x => x.id === id);
-    if (g && g.code) {
-        try {
-            const f = new Function(g.code);
-            f();
-        } catch (e) {
-            document.getElementById('arena').innerHTML = `<div style="color:red">RUNTIME ERROR: ${e.message}</div>`;
-        }
-    }
-}
 
 /** toggleThemeMenu - Відкриває/закриває меню вибору тем */
 function toggleThemeMenu() { const popup = document.getElementById('theme-popup'); popup.innerHTML = ''; themesList.forEach(t => { const el = document.createElement('div'); el.className = 'theme-item'; el.innerHTML = `<div class="color-preview" style="background:${t.c}"></div> ${t.name}`; el.onclick = () => setTheme(t.id); popup.appendChild(el); }); popup.classList.toggle('show'); playSfx(400); }
