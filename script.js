@@ -28,10 +28,10 @@ function openIRC() {
         <div id="irc-header" style="background:var(--text); color:var(--bg); padding:5px; font-weight:bold; cursor:grab; display:flex; justify-content:space-between; align-items:center;">
             <span>[ #general ]</span>
             <div style="display:flex; gap:5px;">
-                <input id="irc-nick-set" placeholder="Nick" value="${systemData.resume.name || ''}" 
+                <input id="irc-nick-set" placeholder="Nick" value="${systemData.resume.name || ''}"
                        style="background:var(--bg); color:var(--text); border:1px solid var(--bg); width:80px; padding:2px; font-size:0.8rem;"
                        onchange="systemData.resume.name=this.value; saveData(); addIRCMessage('System', 'Nick changed to '+this.value, 'yellow');">
-                <button onclick="closeIRC()" style="background:none; border:none; cursor:pointer; font-weight:bold; color: var(--bg);">X</button>
+                <button onclick="closeIRC()" class="btn btn-sm btn-ghost">X</button>
             </div>
         </div>
         <div id="irc-log" style="flex-grow:1; overflow-y:auto; padding:5px; font-size:0.85rem; font-family:monospace;">
@@ -42,7 +42,7 @@ function openIRC() {
         </div>
         <div style="display:flex; border-top:1px solid var(--text);">
             <input type="text" id="irc-input" style="flex-grow:1; background:rgba(0,0,0,0.1); border:none; color:var(--text); padding:5px; font-family:inherit; outline:none;" placeholder="Type /help..." onkeypress="if(event.key==='Enter') sendIRC()">
-            <button onclick="sendIRC()" style="background:var(--dim); border:none; color:var(--text); padding:0 10px; cursor:pointer;">SEND</button>
+            <button onclick="sendIRC()" class="btn btn-sm">SEND</button>
         </div>
     `;
 
@@ -144,6 +144,94 @@ function dragElement(elmnt) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_DIALOGS - Уніфіковані модальні вікна/нотифікації
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ensureModalRoot() {
+    let root = document.getElementById('ui-modal-root');
+    if (!root) {
+        root = document.createElement('div');
+        root.id = 'ui-modal-root';
+        document.body.appendChild(root);
+    }
+    return root;
+}
+
+function showModal({ title = 'Notice', body = '', actions = [{ label: 'OK', variant: 'primary', onClick: null }] }) {
+    const root = ensureModalRoot();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.tabIndex = -1;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-window';
+    modal.innerHTML = `<div class="modal-header"><span>${title}</span><button class="btn btn-sm" aria-label="Close" onclick="this.closest('.modal-overlay').remove()">✕</button></div>`;
+
+    const bodyWrap = document.createElement('div');
+    bodyWrap.className = 'modal-body';
+    if (typeof body === 'string') bodyWrap.innerHTML = body; else bodyWrap.appendChild(body);
+    modal.appendChild(bodyWrap);
+
+    const actionsBar = document.createElement('div');
+    actionsBar.className = 'modal-actions';
+    actions.forEach((a, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `btn btn-sm ${a.variant === 'danger' ? 'btn-red' : a.variant === 'success' ? 'btn-green' : ''}`;
+        btn.innerText = a.label || 'OK';
+        btn.onclick = () => {
+            overlay.remove();
+            if (typeof a.onClick === 'function') a.onClick();
+        };
+        if (idx === 0) btn.autofocus = true;
+        actionsBar.appendChild(btn);
+    });
+    modal.appendChild(actionsBar);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    root.appendChild(overlay);
+    return overlay;
+}
+
+function showToast(message, tone = 'info') {
+    const root = ensureModalRoot();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tone}`;
+    toast.innerText = message;
+    root.appendChild(toast);
+    setTimeout(() => toast.remove(), 2600);
+}
+
+function showConfirm(message, title = 'Confirm') {
+    return new Promise((resolve) => {
+        showModal({
+            title,
+            body: message,
+            actions: [
+                { label: 'Cancel', onClick: () => resolve(false) },
+                { label: 'Confirm', variant: 'success', onClick: () => resolve(true) }
+            ]
+        });
+    });
+}
+
+function showPrompt({ title = 'Input', message = '', placeholder = '', defaultValue = '' }) {
+    return new Promise((resolve) => {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = `${message ? `<div style="margin-bottom:8px;">${message}</div>` : ''}<input type="text" class="form-control" style="width:100%;" placeholder="${placeholder}" value="${defaultValue}">`;
+        const input = wrapper.querySelector('input');
+        showModal({
+            title,
+            body: wrapper,
+            actions: [
+                { label: 'Cancel', onClick: () => resolve(null) },
+                { label: 'Save', variant: 'success', onClick: () => resolve(input.value) }
+            ]
+        });
+        setTimeout(() => input?.focus(), 20);
+    });
+}
+
 // Add Keyboard Shortcut for IRC (Alt+I)
 document.addEventListener('keydown', (e) => {
     if (e.altKey && e.code === 'KeyI') openIRC();
@@ -162,6 +250,11 @@ let adMode = 'draw'; // draw, erase
 let adGrid = [];
 let adCx = 0; let adCy = 0; // Cursor pos
 const adW = 40; const adH = 15;
+// QR STATE
+let lastQRMatrix = null;
+let lastQRFormat = 'png';
+let lastQRSize = 256;
+let lastQRText = '';
 
 /** renderAsciiDraw - Рендерить інтерфейс малювання */
 function renderAsciiDraw() {
@@ -216,11 +309,13 @@ let adIsDrawing = false;
 window.adSetMode = function (m) { adMode = m; renderAsciiDraw(); }
 window.adSetBrush = function (b) { adBrush = b; adMode = 'draw'; renderAsciiDraw(); }
 window.adClear = function () {
-    if (confirm('Clear canvas?')) {
-        adGrid = [];
-        renderAsciiDraw();
-        playSfx(100, 'sawtooth', 0.3);
-    }
+    showConfirm('Clear canvas?').then((ok) => {
+        if (ok) {
+            adGrid = [];
+            renderAsciiDraw();
+            playSfx(100, 'sawtooth', 0.3);
+        }
+    });
 }
 
 window.adStart = function (el) {
@@ -283,8 +378,8 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-window.saveAsciiArt = function () {
-    const name = prompt("Name your artwork:", "Untitled");
+window.saveAsciiArt = async function () {
+    const name = await showPrompt({ title: 'Save ASCII Art', placeholder: 'Untitled' });
     if (!name) return;
 
     const artStr = adGrid.map(row => row.join('')).join('\n');
@@ -299,7 +394,7 @@ window.saveAsciiArt = function () {
     });
 
     saveData();
-    alert("Saved to /gallery > ASCII_ART");
+    showToast("Saved to /gallery > ASCII_ART", 'success');
     playSfx(600, 'square', 0.2);
 }
 /**
@@ -359,11 +454,17 @@ function initData() {
             if (!systemData.games) systemData.games = defaultData.games;
             if (typeof systemData.todoEditable === 'undefined') systemData.todoEditable = defaultData.todoEditable;
 
+            if (!systemData.effects) systemData.effects = JSON.parse(JSON.stringify(defaultData.effects));
+            else {
+                systemData.effects = Object.assign({}, JSON.parse(JSON.stringify(defaultData.effects)), systemData.effects);
+            }
+
             if (!systemData.home.logoText) systemData.home.logoText = defaultData.home.logoText;
             if (!systemData.home.browserTitle) systemData.home.browserTitle = defaultData.home.browserTitle || systemData.home.logoText.replace(':~$', '');
 
             if (!systemData.themes) systemData.themes = JSON.parse(JSON.stringify(defaultData.themes));
             if (!systemData.themes.adminTriggerTheme) systemData.themes.adminTriggerTheme = 'mix-eva';
+            if (!systemData.themes.font) systemData.themes.font = 'modern';
 
             updateCustomThemeCSS();
 
@@ -373,15 +474,21 @@ function initData() {
             } else {
                 setTheme(systemData.themes.defaultId);
             }
+            applyFontChoice(systemData.themes.font);
 
         } catch (e) { systemData = JSON.parse(JSON.stringify(defaultData)); }
     } else {
         systemData = JSON.parse(JSON.stringify(defaultData));
         setTheme(systemData.themes.defaultId);
+        applyFontChoice(systemData.themes.font);
     }
     applyMenuVisibility();
     applyEffects();
     renderDynamicLogo();
+    dataReady = true;
+    if (pendingNavId) {
+        const next = pendingNavId; pendingNavId = null; nav(next);
+    }
 }
 
 /** saveData - Зберігає systemData в localStorage */
@@ -483,13 +590,21 @@ function toggleThemeMenu() {
     });
 
     // EFFECTS SECTION
-    const fx = systemData.effects || { glow: false, flicker: false, scanline: false };
+    const fx = systemData.effects || { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
 
+    const fontChoice = systemData.themes?.font || 'modern';
     html += `<div class="theme-extras">
         <label class="opt-check"><input type="checkbox" ${fx.glow ? 'checked' : ''} onchange="toggleEffect('glow')"> Glow FX</label>
         <label class="opt-check"><input type="checkbox" ${fx.flicker ? 'checked' : ''} onchange="toggleEffect('flicker')"> Flicker</label>
         <label class="opt-check"><input type="checkbox" ${fx.scanline ? 'checked' : ''} onchange="toggleEffect('scanline')"> Scanline+</label>
+        <label class="opt-check"><input type="checkbox" ${fx.svgGlow ? 'checked' : ''} onchange="toggleEffect('svgGlow')"> SVG Glow/Flicker</label>
+        <label class="opt-check"><input type="checkbox" ${fx.screenPulse ? 'checked' : ''} onchange="toggleEffect('screenPulse')"> Screen Pulse</label>
         <label class="opt-check"><input type="checkbox" ${systemData.home.showIcons !== false ? 'checked' : ''} onchange="toggleIcons(this.checked)"> Show Menu Icons</label>
+        <div class="font-switcher">
+            <div style="font-size:0.75rem; opacity:0.75;">Font</div>
+            <button class="btn btn-sm ${fontChoice === 'modern' ? 'active' : ''}" onclick="setFontChoice('modern')">Mono</button>
+            <button class="btn btn-sm ${fontChoice === 'pixel' ? 'active' : ''}" onclick="setFontChoice('pixel')">Pixel</button>
+        </div>
     </div>`;
 
     pop.innerHTML = html;
@@ -498,7 +613,7 @@ function toggleThemeMenu() {
 
 /** toggleEffect - Перемикає візуальні ефекти */
 window.toggleEffect = function (type) {
-    if (!systemData.effects) systemData.effects = { glow: false, flicker: false, scanline: false };
+    if (!systemData.effects) systemData.effects = { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
     systemData.effects[type] = !systemData.effects[type];
     applyEffects();
     saveData();
@@ -510,10 +625,29 @@ function applyEffects() {
     document.body.classList.toggle('fx-glow', systemData.effects.glow);
     document.body.classList.toggle('fx-flicker', systemData.effects.flicker);
     document.body.classList.toggle('fx-scanline', systemData.effects.scanline);
+    document.body.classList.toggle('fx-svg', systemData.effects.svgGlow !== false);
+    document.body.classList.toggle('fx-screen-pulse', !!systemData.effects.screenPulse);
 
     // Apply Icons (OnInit)
     document.body.classList.toggle('no-icons', systemData.home.showIcons === false);
 }
+
+/** applyFontChoice - Застосовує вибір шрифту до документа */
+function applyFontChoice(fontId) {
+    const target = fontId === 'pixel'
+        ? "'Press Start 2P', 'VT323', 'Courier New', monospace"
+        : "'JetBrains Mono', 'Fira Code', monospace";
+    document.documentElement.style.setProperty('--font-main', target);
+    document.body.classList.toggle('pixel-font', fontId === 'pixel');
+}
+
+/** setFontChoice - Змінює вибір шрифту в темах */
+window.setFontChoice = function (fontId) {
+    if (!systemData.themes) systemData.themes = { font: 'modern', defaultId: 'amber', custom: [] };
+    systemData.themes.font = fontId;
+    applyFontChoice(fontId);
+    saveData();
+};
 
 window.toggleIcons = function (show) {
     if (!systemData.home) systemData.home = {};
@@ -804,6 +938,62 @@ function runTreesSS() {
     draw();
 }
 
+function renderScreensaverMenu() {
+    const v = document.getElementById('view');
+    const current = (systemData.screensaver && systemData.screensaver.type) || 'matrix';
+    const timeout = systemData.screensaver?.timeout || 60;
+    const list = [
+        { id: 'matrix', name: 'Matrix Rain', desc: 'Green code rain inspired by classic terminals.' },
+        { id: 'fire', name: 'Pixel Fire', desc: 'Retro fire simulation with palette cycling.' },
+        { id: 'pipes', name: 'Pipes', desc: 'Colorful wandering pipes across the screen.' },
+        { id: 'dvd', name: 'DVD', desc: 'Bouncing DVD logo with rainbow tints.' },
+        { id: 'trees', name: 'Fractal Trees', desc: 'Procedural trees growing across the canvas.' }
+    ];
+
+    const cards = list.map(l => `<label class="saver-card ${current === l.id ? 'active' : ''}">
+        <input type="radio" name="saver-type" value="${l.id}" ${current === l.id ? 'checked' : ''}>
+        <div class="saver-name">${l.name}</div>
+        <div class="saver-desc">${l.desc}</div>
+        <div class="saver-badge">${l.id}</div>
+    </label>`).join('');
+
+    v.innerHTML = `<h2>SCREENSAVER</h2>
+        <div class="saver-grid">${cards}</div>
+        <div class="saver-actions">
+            <label class="opt-check">
+                <input type="checkbox" id="saver-enabled" ${systemData.screensaver?.enabled !== false ? 'checked' : ''}>
+                Enable idle trigger (${timeout}s)
+            </label>
+            <div class="saver-action-buttons">
+                <button class="btn" onclick="previewSaver()">PREVIEW</button>
+                <button class="btn btn-green" onclick="applySaverChoice()">APPLY & START</button>
+            </div>
+        </div>`;
+
+    v.querySelectorAll('.saver-card input').forEach(inp => {
+        inp.addEventListener('change', () => {
+            v.querySelectorAll('.saver-card').forEach(c => c.classList.remove('active'));
+            inp.closest('.saver-card').classList.add('active');
+        });
+    });
+}
+
+window.previewSaver = function () {
+    const type = document.querySelector('input[name="saver-type"]:checked')?.value || 'matrix';
+    startScreensaver(type);
+};
+
+window.applySaverChoice = function () {
+    const type = document.querySelector('input[name="saver-type"]:checked')?.value || 'matrix';
+    if (!systemData.screensaver) systemData.screensaver = { enabled: true, timeout: 60, type: 'matrix' };
+    systemData.screensaver.type = type;
+    systemData.screensaver.enabled = document.getElementById('saver-enabled')?.checked !== false;
+    saveData();
+    resetIdleTimer();
+    startScreensaver(type);
+    showToast(`Screensaver ${type.toUpperCase()} launched`, 'success');
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_NAVIGATION - Навігація та глобальні змінні
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -814,6 +1004,8 @@ let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0;
 let currentLang = 'uk'; let adminAuth = false;
 let admNoteCat = ''; let admNoteFile = '';
 let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
+let dataReady = false;
+let pendingNavId = null;
 
 /**
  * nav - Головна функція навігації між секціями
@@ -822,6 +1014,13 @@ let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
  */
 function nav(id) {
     if (isTyping) return;
+
+    if (!dataReady) {
+        pendingNavId = id;
+        const v = document.getElementById('view');
+        if (v) v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading data...</div>';
+        return;
+    }
 
     // Dynamic Title Update
     const baseTitle = systemData.home.browserTitle || "vvs@cl0w.nz";
@@ -843,7 +1042,7 @@ function nav(id) {
     else if (id === 'gallery') renderGallery();
     else if (id === 'draw') renderAsciiDraw();
     else if (id === 'pc') renderAboutPC();
-    else if (id === 'screensaver') startScreensaver(); // Direct trigger
+    else if (id === 'screensaver') renderScreensaverMenu();
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
     else if (id === 'admin') renderAdmin();
@@ -1146,16 +1345,16 @@ async function selectHomeProfile(id) {
 
     if (hasPass) {
         if (!adminAuth) {
-            const att = prompt("ENTER PASSWORD:");
-            const hash = await hashPass(att);
+            const att = await showPrompt({ title: 'ENTER PASSWORD', placeholder: '********' });
+            const hash = await hashPass(att || '');
             if (hash !== profile.password) {
                 playSfx(100, 'sawtooth', 0.5);
-                alert("ACCESS DENIED");
+                showModal({ title: 'ACCESS DENIED', body: 'Wrong password for this profile.' });
                 return;
             }
         } else {
             playSfx(800, 'sine', 0.1);
-            alert("ADMIN: PASSWORD BYPASSED");
+            showToast('ADMIN: PASSWORD BYPASSED', 'info');
         }
     }
 
@@ -1189,15 +1388,85 @@ function selectHomeTag(tag) {
  */
 function renderWork() {
     const v = document.getElementById('view');
-    v.innerHTML = `<h2>WORK_TOOLS</h2><div class="work-grid"><div class="work-card"><h3>SECURE_PASS_GEN</h3><div id="pass-out" class="pass-result">...</div><div class="opts-grid"><label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label><label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label><label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label><label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label></div><div class="form-group" style="margin-bottom:10px;"><label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label><input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value"></div><button class="btn btn-green" onclick="generatePass()">GENERATE</button><button class="btn" onclick="copyPass()">COPY</button></div><div class="work-card"><h3>TRANSLITERATION (KMU 55)</h3><div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div><textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea><div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div><textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea><div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div></div></div>`;
+    const rememberedQR = lastQRText || '';
+    v.innerHTML = `
+        <h2>WORK_TOOLS</h2>
+        <div class="work-grid">
+            <div class="work-card">
+                <h3>SECURE_PASS_GEN</h3>
+                <div id="pass-out" class="pass-result">...</div>
+                <div class="opts-grid">
+                    <label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label>
+                    <label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label>
+                    <label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label>
+                    <label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label>
+                    <input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value">
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-green" onclick="generatePass()">GENERATE</button>
+                    <button class="btn" onclick="copyPass()">COPY</button>
+                </div>
+            </div>
+
+            <div class="work-card">
+                <h3>QR CODE GENERATOR</h3>
+                <div class="form-group">
+                    <label>Text / URL <span style="opacity:0.6; font-size:0.8rem;">(max 256 chars)</span></label>
+                    <textarea id="qr-text" class="translit-area" style="height:80px;" maxlength="256" placeholder="https://example.com" oninput="autoPreviewQR(); document.getElementById('qr-limit').innerText=this.value.length + '/256';"></textarea>
+                    <div id="qr-limit" style="font-size:0.8rem; opacity:0.6; text-align:right;">0/256</div>
+                </div>
+                <div class="form-group" style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <label class="opt-check">Size:
+                        <input type="range" id="qr-size" min="120" max="420" value="256" oninput="document.getElementById('qr-size-val').innerText=this.value; autoPreviewQR();">
+                        <span id="qr-size-val">256</span>px
+                    </label>
+                    <label class="opt-check">Format:
+                        <select id="qr-format" onchange="autoPreviewQR()"><option value="png">PNG</option><option value="svg">SVG</option></select>
+                    </label>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                    <button class="btn" onclick="generateQR()">GENERATE</button>
+                    <button class="btn" onclick="downloadQR()">DOWNLOAD</button>
+                </div>
+                <div id="qr-preview" class="qr-preview">
+                    <canvas id="qr-canvas" width="256" height="256" aria-label="QR preview"></canvas>
+                    <div id="qr-svg" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div class="work-card">
+                <h3>TRANSLITERATION (KMU 55)</h3>
+                <div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div>
+                <textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea>
+                <div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div>
+                <textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea>
+                <div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div>
+            </div>
+        </div>`;
+
+    const qrInput = document.getElementById('qr-text');
+    if (qrInput) {
+        qrInput.value = rememberedQR;
+        document.getElementById('qr-limit').innerText = `${qrInput.value.length}/256`;
+    }
     generatePass();
+    autoPreviewQR();
 }
 /** words - Слова для генерації парольних фраз */
 const words = ["cyber", "secure", "hack", "node", "core", "linux", "root", "admin", "flux", "neon", "grid", "data", "byte", "bit", "net", "web", "cloud", "void", "null", "zero"];
 /** generatePass - Генерує випадковий пароль за налаштуваннями */
 function generatePass() { const isPhrase = document.getElementById('p-phrase').checked; const len = parseInt(document.getElementById('p-len').value); const useUp = document.getElementById('p-upper').checked; const useNum = document.getElementById('p-nums').checked; const useSym = document.getElementById('p-syms').checked; let res = ""; if (isPhrase) { let wCount = Math.floor(len / 4); if (wCount < 3) wCount = 3; let arr = []; for (let i = 0; i < wCount; i++) { let w = words[Math.floor(Math.random() * words.length)]; if (useUp) w = w.charAt(0).toUpperCase() + w.slice(1); arr.push(w); } res = arr.join(useSym ? "-" : ""); if (useNum) res += Math.floor(Math.random() * 100); } else { let chars = "abcdefghijklmnopqrstuvwxyz"; if (useUp) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; if (useNum) chars += "0123456789"; if (useSym) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"; for (let i = 0; i < len; i++) res += chars.charAt(Math.floor(Math.random() * chars.length)); } document.getElementById('pass-out').innerText = res; }
 /** copyPass - Копіює згенерований пароль у буфер обміну */
-function copyPass() { const txt = document.getElementById('pass-out').innerText; if (txt !== "...") { navigator.clipboard.writeText(txt); alert("Copied!"); } }
+function copyPass() {
+    const txt = document.getElementById('pass-out').innerText;
+    if (txt !== "...") {
+        navigator.clipboard.writeText(txt);
+        showToast('Password copied', 'success');
+    }
+}
 
 /** mapUA - Таблиця транслітерації українських літер у латинські (КМУ 55) */
 const mapUA = { 'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e', 'ж': 'zh', 'з': 'z', 'и': 'y', 'і': 'i', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ь': '', '\'': '', '’': '', 'ю': 'iu', 'я': 'ia', 'є': 'ie', 'ї': 'i', 'й': 'i' };
@@ -1208,6 +1477,191 @@ const mapUA_Start = { 'є': 'ye', 'ї': 'yi', 'й': 'y', 'ю': 'yu', 'я': 'ya' 
  * @param {string} dir - Напрямок ('ua' - UA→EN, 'en' - EN→UA)
  */
 function doTranslit(dir) { if (dir === 'ua') { let src = document.getElementById('tr-ua').value; let out = ""; let temp = src.replace(/зг/g, "zgh").replace(/Зг/g, "Zgh").replace(/ЗГ/g, "ZGH"); for (let i = 0; i < temp.length; i++) { const c = temp[i]; const low = c.toLowerCase(); const isUp = c !== low; const isStart = (i === 0 || /[\s\n\t\.,!?]/.test(temp[i - 1])); let tr = ""; if (isStart && mapUA_Start[low]) tr = mapUA_Start[low]; else if (mapUA[low] !== undefined) tr = mapUA[low]; else tr = c; if (tr.length > 0) { if (isUp) { if (tr.length > 1 && temp[i + 1] && temp[i + 1] === temp[i + 1].toUpperCase()) tr = tr.toUpperCase(); else tr = tr.charAt(0).toUpperCase() + tr.slice(1); } } out += tr; } document.getElementById('tr-en').value = out; } else { let src = document.getElementById('tr-en').value; src = src.replace(/zgh/gi, "зг"); const revMapMulti = [{ k: 'shch', v: 'щ' }, { k: 'zh', v: 'ж' }, { k: 'kh', v: 'х' }, { k: 'ts', v: 'ц' }, { k: 'ch', v: 'ч' }, { k: 'sh', v: 'ш' }, { k: 'ye', v: 'є' }, { k: 'yi', v: 'ї' }, { k: 'yu', v: 'ю' }, { k: 'ya', v: 'я' }, { k: 'ia', v: 'я' }, { k: 'ie', v: 'є' }, { k: 'iu', v: 'ю' }]; for (let pair of revMapMulti) { const reg = new RegExp(pair.k, "gi"); src = src.replace(reg, (match) => { const isUp = match[0] === match[0].toUpperCase(); return isUp ? pair.v.toUpperCase() : pair.v; }); } const revMapSingle = { 'a': 'а', 'b': 'б', 'v': 'в', 'h': 'г', 'g': 'ґ', 'd': 'д', 'e': 'е', 'z': 'з', 'y': 'и', 'i': 'і', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф' }; let out = ""; for (let i = 0; i < src.length; i++) { const c = src[i]; const low = c.toLowerCase(); const isUp = c !== low; if (revMapSingle[low]) out += isUp ? revMapSingle[low].toUpperCase() : revMapSingle[low]; else out += c; } document.getElementById('tr-ua').value = out; } }
+
+// --- QR GENERATOR (VERSION 1-L, OFFLINE) ---
+const gfExp = new Array(512);
+const gfLog = new Array(256);
+(function initGalois() {
+    let x = 1;
+    for (let i = 0; i < 255; i++) {
+        gfExp[i] = x;
+        gfLog[x] = i;
+        x <<= 1;
+        if (x & 0x100) x ^= 0x11d;
+    }
+    for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
+})();
+function gfMul(a, b) { if (a === 0 || b === 0) return 0; return gfExp[gfLog[a] + gfLog[b]]; }
+function rsGeneratorPoly(ec) {
+    let poly = [1];
+    for (let i = 0; i < ec; i++) {
+        poly = polyMultiply(poly, [1, gfExp[i]]);
+    }
+    return poly;
+}
+function polyMultiply(p, q) {
+    const res = new Array(p.length + q.length - 1).fill(0);
+    for (let i = 0; i < p.length; i++) {
+        for (let j = 0; j < q.length; j++) res[i + j] ^= gfMul(p[i], q[j]);
+    }
+    return res;
+}
+function reedSolomon(data, ec) {
+    const gen = rsGeneratorPoly(ec);
+    const res = new Array(ec).fill(0);
+    data.forEach((byte) => {
+        const factor = byte ^ res[0];
+        res.shift(); res.push(0);
+        gen.slice(1).forEach((coef, idx) => { res[idx] ^= gfMul(coef, factor); });
+    });
+    return res;
+}
+
+function encodeQRBytes(text) {
+    const bytes = Array.from(new TextEncoder().encode(text));
+    if (bytes.length > 17) throw new Error('Text too long for offline QR (17 bytes max).');
+    const bits = [];
+    const pushBits = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
+    pushBits(0b0100, 4); // Byte mode
+    pushBits(bytes.length, 8);
+    bytes.forEach((b) => pushBits(b, 8));
+    pushBits(0, Math.min(4, 152 - bits.length));
+    while (bits.length % 8 !== 0) bits.push(0);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+    const pad = [0xec, 0x11]; let padIdx = 0;
+    while (data.length < 19) { data.push(pad[padIdx % 2]); padIdx++; }
+    return data;
+}
+
+function buildQRMatrix(text) {
+    const data = encodeQRBytes(text);
+    const ecc = reedSolomon(data, 7);
+    const codewords = data.concat(ecc);
+    const size = 21;
+    const m = Array.from({ length: size }, () => Array(size).fill(null));
+
+    const placeFinder = (x, y) => {
+        for (let dy = 0; dy < 7; dy++) {
+            for (let dx = 0; dx < 7; dx++) {
+                const on = (dx === 0 || dx === 6 || dy === 0 || dy === 6) || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
+                m[y + dy][x + dx] = on;
+            }
+        }
+    };
+    placeFinder(0, 0); placeFinder(size - 7, 0); placeFinder(0, size - 7);
+    for (let i = 0; i < 8; i++) { m[7][i] = false; m[i][7] = false; m[7][size - 1 - i] = false; m[size - 1 - i][7] = false; m[i][size - 8] = false; m[size - 8][i] = false; }
+    for (let i = 0; i < size; i++) { if (m[6][i] === null) m[6][i] = i % 2 === 0; if (m[i][6] === null) m[i][6] = i % 2 === 0; }
+    m[size - 8][8] = true; // Dark module
+
+    const dataBits = [];
+    codewords.forEach((cw) => { for (let i = 7; i >= 0; i--) dataBits.push((cw >> i) & 1); });
+    let bitIdx = 0; let upward = true;
+    for (let col = size - 1; col > 0; col -= 2) {
+        if (col === 6) col--;
+        for (let rowOffset = 0; rowOffset < size; rowOffset++) {
+            const row = upward ? size - 1 - rowOffset : rowOffset;
+            for (let dx = 0; dx < 2; dx++) {
+                const c = col - dx;
+                if (m[row][c] !== null) continue;
+                const bit = bitIdx < dataBits.length ? dataBits[bitIdx++] : 0;
+                const masked = bit ^ ((row + c) % 2 === 0 ? 1 : 0);
+                m[row][c] = !!masked;
+            }
+        }
+        upward = !upward;
+    }
+
+    const formatBits = 0b111011111000100; // Level L + mask 0
+    const fmtCoordsA = [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]];
+    const fmtCoordsB = [[20, 8], [19, 8], [18, 8], [17, 8], [16, 8], [15, 8], [14, 8], [13, 8], [8, 13], [8, 14], [8, 15], [8, 16], [8, 17], [8, 18], [8, 19]];
+    const fmtBit = (idx) => ((formatBits >> (14 - idx)) & 1) === 1;
+    fmtCoordsA.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+    fmtCoordsB.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+    return m;
+}
+
+function drawQRToCanvas(matrix, size, canvas) {
+    const ctx = canvas.getContext('2d');
+    const dim = matrix.length;
+    const scale = Math.floor(size / dim);
+    const pad = 2 * scale;
+    const finalSize = dim * scale + pad * 2;
+    canvas.width = finalSize; canvas.height = finalSize;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, finalSize, finalSize);
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < dim; y++) {
+        for (let x = 0; x < dim; x++) {
+            if (matrix[y][x]) ctx.fillRect(pad + x * scale, pad + y * scale, scale, scale);
+        }
+    }
+}
+
+function matrixToSVG(matrix, size) {
+    const dim = matrix.length;
+    const scale = size / dim;
+    let path = '';
+    for (let y = 0; y < dim; y++) {
+        for (let x = 0; x < dim; x++) {
+            if (matrix[y][x]) path += `M${(x * scale).toFixed(2)} ${(y * scale).toFixed(2)}h${scale.toFixed(2)}v${scale.toFixed(2)}h-${scale.toFixed(2)}z`;
+        }
+    }
+    const view = size.toFixed(2);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${view} ${view}" width="${view}" height="${view}"><rect width="100%" height="100%" fill="white"/>${path ? `<path d="${path}" fill="black"/>` : ''}</svg>`;
+}
+
+function autoPreviewQR() { setTimeout(generateQR, 10); }
+function generateQR() {
+    const txt = document.getElementById('qr-text')?.value || '';
+    const size = parseInt(document.getElementById('qr-size')?.value || '256');
+    const format = document.getElementById('qr-format')?.value || 'png';
+    lastQRFormat = format; lastQRSize = size; lastQRText = txt;
+    if (!txt.trim()) { const canvas = document.getElementById('qr-canvas'); if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillText('Enter text', 10, 20); } return; }
+    if (txt.length > 256) {
+        showModal({ title: 'QR LIMIT', body: 'Please keep QR content within 256 characters.' });
+        return;
+    }
+    try {
+        lastQRMatrix = buildQRMatrix(txt.trim());
+    } catch (e) {
+        showModal({ title: 'QR ERROR', body: e.message || 'Unable to build QR' });
+        return;
+    }
+
+    const canvas = document.getElementById('qr-canvas');
+    const svgBox = document.getElementById('qr-svg');
+    if (canvas) drawQRToCanvas(lastQRMatrix, size, canvas);
+    if (svgBox) {
+        if (format === 'svg') {
+            svgBox.style.display = 'block';
+            canvas.style.display = 'none';
+            svgBox.innerHTML = matrixToSVG(lastQRMatrix, size);
+        } else {
+            svgBox.style.display = 'none';
+            canvas.style.display = 'block';
+            svgBox.innerHTML = '';
+        }
+    }
+}
+
+function downloadQR() {
+    if (!lastQRMatrix || !lastQRText.trim()) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
+    if (lastQRFormat === 'svg') {
+        const svg = matrixToSVG(lastQRMatrix, lastQRSize);
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'qr.svg'; a.click(); URL.revokeObjectURL(url);
+    } else {
+        const canvas = document.getElementById('qr-canvas');
+        drawQRToCanvas(lastQRMatrix, lastQRSize, canvas);
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'qr.png'; a.click(); URL.revokeObjectURL(url);
+        });
+    }
+}
 
 // --- CRYPTO HELPER ---
 /**
@@ -1370,33 +1824,89 @@ window.genMD = function () {
  * Підтримує категорії, файли та захист паролем
  */
 function renderObsidian() {
-    const v = document.getElementById('view'); const content = currentObsFile ? systemData.obsidian[currentObsCat][currentObsFile].replace(/\\\\/g, '\\') : "Оберіть нотатку для зчитування..."; v.innerHTML = `<h2>Obsidian.Vault</h2><div class="obs-container"><div class="obs-tabs" id="o-t"></div><div class="obs-main"><div class="obs-files" id="o-f"></div><div class="obs-viewer" id="o-v"><pre>${content}</pre></div></div></div>`; const tabBox = document.getElementById('o-t');
-    systemData.obsidian.cats.forEach(c => {
-        const b = document.createElement('button');
-        b.className = `obs-tab-btn ${c === currentObsCat ? 'active' : ''}`;
-        // Lock icon in tab
-        const isLocked = systemData.obsidian.catAuth && systemData.obsidian.catAuth[c];
-        b.innerText = (isLocked ? '🔒 ' : '') + c;
+    const v = document.getElementById('view');
+    if (!v) return;
 
-        b.onclick = () => {
-            if (isLocked) { // Check lock existence first
-                if (!adminAuth) {
-                    const p = prompt("ENTER PASSWORD for " + c + ":");
-                    if (p !== systemData.obsidian.catAuth[c]) {
-                        playSfx(100, 'sawtooth', 0.5); alert("ACCESS DENIED"); return;
+    const obs = (systemData && systemData.obsidian && typeof systemData.obsidian === 'object') ? systemData.obsidian : {};
+    const cats = Array.isArray(obs.cats) ? obs.cats : [];
+
+    if (!dataReady) {
+        v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading Obsidian data...</div>';
+        return;
+    }
+
+    // Ensure current category is valid
+    if (!cats.includes(currentObsCat)) {
+        currentObsCat = cats.length ? cats[0] : '';
+        currentObsFile = '';
+    }
+
+    const currentCatFiles = currentObsCat && obs[currentObsCat] && typeof obs[currentObsCat] === 'object'
+        ? obs[currentObsCat]
+        : {};
+    const fileKeys = Object.keys(currentCatFiles);
+
+    if (currentObsFile && !fileKeys.includes(currentObsFile)) currentObsFile = '';
+    const displayFile = currentObsFile || fileKeys[0] || '';
+
+    const content = displayFile && currentCatFiles[displayFile]
+        ? String(currentCatFiles[displayFile]).replace(/\\\\/g, '\\')
+        : (cats.length ? "Оберіть нотатку для зчитування або створіть нову..." : "Немає доступних категорій нотаток.");
+
+    v.innerHTML = `<h2>Obsidian.Vault</h2>
+        <div class="obs-container">
+            <div class="obs-tabs" id="o-t"></div>
+            <div class="obs-main">
+                <div class="obs-files" id="o-f"></div>
+                <div class="obs-viewer" id="o-v"><pre>${content}</pre></div>
+            </div>
+        </div>`;
+
+    const tabBox = document.getElementById('o-t');
+    if (tabBox && cats.length) {
+        cats.forEach(c => {
+            const b = document.createElement('button');
+            b.className = `obs-tab-btn ${c === currentObsCat ? 'active' : ''}`;
+            const isLocked = obs.catAuth && obs.catAuth[c];
+            b.innerText = (isLocked ? '🔒 ' : '') + c;
+
+            b.onclick = () => {
+                if (isLocked) {
+                    if (!adminAuth) {
+                        showPrompt({ title: 'ENTER PASSWORD', message: `Category ${c} is locked`, placeholder: '********' }).then((p) => {
+                            if (p !== obs.catAuth[c]) {
+                                playSfx(100, 'sawtooth', 0.5); showModal({ title: 'ACCESS DENIED', body: 'Wrong category password.' }); return;
+                            }
+                            currentObsCat = c; currentObsFile = ''; renderObsidian();
+                        });
+                        return;
+                    } else {
+                        playSfx(800, 'sine', 0.1);
+                        showToast('ADMIN: PASSWORD BYPASSED', 'info');
                     }
-                } else {
-                    // Admin feedback
-                    playSfx(800, 'sine', 0.1);
-                    alert("ADMIN: PASSWORD BYPASSED");
                 }
-            }
-            currentObsCat = c; currentObsFile = ''; renderObsidian();
-        };
-        tabBox.appendChild(b);
-    });
+                currentObsCat = c; currentObsFile = ''; renderObsidian();
+            };
+            tabBox.appendChild(b);
+        });
+    } else if (tabBox) {
+        tabBox.innerHTML = '<div style="opacity:0.6; padding:8px;">No note categories</div>';
+    }
 
-    const fileBox = document.getElementById('o-f'); Object.keys(systemData.obsidian[currentObsCat]).forEach(f => { const b = document.createElement('button'); b.className = `obs-file-item ${f === currentObsFile ? 'active' : ''}`; b.innerText = '> ' + f; b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); }; fileBox.appendChild(b); });
+    const fileBox = document.getElementById('o-f');
+    if (fileBox) {
+        if (!fileKeys.length) {
+            fileBox.innerHTML = '<div style="opacity:0.6; padding:8px;">No files in this category</div>';
+        } else {
+            fileKeys.forEach(f => {
+                const b = document.createElement('button');
+                b.className = `obs-file-item ${f === displayFile ? 'active' : ''}`;
+                b.innerText = '> ' + f;
+                b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); };
+                fileBox.appendChild(b);
+            });
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1524,20 +2034,38 @@ function renderTodo() {
     // Initialize events
     if (!systemData.calendarEvents) systemData.calendarEvents = [];
 
+    const totalTasks = systemData.todos.length;
+    const doneTasks = systemData.todos.filter(t => t.d).length;
+    const scheduledTasks = systemData.todos.filter(t => t.due).length;
+    const progress = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
     let html = `<h2>TODO_MANAGER ${editable ? '[EDIT_MODE]' : '[READ_ONLY]'}</h2>`;
+    html += `<div class="todo-stats">
+        <div><strong>${doneTasks}/${totalTasks}</strong> completed</div>
+        <div class="progress"><span style="width:${progress}%;"></span></div>
+        <div>${scheduledTasks} scheduled</div>
+    </div>`;
 
     if (editable) {
         html += `<div class="todo-input-group" style="margin-bottom:15px; flex-wrap:wrap;">
             <input type="text" id="new-todo-input" class="todo-input" placeholder="New task..." onkeypress="if(event.key==='Enter') addTodoItem()">
+            <input type="date" id="new-todo-date" class="todo-input" style="max-width:180px;" aria-label="Due date">
+            <input type="time" id="new-todo-time" class="todo-input" style="max-width:140px;" aria-label="Due time">
             <button class="btn" onclick="addTodoItem()">ADD_TASK</button>
             <button class="btn" onclick="renderCalendar()" style="margin-left:auto;">[ CALENDAR_VIEW ]</button>
             <button class="btn" onclick="renderTodoList()" id="list-view-btn" style="display:none;">[ LIST_VIEW ]</button>
         </div>
         <div style="margin-bottom:15px; display:flex; gap:10px;">
              <button class="btn" onclick="exportTodoData()">EXPORT (JSON)</button>
+             <button class="btn" onclick="exportTodoICS()">EXPORT (ICS)</button>
              <label class="btn" style="cursor:pointer;">
                 IMPORT (JSON) <input type="file" id="todo-imp" style="display:none" onchange="importTodoData(this)">
              </label>
+        </div>`;
+    } else {
+        html += `<div style="margin-bottom:15px; display:flex; gap:10px;">
+            <button class="btn" onclick="renderCalendar()">[ CALENDAR_VIEW ]</button>
+            <button class="btn" onclick="exportTodoICS()">EXPORT (ICS)</button>
         </div>`;
     }
     html += `<div class="todo-container" id="todo-main-box"><div class="todo-list" id="todo-list"></div></div>`;
@@ -1558,12 +2086,19 @@ function renderTodoList() {
     systemData.todos.forEach((t, i) => {
         const el = document.createElement('div');
         el.className = `todo-item ${t.d ? 'todo-done' : ''}`;
+        const dueInfo = t.due ? `<span class="todo-due">${t.due}${t.time ? ' ' + t.time : ''}</span>` : '<span class="todo-due muted">No date</span>';
         if (editable) {
-            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span> 
-                           <span class="todo-text">${t.t}</span>
-                           <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})" style="margin-left:auto">X</button>`;
+            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span>
+                           <div class="todo-meta" onclick="openTodoDetail(${i})">
+                                <div class="todo-text">${t.t}</div>
+                                <div class="todo-meta-line">${dueInfo} <span class="todo-status">${t.d ? 'DONE' : 'ACTIVE'}</span></div>
+                           </div>
+                           <div class="todo-actions">
+                                <button class="btn btn-sm" onclick="openTodoDetail(${i})">DETAILS</button>
+                                <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})">X</button>
+                           </div>`;
         } else {
-            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>`;
+            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <div class="todo-meta"><div class="todo-text">${t.t}</div><div class="todo-meta-line">${dueInfo}</div></div>`;
         }
         l.appendChild(el);
     });
@@ -1613,43 +2148,75 @@ function renderCalendar() {
 }
 
 window.openCalDate = function (date) {
-    const events = systemData.calendarEvents.filter(e => e.date === date);
-    let l = events.map((e, idx) => `<div>[${e.time}] ${e.title} <button onclick="delCalEvent('${date}',${idx})">x</button></div>`).join('');
+    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.gap = '10px';
 
-    const name = prompt(`EVENTS FOR ${date}\n\n${l.replace(/<[^>]*>/g, '')}\n\nAdd new event (Format: HH:MM Title):`);
-    if (name) {
-        const parts = name.split(' ');
-        const time = parts[0];
-        const title = parts.slice(1).join(' ');
-        systemData.calendarEvents.push({ date: date, time: time, title: title || 'Event' });
-        saveData();
-        renderCalendar();
-    }
-}
+    const listBox = document.createElement('div');
+    listBox.className = 'cal-event-list';
 
-window.delCalEvent = function (date, idx) {
-    if (!confirm("Delete this event?")) return;
-    const globalIdx = systemData.calendarEvents.findIndex((e, i) => e.date === date && i === (systemData.calendarEvents.filter(x => x.date === date).indexOf(e))); // Tricky to find exact index in global array if multiple events on same day. 
-    // Easier approach: Filter out the specific one.
-    // However, the `idx` passed is the index within the *filtered* array for that day.
-
-    // Let's get the event object first
-    const dayEvents = systemData.calendarEvents.filter(e => e.date === date);
-    const eventToDelete = dayEvents[idx];
-
-    if (eventToDelete) {
-        // Find index in main array
-        const realIdx = systemData.calendarEvents.indexOf(eventToDelete);
-        if (realIdx > -1) {
-            systemData.calendarEvents.splice(realIdx, 1);
-            saveData();
-            // Re-open date view
-            openCalDate(date);
-            // Refresh calendar background
-            renderCalendar();
+    const renderList = () => {
+        const events = systemData.calendarEvents.filter(e => e.date === date);
+        if (!events.length) {
+            listBox.innerHTML = '<div style="opacity:0.6;">No events for this date</div>';
+            return;
         }
-    }
-}
+        listBox.innerHTML = '';
+        events.forEach((e, idx) => {
+            const row = document.createElement('div');
+            row.className = 'cal-event-row';
+            row.innerHTML = `<span class="badge">${e.time || 'All Day'}</span><span class="cal-event-title">${e.title}</span>`;
+            const delBtn = document.createElement('button');
+            delBtn.className = 'btn btn-sm btn-red';
+            delBtn.innerText = 'Delete';
+            delBtn.onclick = () => {
+                showConfirm('Delete this event?').then((ok) => {
+                    if (!ok) return;
+                    const dayEvents = systemData.calendarEvents.filter(ev => ev.date === date);
+                    const target = dayEvents[idx];
+                    if (!target) return;
+                    const realIdx = systemData.calendarEvents.indexOf(target);
+                    if (realIdx > -1) systemData.calendarEvents.splice(realIdx, 1);
+                    saveData();
+                    renderList();
+                    renderCalendar();
+                });
+            };
+            row.appendChild(delBtn);
+            listBox.appendChild(row);
+        });
+    };
+
+    const form = document.createElement('div');
+    form.style.display = 'flex';
+    form.style.gap = '10px';
+    form.style.flexWrap = 'wrap';
+    form.innerHTML = `
+        <label class="opt-check">Time <input type="time" id="cal-time" class="todo-input" style="max-width:140px;"></label>
+        <input type="text" id="cal-title" class="todo-input" placeholder="Title..." style="flex:1; min-width:180px;">
+        <button class="btn btn-green" id="cal-add-btn">Add</button>
+    `;
+
+    wrapper.appendChild(listBox);
+    wrapper.appendChild(form);
+
+    const overlay = showModal({ title: `Events for ${date}`, body: wrapper, actions: [{ label: 'Close' }] });
+    const addBtn = form.querySelector('#cal-add-btn');
+    addBtn.onclick = () => {
+        const time = form.querySelector('#cal-time').value || 'All Day';
+        const title = form.querySelector('#cal-title').value.trim() || 'Event';
+        systemData.calendarEvents.push({ date, time, title });
+        saveData();
+        form.querySelector('#cal-title').value = '';
+        renderList();
+        renderCalendar();
+    };
+
+    renderList();
+    setTimeout(() => overlay?.querySelector('input')?.focus(), 30);
+};
 
 // IMPORT / EXPORT
 window.exportTodoData = function () {
@@ -1665,6 +2232,30 @@ window.exportTodoData = function () {
     link.click();
 }
 
+window.exportTodoICS = function () {
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//cl0w.nz//tasks//EN'];
+    const pushEvent = (title, date, time) => {
+        if (!date) return;
+        const uid = `${title}-${date}-${time || 'allday'}@cl0w.nz`;
+        const dt = date.replace(/-/g, '') + (time ? 'T' + time.replace(/:/g, '') + '00' : '');
+        lines.push('BEGIN:VEVENT');
+        lines.push('UID:' + uid);
+        lines.push('DTSTAMP:' + stamp);
+        lines.push('DTSTART:' + dt);
+        lines.push('SUMMARY:' + title);
+        lines.push('END:VEVENT');
+    };
+    (systemData.calendarEvents || []).forEach((ev) => pushEvent(ev.title || 'Event', ev.date, ev.time && ev.time !== 'All Day' ? ev.time : ''));
+    (systemData.todos || []).forEach((t) => pushEvent(t.t, t.due, t.time));
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tasks.ics'; a.click(); URL.revokeObjectURL(url);
+};
+
 window.importTodoData = function (acc) {
     const file = acc.files[0];
     if (!file) return;
@@ -1675,10 +2266,10 @@ window.importTodoData = function (acc) {
             if (d.todos) systemData.todos = d.todos;
             if (d.calendar) systemData.calendarEvents = d.calendar;
             saveData();
-            alert("Tasks Imported!");
+            showToast('Tasks Imported!', 'success');
             renderTodo();
         } catch (err) {
-            alert("Error parsing JSON");
+            showModal({ title: 'Import Error', body: 'Error parsing JSON' });
         }
     };
     r.readAsText(file);
@@ -1688,10 +2279,21 @@ window.importTodoData = function (acc) {
 function addTodoItem() {
     const inp = document.getElementById('new-todo-input');
     if (!inp || !inp.value.trim()) return;
-    systemData.todos.push({ t: inp.value.trim(), d: false });
+    const dueDate = document.getElementById('new-todo-date')?.value || '';
+    const dueTime = document.getElementById('new-todo-time')?.value || '';
+    const item = { t: inp.value.trim(), d: false };
+    if (dueDate) item.due = dueDate;
+    if (dueTime) item.time = dueTime;
+    systemData.todos.push(item);
+    if (dueDate) {
+        if (!systemData.calendarEvents) systemData.calendarEvents = [];
+        systemData.calendarEvents.push({ date: dueDate, time: dueTime || 'All Day', title: item.t });
+    }
     saveData();
     renderTodoList();
     inp.value = '';
+    const dIn = document.getElementById('new-todo-date'); if (dIn) dIn.value = '';
+    const tIn = document.getElementById('new-todo-time'); if (tIn) tIn.value = '';
     playSfx(800);
 }
 /** toggleTodoDone - Змінює статус виконання завдання */
@@ -1703,12 +2305,61 @@ function toggleTodoDone(i) {
 }
 /** removeTodoItem - Видаляє елемент зі списку справ */
 function removeTodoItem(i) {
-    if (confirm("Delete this task?")) {
+    showConfirm('Delete this task?').then((ok) => {
+        if (!ok) return;
         systemData.todos.splice(i, 1);
         saveData();
         renderTodoList();
         playSfx(400);
-    }
+    });
+}
+
+function openTodoDetail(i) {
+    const item = systemData.todos[i];
+    if (!item) return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+        <div class="form-group"><label>Title</label><input type="text" id="todo-edit-title" class="form-control" value="${item.t}"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <label class="opt-check">Due <input type="date" id="todo-edit-date" value="${item.due || ''}" class="todo-input" style="max-width:180px;"></label>
+            <label class="opt-check">Time <input type="time" id="todo-edit-time" value="${item.time || ''}" class="todo-input" style="max-width:140px;"></label>
+            <label class="opt-check"><input type="checkbox" id="todo-edit-done" ${item.d ? 'checked' : ''}> Done</label>
+        </div>
+    `;
+
+    showModal({
+        title: 'Task Details',
+        body: wrapper,
+        actions: [
+            { label: 'Delete', variant: 'danger', onClick: () => removeTodoItem(i) },
+            {
+                label: 'Save', variant: 'success', onClick: () => {
+                    const title = wrapper.querySelector('#todo-edit-title').value.trim() || 'Task';
+                    const due = wrapper.querySelector('#todo-edit-date').value;
+                    const time = wrapper.querySelector('#todo-edit-time').value;
+                    const done = wrapper.querySelector('#todo-edit-done').checked;
+
+                    const prevDue = item.due;
+                    const prevTitle = item.t;
+                    item.t = title;
+                    item.due = due || undefined;
+                    item.time = time || undefined;
+                    item.d = done;
+
+                    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+                    if (prevDue) {
+                        systemData.calendarEvents = systemData.calendarEvents.filter(ev => !(ev.title === prevTitle && ev.date === prevDue));
+                    }
+                    if (item.due) {
+                        systemData.calendarEvents.push({ date: item.due, time: item.time || 'All Day', title: item.t });
+                    }
+
+                    saveData();
+                    renderTodoList();
+                }
+            }
+        ]
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1718,7 +2369,8 @@ function removeTodoItem(i) {
 function renderGameMenu() {
     const v = document.getElementById('view');
     // MERGED RENDER GAME MENU
-    const customGames = systemData.games.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
+    const gameList = Array.isArray(systemData.games) ? systemData.games : [];
+    const customGames = gameList.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
 
     v.innerHTML = `<h2>GAME_CENTER</h2>
     <div class="game-hub">
@@ -1728,62 +2380,298 @@ function renderGameMenu() {
         <div class="game-card" onclick="runGame('pico8')">PICO-8 (WEB)</div>
         ${customGames}
     </div>
-    <div id="game-area" class="game-area" style="display:none; width:640px; height:480px;">
-        <canvas id="game-canvas" width="640" height="480"></canvas>
+    <div class="game-panels">
+        <div id="game-area" class="game-area" style="display:none; width:640px; height:480px;">
+            <canvas id="game-canvas" width="640" height="480"></canvas>
+            <div class="game-hint">Arrows to move. Space/Enter to rotate. Esc to exit.</div>
+        </div>
+        <div id="pico-area" class="pico-panel" style="display:none;">
+            <div class="game-toolbar">
+                <input id="pico-url" class="todo-input" placeholder="PICO-8 widget URL" value="https://www.lexaloffle.com/bbs/widget.php?pid=celeste" aria-label="PICO-8 cart url">
+                <button class="btn" onclick="loadPicoCart()">LOAD CART</button>
+                <button class="btn" onclick="playPicoDemo()">PLAY CELESTE</button>
+            </div>
+            <iframe id="pico-frame" src="" style="width:100%; height:70vh; border:1px solid var(--text); background:#000;"></iframe>
+        </div>
     </div>
-    <div id="pico-area" style="display:none; width:100%; height:80vh; flex-direction:column;">
-         <div style="margin-bottom:5px; display:flex; gap:10px;">
-            <button class="btn" onclick="loadPicoCart()">LOAD CART URL</button>
-            <button class="btn" onclick="document.getElementById('pico-frame').src='https://www.lexaloffle.com/bbs/widget.php?pid=celeste'">PLAY CELESTE</button>
-         </div>
-        <iframe id="pico-frame" src="" style="width:100%; height:100%; border:none; background:#000;"></iframe>
-    </div>
-    <div style="margin-top:10px;"><button class="btn btn-red" onclick="stopGames()">EXIT_GAME</button></div>`;
+    <div class="game-footer">
+        <div id="game-status" aria-live="polite">Select a game to start.</div>
+        <button class="btn btn-red" onclick="stopGames()">EXIT_GAME</button>
+    </div>`;
 }
 
 window.loadPicoCart = function () {
-    const url = prompt("Enter PICO-8 Web/Widget URL:");
-    if (url) document.getElementById('pico-frame').src = url;
+    const input = document.getElementById('pico-url');
+    const url = input?.value?.trim();
+    if (!url) { showModal({ title: 'No URL', body: 'Paste a PICO-8 web cart URL first.' }); return; }
+    document.getElementById('pico-frame').src = url;
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Loading PICO-8 cart...';
+}
+
+window.playPicoDemo = function () {
+    const demo = 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
+    const input = document.getElementById('pico-url');
+    if (input) input.value = demo;
+    document.getElementById('pico-frame').src = demo;
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Playing Celeste demo';
 }
 
 /** gameInterval - Інтервал активної гри для коректної зупинки */
 var gameInterval = null; // Renamed from gameInt to match new code
+var gameCleanup = null;
 function stopGames() {
     if (gameInterval) clearInterval(gameInterval);
+    if (typeof gameCleanup === 'function') {
+        try { gameCleanup(); } catch (e) { }
+    }
+    gameCleanup = null;
     const gameArea = document.getElementById('game-area');
     if (gameArea) gameArea.style.display = 'none';
     const picoArea = document.getElementById('pico-area');
     if (picoArea) picoArea.style.display = 'none';
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Game stopped';
     // stopScreensaver(); // Just in case - assuming this function exists elsewhere or is a placeholder
 }
 
-/** runGame - Запускає обрану гру */
-function runGame(id) {
-    const area = document.getElementById('game-area');
-    const pico = document.getElementById('pico-area');
-    const canvas = document.getElementById('game-canvas');
-    if (!canvas) return; // Error safety
-    const ctx = canvas.getContext('2d');
+// --- BUILT-IN MINI GAMES (SAFE DEFAULTS) ---
 
-    stopGames(); // Clear previous
+// Predeclare handlers to avoid ReferenceErrors during resolution
+function startSnake(canvas, ctx) {
+    const gridSize = 20;
+    const cols = Math.floor(canvas.width / gridSize);
+    const rows = Math.floor(canvas.height / gridSize);
+    let snake = [{ x: 5, y: 5 }];
+    let dir = { x: 1, y: 0 };
+    let food = { x: 10, y: 10 };
+    let alive = true;
 
-    if (id === 'pico8') {
-        pico.style.display = 'block';
-        // Use a generic placeholder or allow input
-        const url = prompt("Enter PICO-8 Web Cart URL (or cancel for demo):", "https://www.lexaloffle.com/bbs/widget.php?pid=celeste");
-        if (url) {
-            document.getElementById('pico-frame').src = url;
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowUp' && dir.y === 0) dir = { x: 0, y: -1 };
+        if (e.key === 'ArrowDown' && dir.y === 0) dir = { x: 0, y: 1 };
+        if (e.key === 'ArrowLeft' && dir.x === 0) dir = { x: -1, y: 0 };
+        if (e.key === 'ArrowRight' && dir.x === 0) dir = { x: 1, y: 0 };
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const spawnFood = () => {
+        food = {
+            x: Math.floor(Math.random() * cols),
+            y: Math.floor(Math.random() * rows)
+        };
+    };
+
+    const loop = () => {
+        if (!alive) return;
+        const head = { x: (snake[0].x + dir.x + cols) % cols, y: (snake[0].y + dir.y + rows) % rows };
+        // Collision with self
+        if (snake.some((s) => s.x === head.x && s.y === head.y)) {
+            alive = false;
+            ctx.fillStyle = '#f55';
+            ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+            return;
         }
-        return;
-    }
+        snake.unshift(head);
+        if (head.x === food.x && head.y === food.y) {
+            playSfx(900, 'square', 0.05);
+            spawnFood();
+        } else {
+            snake.pop();
+        }
 
-    area.style.display = 'block';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        snake.forEach((s) => ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize - 2, gridSize - 2));
+        ctx.fillStyle = '#f50';
+        ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+    };
 
-    // Assuming startSnake, startTetris, startPong functions exist
-    if (id === 'snake') startSnake(canvas, ctx);
-    else if (id === 'tetris') startTetris(canvas, ctx);
-    else if (id === 'pong') startPong(canvas, ctx);
+    gameInterval = setInterval(loop, 120);
+    gameCleanup = () => document.removeEventListener('keydown', keyHandler);
 }
+
+function startPong(canvas, ctx) {
+    let ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: 2 };
+    let paddle = { x: canvas.width / 2 - 40, y: canvas.height - 20, w: 80, h: 8 };
+    const keyState = { left: false, right: false };
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowLeft') keyState.left = e.type === 'keydown';
+        if (e.key === 'ArrowRight') keyState.right = e.type === 'keydown';
+    };
+    document.addEventListener('keydown', keyHandler);
+    document.addEventListener('keyup', keyHandler);
+
+    const loop = () => {
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        if (ball.x < 5 || ball.x > canvas.width - 5) ball.vx *= -1;
+        if (ball.y < 5) ball.vy *= -1;
+
+        if (ball.y > paddle.y - 5 && ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
+            ball.vy *= -1;
+            playSfx(700, 'square', 0.05);
+        }
+        if (ball.y > canvas.height) {
+            ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: -2 };
+        }
+
+        if (keyState.left) paddle.x = Math.max(0, paddle.x - 5);
+        if (keyState.right) paddle.x = Math.min(canvas.width - paddle.w, paddle.x + 5);
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        ctx.fillRect(ball.x - 4, ball.y - 4, 8, 8);
+        ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    };
+
+    gameInterval = setInterval(loop, 16);
+    gameCleanup = () => {
+        document.removeEventListener('keydown', keyHandler);
+        document.removeEventListener('keyup', keyHandler);
+    };
+}
+
+function startTetris(canvas, ctx) {
+      const cols = 10, rows = 20, size = 24;
+      canvas.width = cols * size;
+      canvas.height = rows * size;
+    const shapes = [
+        [[1, 1, 1, 1]],
+        [[1, 1], [1, 1]],
+        [[0, 1, 0], [1, 1, 1]],
+        [[1, 0, 0], [1, 1, 1]],
+        [[0, 0, 1], [1, 1, 1]],
+    ];
+    const board = Array.from({ length: rows }, () => Array(cols).fill(0));
+    let current = { shape: shapes[Math.floor(Math.random() * shapes.length)], x: 3, y: 0 };
+
+    const canMove = (dx, dy, shape = current.shape) => {
+        for (let y = 0; y < shape.length; y++) {
+            for (let x = 0; x < shape[0].length; x++) {
+                if (!shape[y][x]) continue;
+                const nx = current.x + dx + x;
+                const ny = current.y + dy + y;
+                if (nx < 0 || nx >= cols || ny >= rows) return false;
+                if (ny >= 0 && board[ny][nx]) return false;
+            }
+        }
+        return true;
+    };
+
+    const mergePiece = () => {
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+            if (val) board[current.y + y][current.x + x] = 1;
+        }));
+        clearLines();
+        current = { shape: shapes[Math.floor(Math.random() * shapes.length)], x: 3, y: 0 };
+    };
+
+    const clearLines = () => {
+        for (let y = rows - 1; y >= 0; y--) {
+            if (board[y].every((v) => v)) {
+                board.splice(y, 1);
+                board.unshift(Array(cols).fill(0));
+                playSfx(800, 'sine', 0.05);
+            }
+        }
+    };
+
+    const rotate = () => {
+        const rotated = current.shape[0].map((_, idx) => current.shape.map((row) => row[idx]).reverse());
+        if (canMove(0, 0, rotated)) current.shape = rotated;
+    };
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowLeft' && canMove(-1, 0)) current.x -= 1;
+        if (e.key === 'ArrowRight' && canMove(1, 0)) current.x += 1;
+        if (e.key === 'ArrowDown' && canMove(0, 1)) current.y += 1;
+        if (e.key === 'ArrowUp') rotate();
+        if (e.key === ' ') {
+            while (canMove(0, 1)) current.y += 1;
+            mergePiece();
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const draw = () => {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        board.forEach((row, y) => row.forEach((val, x) => {
+            if (val) ctx.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+        }));
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+            if (val) ctx.fillRect((current.x + x) * size + 1, (current.y + y) * size + 1, size - 2, size - 2);
+        }));
+    };
+
+    const tick = () => {
+        if (canMove(0, 1)) {
+            current.y += 1;
+        } else {
+            mergePiece();
+        }
+        draw();
+    };
+
+      draw();
+      gameInterval = setInterval(tick, 450);
+      gameCleanup = () => document.removeEventListener('keydown', keyHandler);
+  }
+
+  /** runGame - Запускає обрану гру */
+  function runGame(id) {
+      const area = document.getElementById('game-area');
+      const pico = document.getElementById('pico-area');
+      const canvas = document.getElementById('game-canvas');
+      if (!area || !pico || !canvas) return; // Error safety
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      stopGames(); // Clear previous
+
+      if (id === 'pico8') {
+          pico.style.display = 'flex';
+          const input = document.getElementById('pico-url');
+          const url = input?.value || 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
+          document.getElementById('pico-frame').src = url;
+          const status = document.getElementById('game-status');
+          if (status) status.innerText = 'PICO-8 web player ready';
+          return;
+      }
+
+      area.style.display = 'block';
+      const status = document.getElementById('game-status');
+      if (status) status.innerText = `Running ${id.toUpperCase()}`;
+
+      const handlers = {
+          snake: typeof window.startSnake === 'function' ? window.startSnake : startSnake,
+          tetris: typeof window.startTetris === 'function' ? window.startTetris : startTetris,
+          pong: typeof window.startPong === 'function' ? window.startPong : startPong,
+      };
+
+      if (typeof handlers[id] === 'function') {
+          handlers[id](canvas, ctx);
+          return;
+      }
+
+      // Graceful fallback for unknown/missing games
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '16px monospace';
+      ctx.fillText('Game not available', canvas.width / 2, canvas.height / 2);
+  }
+
+  window.startSnake = typeof window.startSnake === 'function' ? window.startSnake : startSnake;
+  window.startPong = typeof window.startPong === 'function' ? window.startPong : startPong;
+  window.startTetris = typeof window.startTetris === 'function' ? window.startTetris : startTetris;
 
 /**
  * renderGallery - Рендерить сітку галереї
@@ -1990,7 +2878,7 @@ function easterEggLogo() {
 function checkAdminUnlock() {
     if (glitchTriggered && mintEvaClicks >= 10) {
         const btn = document.getElementById('nav-admin');
-        if (btn.style.display !== 'block') { btn.style.display = 'block'; playSfx(800, 'square', 0.5); alert("SYSTEM OVERRIDE: ADMIN ACCESS UNLOCKED"); }
+        if (btn.style.display !== 'block') { btn.style.display = 'block'; playSfx(800, 'square', 0.5); showToast('SYSTEM OVERRIDE: ADMIN ACCESS UNLOCKED', 'success'); }
     }
 }
 /** easterEggClown - Секретний оверлей з клоуном */
