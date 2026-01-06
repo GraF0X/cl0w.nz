@@ -2499,22 +2499,30 @@ function renderGameMenu() {
     // MERGED RENDER GAME MENU
     const gameList = Array.isArray(systemData.games) ? systemData.games : [];
     const reserved = ['snake', 'tetris', 'pong', 'pico8'];
+    const nameFor = (id, fallback) => {
+        const found = gameList.find((g) => g && g.id === id);
+        if (found && found.name) return found.name;
+        return fallback;
+    };
     const customGames = gameList
         .filter((g) => g && g.id && reserved.indexOf(g.id) === -1)
         .map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
 
     v.innerHTML = `<h2>GAME_CENTER</h2>
     <div class="game-hub">
-        <div class="game-card" onclick="runGame('snake')">SNAKE</div>
-        <div class="game-card" onclick="runGame('tetris')">TETRIS</div>
-        <div class="game-card" onclick="runGame('pong')">PONG</div>
+        <div class="game-card" onclick="runGame('snake')">${nameFor('snake', 'SNAKE')}</div>
+        <div class="game-card" onclick="runGame('tetris')">${nameFor('tetris', 'TETRIS')}</div>
+        <div class="game-card" onclick="runGame('pong')">${nameFor('pong', 'PONG')}</div>
         <div class="game-card" onclick="runGame('pico8')">PICO-8 (WEB)</div>
         ${customGames}
     </div>
     <div class="game-panels">
         <div id="game-area" class="game-area" style="display:none;">
-            <canvas id="game-canvas" width="640" height="480"></canvas>
-            <div class="game-hint">Arrows to move. Space/Enter to rotate. Esc to exit.</div>
+            <div class="game-stage">
+                <canvas id="game-canvas" width="640" height="480"></canvas>
+                <div id="arena" class="custom-game" role="presentation"></div>
+            </div>
+            <div id="game-hint" class="game-hint">Arrows to move. Space/Enter to rotate. Esc to exit.</div>
         </div>
         <div id="pico-area" class="pico-panel" style="display:none;">
             <div class="game-toolbar">
@@ -2620,14 +2628,30 @@ window.removePicoEntry = function (idx) {
 /** gameInterval - Інтервал активної гри для коректної зупинки */
 var gameInterval = null; // Renamed from gameInt to match new code
 var gameCleanup = null;
+function setGameTimer(handle) {
+    gameInterval = handle;
+    window.gameInt = handle;
+    return handle;
+}
 function stopGames() {
     if (gameInterval) clearInterval(gameInterval);
+    if (window.gameInt) {
+        try { clearInterval(window.gameInt); } catch (e) { }
+    }
     if (typeof gameCleanup === 'function') {
         try { gameCleanup(); } catch (e) { }
     }
+    gameInterval = null;
+    window.gameInt = null;
     gameCleanup = null;
     const gameArea = document.getElementById('game-area');
     if (gameArea) gameArea.style.display = 'none';
+    const customHost = document.getElementById('arena');
+    if (customHost) { customHost.innerHTML = ''; customHost.style.display = 'none'; }
+    const canvas = document.getElementById('game-canvas');
+    if (canvas) { canvas.style.display = 'block'; }
+    const hint = document.getElementById('game-hint');
+    if (hint) { hint.innerText = 'Arrows to move. Space/Enter to rotate. Esc to exit.'; }
     const picoArea = document.getElementById('pico-area');
     if (picoArea) picoArea.style.display = 'none';
     const status = document.getElementById('game-status');
@@ -2701,7 +2725,7 @@ function startSnake(canvas, ctx) {
         ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
     };
 
-    gameInterval = setInterval(loop, 120);
+    setGameTimer(setInterval(loop, 120));
     gameCleanup = () => document.removeEventListener('keydown', keyHandler);
 }
 
@@ -2742,7 +2766,7 @@ function startPong(canvas, ctx) {
         ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
     };
 
-    gameInterval = setInterval(loop, 16);
+    setGameTimer(setInterval(loop, 16));
     gameCleanup = () => {
         document.removeEventListener('keydown', keyHandler);
         document.removeEventListener('keyup', keyHandler);
@@ -2832,16 +2856,18 @@ function startTetris(canvas, ctx) {
         draw();
     };
 
-      draw();
-      gameInterval = setInterval(tick, 450);
-      gameCleanup = () => document.removeEventListener('keydown', keyHandler);
-  }
+    draw();
+    setGameTimer(setInterval(tick, 450));
+    gameCleanup = () => document.removeEventListener('keydown', keyHandler);
+}
 
   /** runGame - Запускає обрану гру */
   function runGame(id) {
       const area = document.getElementById('game-area');
       const pico = document.getElementById('pico-area');
       const canvas = document.getElementById('game-canvas');
+      const customHost = document.getElementById('arena');
+      const hint = document.getElementById('game-hint');
       if (!area || !pico || !canvas) return; // Error safety
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -2853,6 +2879,7 @@ function startTetris(canvas, ctx) {
             const input = document.getElementById('pico-url');
             const url = input && input.value ? input.value : 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
           document.getElementById('pico-frame').src = url;
+          if (customHost) { customHost.innerHTML = ''; customHost.style.display = 'none'; }
           const status = document.getElementById('game-status');
           if (status) status.innerText = 'PICO-8 web player ready';
           return;
@@ -2860,18 +2887,40 @@ function startTetris(canvas, ctx) {
 
       area.style.display = 'block';
       sizeGameCanvas();
+      if (customHost) { customHost.innerHTML = ''; customHost.style.display = 'none'; }
+      canvas.style.display = 'block';
+      if (hint) { hint.style.display = 'block'; hint.innerText = 'Arrows to move. Space/Enter to rotate. Esc to exit.'; }
       const status = document.getElementById('game-status');
       if (status) status.innerText = `Running ${id.toUpperCase()}`;
 
       const customGame = (Array.isArray(systemData.games) ? systemData.games : []).find(g => g.id === id);
-      if (customGame && customGame.code) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#fff';
-          ctx.textAlign = 'center';
-          ctx.font = '16px monospace';
-          ctx.fillText('Custom game slot loaded', canvas.width / 2, canvas.height / 2 - 10);
-          ctx.fillText('Run external code from admin panel if needed.', canvas.width / 2, canvas.height / 2 + 10);
-          return;
+      const customCode = customGame && customGame.code ? customGame.code.trim() : '';
+      if (customCode && customHost) {
+          customHost.style.display = 'block';
+          canvas.style.display = 'none';
+          if (hint) hint.innerText = 'Custom game active — code comes from admin.';
+          try {
+              new Function('canvas', 'ctx', 'host', 'systemData', 'helpers', customCode)(
+                  canvas,
+                  ctx,
+                  customHost,
+                  systemData,
+                  {
+                      stopGames: stopGames,
+                      playSfx: playSfx,
+                      saveData: saveData,
+                      setInterval: function (fn, t) { return setGameTimer(setInterval(fn, t)); },
+                      setTimeout: setTimeout,
+                      requestAnimationFrame: requestAnimationFrame
+                  }
+              );
+              return;
+          } catch (err) {
+              customHost.innerHTML = '<div class="game-error">Custom game failed to run.</div>';
+              showModal({ title: 'Game Error', body: 'Failed to run custom game: ' + err.message });
+              if (status) status.innerText = 'Custom game error';
+              return;
+          }
       }
 
       const handlers = {
