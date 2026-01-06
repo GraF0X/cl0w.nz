@@ -1118,6 +1118,8 @@
             background: #000;
         }
 
+        .saver-action-buttons { display: flex; gap: 8px; }
+
         .gallery-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
