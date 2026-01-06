@@ -780,17 +780,13 @@ window.startScreensaver = function (previewType) {
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'screensaver-overlay';
-        overlay.innerHTML = '<canvas id="screensaver-canvas"></canvas>';
         document.body.appendChild(overlay);
         overlay.onclick = stopScreensaver;
     }
 
     overlay.style.display = 'flex';
-    ssCanvas = document.getElementById('screensaver-canvas');
-    if (!ssCanvas) {
-        overlay.innerHTML = '<canvas id="screensaver-canvas"></canvas>';
-        ssCanvas = document.getElementById('screensaver-canvas');
-    }
+    overlay.innerHTML = '<canvas id="screensaver-canvas"></canvas>';
+    ssCanvas = overlay.querySelector('#screensaver-canvas');
     ssCtx = ssCanvas ? ssCanvas.getContext('2d') : null;
     ssCanvas.width = window.innerWidth;
     ssCanvas.height = window.innerHeight;
@@ -1605,9 +1601,12 @@ const qrEncoder = (() => {
         return res;
     }
 
-    function encodeQRBytes(text) {
-        const bytes = Array.from(new TextEncoder().encode(text));
-        if (bytes.length > 17) throw new Error('Chunk too long for offline QR page (17 bytes max).');
+    function encodeQRBytes(data) {
+        const bytes = Array.isArray(data) || data instanceof Uint8Array
+            ? Array.from(data)
+            : Array.from(new TextEncoder().encode(data));
+        const chunkLimit = 17;
+        if (bytes.length > chunkLimit) throw new Error('Chunk too long for offline QR page (17 bytes max).');
         const bits = [];
         const pushBits = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
         pushBits(0b0100, 4); // Byte mode
@@ -1615,11 +1614,11 @@ const qrEncoder = (() => {
         bytes.forEach((b) => pushBits(b, 8));
         pushBits(0, Math.min(4, 152 - bits.length));
         while (bits.length % 8 !== 0) bits.push(0);
-        const data = [];
-        for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+        const dataWords = [];
+        for (let i = 0; i < bits.length; i += 8) dataWords.push(parseInt(bits.slice(i, i + 8).join(''), 2));
         const pad = [0xec, 0x11]; let padIdx = 0;
-        while (data.length < 19) { data.push(pad[padIdx % 2]); padIdx++; }
-        return data;
+        while (dataWords.length < 19) { dataWords.push(pad[padIdx % 2]); padIdx++; }
+        return dataWords;
     }
 
     function buildQRMatrix(text) {
@@ -1723,11 +1722,11 @@ function generateQR() {
         return;
     }
 
-    const decoder = new TextDecoder();
+    const chunkSize = 17;
     const chunked = [];
-    for (let i = 0; i < bytes.length; i += 17) {
-        const slice = bytes.slice(i, i + 17);
-        chunked.push(decoder.decode(new Uint8Array(slice)));
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        const slice = bytes.slice(i, i + chunkSize);
+        chunked.push(slice);
     }
 
     lastQRPages = [];
@@ -2498,7 +2497,7 @@ function renderGameMenu() {
     const v = document.getElementById('view');
     // MERGED RENDER GAME MENU
     const gameList = Array.isArray(systemData.games) ? systemData.games : [];
-    const reserved = ['snake', 'tetris', 'pong', 'pico8'];
+    const reserved = ['snake', 'tetris', 'pico8'];
     const nameFor = (id, fallback) => {
         const found = gameList.find((g) => g && g.id === id);
         if (found && found.name) return found.name;
@@ -2512,7 +2511,6 @@ function renderGameMenu() {
     <div class="game-hub">
         <div class="game-card" onclick="runGame('snake')">${nameFor('snake', 'SNAKE')}</div>
         <div class="game-card" onclick="runGame('tetris')">${nameFor('tetris', 'TETRIS')}</div>
-        <div class="game-card" onclick="runGame('pong')">${nameFor('pong', 'PONG')}</div>
         <div class="game-card" onclick="runGame('pico8')">PICO-8 (WEB)</div>
         ${customGames}
     </div>
@@ -2729,50 +2727,6 @@ function startSnake(canvas, ctx) {
     gameCleanup = () => document.removeEventListener('keydown', keyHandler);
 }
 
-function startPong(canvas, ctx) {
-    let ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: 2 };
-    let paddle = { x: canvas.width / 2 - 40, y: canvas.height - 20, w: 80, h: 8 };
-    const keyState = { left: false, right: false };
-
-    const keyHandler = (e) => {
-        if (e.key === 'ArrowLeft') keyState.left = e.type === 'keydown';
-        if (e.key === 'ArrowRight') keyState.right = e.type === 'keydown';
-    };
-    document.addEventListener('keydown', keyHandler);
-    document.addEventListener('keyup', keyHandler);
-
-    const loop = () => {
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-
-        if (ball.x < 5 || ball.x > canvas.width - 5) ball.vx *= -1;
-        if (ball.y < 5) ball.vy *= -1;
-
-        if (ball.y > paddle.y - 5 && ball.x > paddle.x && ball.x < paddle.x + paddle.w) {
-            ball.vy *= -1;
-            playSfx(700, 'square', 0.05);
-        }
-        if (ball.y > canvas.height) {
-            ball = { x: canvas.width / 2, y: canvas.height / 2, vx: 3, vy: -2 };
-        }
-
-        if (keyState.left) paddle.x = Math.max(0, paddle.x - 5);
-        if (keyState.right) paddle.x = Math.min(canvas.width - paddle.w, paddle.x + 5);
-
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
-        ctx.fillRect(ball.x - 4, ball.y - 4, 8, 8);
-        ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
-    };
-
-    setGameTimer(setInterval(loop, 16));
-    gameCleanup = () => {
-        document.removeEventListener('keydown', keyHandler);
-        document.removeEventListener('keyup', keyHandler);
-    };
-}
-
 function startTetris(canvas, ctx) {
       const cols = 10, rows = 20, size = 24;
       canvas.width = cols * size;
@@ -2900,7 +2854,7 @@ function startTetris(canvas, ctx) {
           canvas.style.display = 'none';
           if (hint) hint.innerText = 'Custom game active — code comes from admin.';
           try {
-              new Function('canvas', 'ctx', 'host', 'systemData', 'helpers', customCode)(
+              new Function('gameCanvas', 'gameCtx', 'host', 'systemData', 'helpers', customCode)(
                   canvas,
                   ctx,
                   customHost,
@@ -2926,7 +2880,6 @@ function startTetris(canvas, ctx) {
       const handlers = {
           snake: typeof window.startSnake === 'function' ? window.startSnake : startSnake,
           tetris: typeof window.startTetris === 'function' ? window.startTetris : startTetris,
-          pong: typeof window.startPong === 'function' ? window.startPong : startPong,
       };
 
       if (typeof handlers[id] === 'function') {
@@ -2943,7 +2896,6 @@ function startTetris(canvas, ctx) {
   }
 
   window.startSnake = typeof window.startSnake === 'function' ? window.startSnake : startSnake;
-  window.startPong = typeof window.startPong === 'function' ? window.startPong : startPong;
   window.startTetris = typeof window.startTetris === 'function' ? window.startTetris : startTetris;
 
 /**

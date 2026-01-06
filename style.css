@@ -1254,6 +1254,21 @@
             margin-top: 8px;
         }
 
+        .home-tag-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px dashed var(--dim);
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.8;
+            transition: opacity 0.2s, border-color 0.2s, background 0.2s;
+        }
+
         .home-tag-btn:hover {
             opacity: 1;
             border-color: var(--text);
