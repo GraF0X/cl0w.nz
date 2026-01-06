@@ -14,6 +14,18 @@ const defaultData = {
         "svgGlow": true,
         "screenPulse": false
     },
+    "screensaver": {
+        "enabled": true,
+        "timeout": 60,
+        "type": "matrix",
+        "catalog": [
+            { "id": "matrix", "name": "Matrix Rain", "desc": "Green code rain inspired by classic terminals." },
+            { "id": "fire", "name": "Pixel Fire", "desc": "Retro fire simulation with palette cycling." },
+            { "id": "pipes", "name": "Pipes", "desc": "Colorful wandering pipes across the screen." },
+            { "id": "dvd", "name": "DVD", "desc": "Bouncing DVD logo with rainbow tints." },
+            { "id": "trees", "name": "Fractal Trees", "desc": "Procedural trees growing across the canvas." }
+        ]
+    },
     "todoEditable": false,
     "home": {
         "ascii": "        .      ______    __\\/\\____            _.------. \n        |\\___/_  __/____)  __  /  _____.--.(      .: | \n   .----|__   /  \\__   /  _  _/--/   _      _)   l___/ \n   |         /      |   |  |      |   (    |__   __/   \n   | ::. ___/|__    .: |__|  .:: | ::.  _  /|   |     \n   l____ ( x0! \\_______l  l______l______)\\/ |___|     \n       \\/\n",
