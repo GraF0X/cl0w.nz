@@ -846,7 +846,8 @@ function savePlaygroundFiles() {
     try { localStorage.setItem('playground-files', JSON.stringify(playgroundFiles)); } catch (e) { /* ignore */ }
 }
 
-function ensureThree(callback) {
+function ensureThree(callback, onError) {
+    const fail = typeof onError === 'function' ? onError : function () { };
     if (window.THREE) { callback(); return; }
     threeQueue.push(callback);
     if (threeLoading) return;
@@ -859,7 +860,11 @@ function ensureThree(callback) {
         threeQueue = [];
         queue.forEach(fn => { if (typeof fn === 'function') fn(); });
     };
-    s.onerror = function () { threeLoading = false; threeQueue = []; showToast('Three.js failed to load', 'error'); };
+    s.onerror = function () {
+        threeLoading = false; threeQueue = [];
+        fail();
+        showToast('Three.js failed to load', 'error');
+    };
     document.head.appendChild(s);
 }
 
@@ -891,10 +896,12 @@ function resizeFoxLab(container) {
 function setupFoxLab() {
     const holder = document.getElementById('fox-lab');
     if (!holder) return;
+    holder.innerHTML = '<div class="fox-loading">Loading fox lab…</div>';
     ensureThree(() => {
         if (!holder) return;
         teardownFoxLab();
         const THREE = window.THREE;
+        if (!THREE) { holder.innerHTML = '<div class="fox-loading">Three.js unavailable</div>'; return; }
         foxRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         foxRenderer.setPixelRatio(window.devicePixelRatio || 1);
         foxRenderer.setSize(holder.clientWidth, holder.clientHeight);
@@ -963,6 +970,8 @@ function setupFoxLab() {
         foxResizeHandler = function () { resizeFoxLab(holder); };
         window.addEventListener('resize', foxResizeHandler);
         resizeFoxLab(holder);
+    }, () => {
+        if (holder) holder.innerHTML = '<div class="fox-loading">Fox lab failed to load</div>';
     });
 }
 
@@ -1034,6 +1043,39 @@ window.runPlayground = function () {
     }
 };
 
+function wirePlaygroundDesktop() {
+    closePlaygroundStartMenu();
+    document.addEventListener('click', handlePlaygroundOutsideClick, { once: true });
+}
+
+function togglePlaygroundStartMenu(evt) {
+    evt.stopPropagation();
+    const menu = document.getElementById('pg-start-menu');
+    if (!menu) return;
+    const isOpen = menu.classList.contains('open');
+    if (isOpen) {
+        closePlaygroundStartMenu();
+        return;
+    }
+    menu.classList.add('open');
+    menu.setAttribute('aria-hidden', 'false');
+}
+
+function closePlaygroundStartMenu() {
+    const menu = document.getElementById('pg-start-menu');
+    if (!menu) return;
+    menu.classList.remove('open');
+    menu.setAttribute('aria-hidden', 'true');
+}
+
+function handlePlaygroundOutsideClick(evt) {
+    const menu = document.getElementById('pg-start-menu');
+    const start = document.getElementById('pg-start');
+    if (!menu) return;
+    if (menu.contains(evt.target) || (start && start.contains(evt.target))) return;
+    closePlaygroundStartMenu();
+}
+
 function submitPlaygroundCommand(evt) {
     if (!evt || evt.key !== 'Enter') return;
     evt.preventDefault();
@@ -1052,6 +1094,7 @@ function renderPlaygroundPolygon() {
         pcScrollCleanup = function () {
             main.style.overflow = main.dataset.prevOverflow || '';
             teardownFoxLab();
+            closePlaygroundStartMenu();
         };
     }
 
@@ -1138,15 +1181,24 @@ function renderPlaygroundPolygon() {
             </section>
         </div>
         <div class="win98-taskbar">
-            <button class="start-btn">Start</button>
+            <button class="start-btn" id="pg-start" onclick="togglePlaygroundStartMenu(event)">Start</button>
             <div class="task-label">Playground Polygon</div>
             <div class="task-clock">${new Date().toLocaleTimeString()}</div>
+            <div class="start-menu" id="pg-start-menu" aria-hidden="true">
+                <div class="start-menu-title">Playground</div>
+                <button onclick="fillPlaygroundEditor()">📁 Files</button>
+                <button onclick="setupFoxLab()">🦊 Fox Lab</button>
+                <button onclick="runPlayground()">▶️ Run Code</button>
+                <button onclick="renderPlaygroundPolygon()">🔄 Refresh</button>
+                <button onclick="nav('home')">🏠 Exit playground</button>
+            </div>
         </div>
     </div>`;
 
     renderPlaygroundFilesList();
     fillPlaygroundEditor();
     setupFoxLab();
+    wirePlaygroundDesktop();
 }
 
 function generateFakeProcesses() {
