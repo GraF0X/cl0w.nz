@@ -1153,16 +1153,16 @@ function renderPlaygroundPolygon() {
                 </div>
                 <div class="pg-body pg-three">
                     <div class="pg-fox-shell">
-                        <div class="panel-sub">Low-poly fox</div>
+                        <div class="panel-sub">Skeletal preview</div>
                         <div id="fox-stage" class="fox-stage"></div>
-                        <div class="panel-note">Local WebGL scenes rendered with theme-aware chrome.</div>
+                        <div class="panel-note">Rigged demo loaded inline with theme-aware chrome.</div>
                     </div>
                     <div class="pg-three-demos">
                         <div class="panel-sub">WebGL demos</div>
                         <div class="pg-demo-list">
                             ${threeDemos.map(d => `<button class="btn btn-sm" onclick="loadThreeExample('${d.id}')">${d.label}</button>`).join('') || '<div class="panel-note">No demos available</div>'}
                         </div>
-                        <div class="pg-demo-frame">
+                        <div class="pg-demo-frame" id="pg-demo-frame">
                             <canvas id="pg-demo-canvas"></canvas>
                             <div id="pg-demo-status" class="panel-note">Select a demo to load it inline.</div>
                         </div>
@@ -1180,7 +1180,7 @@ function renderPlaygroundPolygon() {
         const holder = document.getElementById('fox-stage');
         if (holder) holder.innerHTML = '<div class="fox-loading">3D lab unavailable</div>';
     }
-    loadThreeExample('fox-local');
+    loadThreeExample('skeletal');
     wirePlaygroundDesktop();
 }
 
