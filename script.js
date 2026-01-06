@@ -1320,187 +1320,334 @@ function nav(id) {
     else if (id === 'todo') renderTodo();
     else if (id === 'gallery') renderGallery();
     else if (id === 'draw') renderAsciiDraw();
-    else if (id === 'pc') renderAboutPC();
+    else if (id === 'pc') renderPlaygroundPolygon();
     else if (id === 'screensaver') renderScreensaverMenu();
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
     else if (id === 'admin') renderAdmin();
 }
 
-/** renderAboutPC - Виводить статистику комп'ютера з віджетами */
-function renderAboutPC() {
-    const v = document.getElementById('view');
-    const ua = navigator.userAgent;
-    const platform = navigator.platform;
-    const cores = navigator.hardwareConcurrency || '?';
-    const mem = navigator.deviceMemory || '?';
+let playgroundFiles = [];
+let playgroundCurrentFileId = '';
+let foxRenderer = null;
+let foxScene = null;
+let foxCamera = null;
+let foxGroup = null;
+let foxAnimHandle = null;
+let foxResizeHandler = null;
+let threeLoading = false;
+let threeQueue = [];
 
-    // Physics Container
-    let physicsHtml = `
-    <div id="pc-physics-world" style="height:150px; border:1px solid var(--text); position:relative; overflow:hidden; margin-bottom:20px; background:rgba(0,0,0,0.2);">
-        <div style="position:absolute; top:5px; left:5px; opacity:0.6; font-size:0.7rem;">[ SCROLLME: UP=PORTAL, DOWN=CRASH ]</div>
-        <div id="pc-avatar" style="font-size:3rem; position:absolute; top:50px; left:50%; transform:translate(-50%, 0); will-change: transform;">💻</div>
-        <div id="pc-portal" style="font-size:3rem; position:absolute; top:-40px; left:50%; transform:translateX(-50%) rotate(180deg); color:cyan; display:none;">🌀</div>
-        <div id="pc-fire" style="font-size:3rem; position:absolute; bottom:-40px; left:50%; transform:translateX(-50%); color:orange; display:none;">🔥</div>
-    </div>`;
-
-    // Code Playground
-    let codeHtml = `
-    <div class="work-card draggable-card" style="min-width:300px;">
-        <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:10px; font-weight:bold;">:: JS_PLAYGROUND ::</div>
-        <textarea id="code-in" style="width:100%; height:80px; background:rgba(0,0,0,0.3); color:var(--text); border:1px solid var(--dim); font-family:monospace; padding:5px;" placeholder="alert('Hello');"></textarea>
-        <button class="btn btn-sm" onclick="runPlayground()">EXECUTE</button>
-        <div id="code-out" style="margin-top:5px; font-size:0.8rem; color: #0f0;"></div>
-    </div>`;
-
-    v.innerHTML = `<h2>SYSTEM_MONITOR_V2</h2>
-    ${physicsHtml}
-    
-    <div id="pc-widgets-area" style="position:relative; height:600px; border:1px dashed var(--dim); padding:10px; overflow:hidden;">
-        <div class="work-card draggable-card" style="position:absolute; top:10px; left:10px; width:250px;">
-            <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">HOST_INFO</div>
-            <div>PLATFORM: ${platform}</div>
-            <div>CORES: ${cores}</div>
-            <div>RAM: ~${mem} GB</div>
-        </div>
-        
-        <div class="work-card draggable-card" style="position:absolute; top:10px; left:280px; width:250px;">
-            <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">NETWORK</div>
-            <div>STATUS: ${navigator.onLine ? 'ONLINE' : 'OFFLINE'}</div>
-            <div>DL: ${navigator.connection ? navigator.connection.downlink + 'Mbps' : '?'}</div>
-        </div>
-        
-        <div class="work-card draggable-card" style="position:absolute; top:150px; left:10px; width:300px;">
-             <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">PROCESS_LIST</div>
-             <div class="scroll-area" style="height:100px; font-size:0.7rem;">
-                <table style="width:100%">${generateFakeProcesses()}</table>
-             </div>
-        </div>
-        
-        <div style="position:absolute; top:150px; left:330px;">
-            ${codeHtml}
-        </div>
-    </div>`;
-
-    initDraggables();
-    initPhysics();
+function loadPlaygroundFiles() {
+    if (playgroundFiles && playgroundFiles.length) return playgroundFiles;
+    try {
+        const raw = localStorage.getItem('playground-files');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                playgroundFiles = parsed;
+                return playgroundFiles;
+            }
+        }
+    } catch (e) { /* ignore */ }
+    playgroundFiles = [
+        { id: 'readme.txt', name: 'readme.txt', content: 'PLAYGROUND_POLYGON\nЛаскаво просимо до полігону — тестуйте UI, ефекти та міні-інструменти без ризику.' },
+        { id: 'fox-notes.txt', name: 'fox-notes.txt', content: 'Fox Lab: low-poly fox built with Three.js primitives. Rotate with time, lit by dual lights.' },
+        { id: 'ideas.md', name: 'ideas.md', content: '- Toggle shaders\n- Try new sound cues\n- Prototype UI micro-interactions' }
+    ];
+    return playgroundFiles;
 }
 
-// PHYSICS
-function initPhysics() {
-    const av = document.getElementById('pc-avatar');
-    const port = document.getElementById('pc-portal');
-    const fire = document.getElementById('pc-fire');
-    if (!av) return;
-
-    const main = document.querySelector('main');
-    if (!main) return;
-
-    let lastScroll = main.scrollTop;
-    let offset = 0;
-    let ticking = false;
-
-    const applyMotion = () => {
-        ticking = false;
-        if (!document.getElementById('pc-avatar') || !port || !fire) {
-            return;
-        }
-
-        const diff = main.scrollTop - lastScroll;
-        lastScroll = main.scrollTop;
-        offset += diff * 1.5;
-
-        const currentPos = 50 + offset;
-        av.style.transform = `translate(-50%, ${offset}px)`;
-
-        if (currentPos < -20) {
-            port.style.display = 'block';
-            port.style.transform = 'translate(-50%, 10px) rotate(180deg)';
-            if (currentPos < -50) {
-                playSfx(1000, 'sawtooth', 0.2);
-                offset = 90; // 50 base + 90 => 140px
-                av.style.transform = `translate(-50%, ${offset}px)`;
-                port.style.display = 'none';
-            }
-        } else {
-            port.style.display = 'none';
-        }
-
-        if (currentPos > 140) {
-            fire.style.display = 'block';
-            fire.style.transform = 'translate(-50%, -10px)';
-            if (currentPos > 170) {
-                playSfx(100, 'noise', 0.3);
-                av.innerText = '💥';
-                setTimeout(() => { av.innerText = '💻'; offset = 0; av.style.transform = 'translate(-50%, 0px)'; fire.style.display = 'none'; }, 1000);
-            }
-        } else {
-            fire.style.display = 'none';
-        }
-    };
-
-    const onScroll = () => {
-        if (ticking) return;
-        ticking = true;
-        requestAnimationFrame(applyMotion);
-    };
-
-    main.addEventListener('scroll', onScroll, { passive: true });
-    pcScrollCleanup = () => {
-        main.removeEventListener('scroll', onScroll);
-    };
+function savePlaygroundFiles() {
+    try { localStorage.setItem('playground-files', JSON.stringify(playgroundFiles)); } catch (e) { /* ignore */ }
 }
 
-// DRAGGABLE
-function initDraggables() {
-    const cards = document.querySelectorAll('.draggable-card');
-    cards.forEach(c => {
-        const header = c.querySelector('.card-header');
-        if (!header) return;
+function ensureThree(callback) {
+    if (window.THREE) { callback(); return; }
+    threeQueue.push(callback);
+    if (threeLoading) return;
+    threeLoading = true;
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/three@0.160.0/build/three.min.js';
+    s.onload = function () {
+        threeLoading = false;
+        const queue = threeQueue.slice();
+        threeQueue = [];
+        queue.forEach(fn => { if (typeof fn === 'function') fn(); });
+    };
+    s.onerror = function () { threeLoading = false; threeQueue = []; showToast('Three.js failed to load', 'error'); };
+    document.head.appendChild(s);
+}
 
-        header.onmousedown = function (e) {
-            e.preventDefault();
-            let pos3 = e.clientX;
-            let pos4 = e.clientY;
+function teardownFoxLab() {
+    if (foxResizeHandler) {
+        window.removeEventListener('resize', foxResizeHandler);
+        foxResizeHandler = null;
+    }
+    if (foxAnimHandle) {
+        cancelAnimationFrame(foxAnimHandle);
+        foxAnimHandle = null;
+    }
+    if (foxRenderer) {
+        foxRenderer.dispose();
+        foxRenderer = null;
+    }
+    foxScene = null; foxCamera = null; foxGroup = null;
+}
 
-            document.onmouseup = closeDragElement;
-            document.onmousemove = elementDrag;
+function resizeFoxLab(container) {
+    if (!foxRenderer || !foxCamera || !container) return;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    foxCamera.aspect = w / h;
+    foxCamera.updateProjectionMatrix();
+    foxRenderer.setSize(w, h);
+}
 
-            // Bring to front
-            c.style.zIndex = 100;
+function setupFoxLab() {
+    const holder = document.getElementById('fox-lab');
+    if (!holder) return;
+    ensureThree(() => {
+        if (!holder) return;
+        teardownFoxLab();
+        const THREE = window.THREE;
+        foxRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        foxRenderer.setPixelRatio(window.devicePixelRatio || 1);
+        foxRenderer.setSize(holder.clientWidth, holder.clientHeight);
+        holder.innerHTML = '';
+        holder.appendChild(foxRenderer.domElement);
 
-            function elementDrag(e) {
-                e.preventDefault();
-                let pos1 = pos3 - e.clientX;
-                let pos2 = pos4 - e.clientY;
-                pos3 = e.clientX;
-                pos4 = e.clientY;
-                c.style.top = (c.offsetTop - pos2) + "px";
-                c.style.left = (c.offsetLeft - pos1) + "px";
-            }
+        foxScene = new THREE.Scene();
+        foxCamera = new THREE.PerspectiveCamera(50, holder.clientWidth / holder.clientHeight, 0.1, 100);
+        foxCamera.position.set(2, 1.4, 3);
 
-            function closeDragElement() {
-                document.onmouseup = null;
-                document.onmousemove = null;
-                c.style.zIndex = '';
-            }
+        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+        const spot = new THREE.DirectionalLight(0xffb000, 0.8);
+        spot.position.set(3, 4, 2);
+        foxScene.add(ambient);
+        foxScene.add(spot);
+
+        foxGroup = new THREE.Group();
+        const orange = new THREE.MeshStandardMaterial({ color: 0xffa040, roughness: 0.6, metalness: 0.1 });
+        const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+        const black = new THREE.MeshStandardMaterial({ color: 0x111111 });
+
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 0.6), orange);
+        body.position.set(0, 0.3, 0);
+        foxGroup.add(body);
+
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), orange);
+        head.position.set(0.9, 0.55, 0);
+        foxGroup.add(head);
+
+        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.2), black);
+        nose.position.set(1.3, 0.45, 0);
+        foxGroup.add(nose);
+
+        const earL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.1), white);
+        earL.position.set(0.75, 0.85, 0.2);
+        const earR = earL.clone(); earR.position.z = -0.2;
+        foxGroup.add(earL); foxGroup.add(earR);
+
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.2), orange);
+        tail.position.set(-1.0, 0.35, 0);
+        tail.rotation.z = 0.25;
+        foxGroup.add(tail);
+
+        const legs = new THREE.BoxGeometry(0.15, 0.3, 0.15);
+        const legOffsets = [ [0.4, 0, 0.2], [0.4, 0, -0.2], [-0.4, 0, 0.2], [-0.4, 0, -0.2] ];
+        legOffsets.forEach((p, i) => {
+            const leg = new THREE.Mesh(legs, black);
+            leg.position.set(p[0], 0.15, p[2]);
+            foxGroup.add(leg);
+        });
+
+        foxScene.add(foxGroup);
+        const ground = new THREE.Mesh(new THREE.CircleGeometry(3, 40), new THREE.MeshBasicMaterial({ color: 0x101010 }));
+        ground.rotation.x = -Math.PI / 2;
+        foxScene.add(ground);
+
+        const animateFox = function () {
+            if (!foxRenderer || !foxScene || !foxCamera) return;
+            foxGroup.rotation.y += 0.01;
+            foxGroup.position.y = 0.05 + Math.sin(Date.now() / 500) * 0.02;
+            foxRenderer.render(foxScene, foxCamera);
+            foxAnimHandle = requestAnimationFrame(animateFox);
         };
+        animateFox();
+
+        foxResizeHandler = function () { resizeFoxLab(holder); };
+        window.addEventListener('resize', foxResizeHandler);
+        resizeFoxLab(holder);
     });
 }
 
-// PLAYGROUND
-window.runPlayground = function () {
-    const code = document.getElementById('code-in').value;
-    const out = document.getElementById('code-out');
-    try {
-        const res = eval(code);
-        out.innerText = ">> " + res;
-        playSfx(600);
-    } catch (e) {
-        out.innerText = "!! " + e.message;
-        out.style.color = 'red';
-        playSfx(100, 'sawtooth');
+function renderPlaygroundFilesList() {
+    const list = document.getElementById('pg-files');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!playgroundFiles.length) {
+        const e = document.createElement('div');
+        e.className = 'fs-empty';
+        e.innerText = 'No files yet';
+        list.appendChild(e);
+        return;
     }
+    playgroundFiles.forEach(f => {
+        const b = document.createElement('button');
+        b.className = 'fs-item ' + (f.id === playgroundCurrentFileId ? 'active' : '');
+        b.innerText = f.name;
+        b.onclick = function () { playgroundCurrentFileId = f.id; fillPlaygroundEditor(); };
+        list.appendChild(b);
+    });
+}
+
+function fillPlaygroundEditor() {
+    if (!playgroundFiles.length) return;
+    const editor = document.getElementById('pg-file-content');
+    const nameInput = document.getElementById('pg-file-name');
+    const header = document.getElementById('pg-file-heading');
+    const current = playgroundFiles.find(f => f.id === playgroundCurrentFileId) || playgroundFiles[0];
+    playgroundCurrentFileId = current.id;
+    if (editor) editor.value = current.content || '';
+    if (nameInput) nameInput.value = current.name || current.id;
+    if (header) header.innerText = current.name;
+    renderPlaygroundFilesList();
+}
+
+function newPlaygroundFile() {
+    const id = 'note-' + Date.now();
+    playgroundFiles.push({ id: id, name: 'note.txt', content: '' });
+    playgroundCurrentFileId = id;
+    savePlaygroundFiles();
+    fillPlaygroundEditor();
+}
+
+function saveCurrentPlaygroundFile() {
+    const editor = document.getElementById('pg-file-content');
+    const nameInput = document.getElementById('pg-file-name');
+    const current = playgroundFiles.find(f => f.id === playgroundCurrentFileId);
+    if (!current || !editor || !nameInput) return;
+    current.content = editor.value;
+    current.name = nameInput.value || current.name;
+    savePlaygroundFiles();
+    fillPlaygroundEditor();
+    showToast('File saved', 'success');
+}
+
+window.runPlayground = function () {
+    const codeBox = document.getElementById('code-in');
+    const out = document.getElementById('code-out');
+    if (!codeBox || !out) return;
+    out.style.color = '#0f0';
+    try {
+        // eslint-disable-next-line no-eval
+        const res = eval(codeBox.value);
+        out.innerText = '>> ' + res;
+    } catch (e) {
+        out.style.color = 'red';
+        out.innerText = '!! ' + e.message;
+    }
+};
+
+function submitPlaygroundCommand(evt) {
+    if (!evt || evt.key !== 'Enter') return;
+    evt.preventDefault();
+    const cmd = evt.target.value;
+    const codeBox = document.getElementById('code-in');
+    if (codeBox) codeBox.value = cmd;
+    runPlayground();
+    evt.target.value = '';
+}
+
+function renderPlaygroundPolygon() {
+    const main = document.querySelector('main');
+    if (main) {
+        if (!main.dataset.prevOverflow) main.dataset.prevOverflow = main.style.overflow || '';
+        main.style.overflow = 'hidden';
+        pcScrollCleanup = function () {
+            main.style.overflow = main.dataset.prevOverflow || '';
+            teardownFoxLab();
+        };
+    }
+
+    loadPlaygroundFiles();
+    if (!playgroundFiles.length) newPlaygroundFile();
+    if (!playgroundCurrentFileId && playgroundFiles.length) playgroundCurrentFileId = playgroundFiles[0].id;
+
+    const v = document.getElementById('view');
+    const platform = navigator.platform || 'unknown';
+    const cores = navigator.hardwareConcurrency || '?';
+    const mem = navigator.deviceMemory || '?';
+    const net = navigator.connection ? navigator.connection.downlink + 'Mbps' : 'n/a';
+    const themeActive = systemData.theme && systemData.theme.active ? systemData.theme.active : 'amber';
+
+    v.innerHTML = `<h2>PLAYGROUND_POLYGON</h2>
+    <div class="playground-shell">
+        <div class="playground-grid">
+            <section class="playground-panel">
+                <div class="panel-title">SYSTEM SNAPSHOT</div>
+                <div class="stat-row"><span>PLATFORM</span><strong>${platform}</strong></div>
+                <div class="stat-row"><span>CORES</span><strong>${cores}</strong></div>
+                <div class="stat-row"><span>RAM</span><strong>${mem} GB</strong></div>
+                <div class="stat-row"><span>NETWORK</span><strong>${navigator.onLine ? 'ONLINE' : 'OFFLINE'} / ${net}</strong></div>
+                <div class="panel-sub">Quick Toggles</div>
+                <div class="toggle-row"><label><input type="checkbox" id="pg-audio" checked> Sound FX</label><label><input type="checkbox" id="pg-grid" checked> Grid helpers</label></div>
+                <div class="panel-sub">Desktop Shortcuts</div>
+                <div class="desktop-icons">
+                    <button class="desktop-icon" onclick="fillPlaygroundEditor()">🗒️ Notes</button>
+                    <button class="desktop-icon" onclick="setupFoxLab()">🦊 Fox Lab</button>
+                    <button class="desktop-icon" onclick="document.getElementById('pg-lab-terminal').focus()">⌨️ Console</button>
+                </div>
+            </section>
+
+            <section class="playground-panel">
+                <div class="panel-title">FOX LAB (three.js)</div>
+                <div id="fox-lab" class="fox-stage"></div>
+                <div class="panel-note">Low-poly fox spins under dual lights. Resize-safe.</div>
+            </section>
+
+            <section class="playground-panel">
+                <div class="panel-title">JS CONSOLE</div>
+                <textarea id="code-in" class="playground-code" placeholder="console.log('Hello polygon')"></textarea>
+                <input id="pg-lab-terminal" class="playground-term" placeholder=":> type and press Enter" onkeydown="submitPlaygroundCommand(event)">
+                <div class="btn-row">
+                    <button class="btn" onclick="runPlayground()">RUN</button>
+                    <button class="btn" onclick="document.getElementById('code-out').innerText='>> cleared'">CLEAR</button>
+                </div>
+                <pre id="code-out" class="playground-output">>> ready</pre>
+                <div class="panel-title" style="margin-top:10px;">SENSOR HUD</div>
+                <div class="hud-grid">
+                    <div class="hud-card">Idle Saver: <strong>${systemData.screensavers.default || 'none'}</strong></div>
+                    <div class="hud-card">Theme: <strong>${themeActive}</strong></div>
+                    <div class="hud-card">Games: <strong>${(systemData.games || []).length}</strong></div>
+                    <div class="hud-card">Todos: <strong>${(systemData.todo || []).length}</strong></div>
+                </div>
+            </section>
+
+            <section class="playground-panel wide">
+                <div class="panel-title">FILE SYSTEM</div>
+                <div class="fs-manager">
+                    <div class="fs-sidebar" id="pg-files"></div>
+                    <div class="fs-editor">
+                        <div class="fs-header">
+                            <div id="pg-file-heading" class="fs-heading">notes</div>
+                            <div class="fs-actions">
+                                <input id="pg-file-name" class="fs-name" value="" />
+                                <button class="btn btn-sm" onclick="saveCurrentPlaygroundFile()">Save</button>
+                                <button class="btn btn-sm" onclick="newPlaygroundFile()">New</button>
+                            </div>
+                        </div>
+                        <textarea id="pg-file-content" class="fs-text"></textarea>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>`;
+
+    renderPlaygroundFilesList();
+    fillPlaygroundEditor();
+    setupFoxLab();
 }
 
 function generateFakeProcesses() {
