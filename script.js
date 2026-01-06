@@ -258,6 +258,8 @@ let lastQRMatrix = null;
 let lastQRFormat = 'png';
 let lastQRSize = 256;
 let lastQRText = '';
+let lastQRDataUrl = '';
+let lastQRSvgMarkup = '';
 let pcScrollCleanup = null;
 
 /** renderAsciiDraw - Рендерить інтерфейс малювання */
@@ -788,8 +790,18 @@ window.startScreensaver = function (previewType) {
     overlay.innerHTML = '<canvas id="screensaver-canvas"></canvas>';
     ssCanvas = overlay.querySelector('#screensaver-canvas');
     ssCtx = ssCanvas ? ssCanvas.getContext('2d') : null;
-    ssCanvas.width = window.innerWidth;
-    ssCanvas.height = window.innerHeight;
+    if (ssCanvas) {
+        ssCanvas.style.width = '100%';
+        ssCanvas.style.height = '100%';
+        const bounds = overlay.getBoundingClientRect();
+        ssCanvas.width = bounds.width || window.innerWidth;
+        ssCanvas.height = bounds.height || window.innerHeight;
+    }
+
+    if (!ssCanvas || !ssCtx) {
+        showToast('Screensaver canvas unavailable', 'error');
+        return;
+    }
 
     if (!ssCanvas || !ssCtx) {
         showToast('Screensaver canvas unavailable', 'error');
@@ -1561,7 +1573,7 @@ const mapUA_Start = { 'є': 'ye', 'ї': 'yi', 'й': 'y', 'ю': 'yu', 'я': 'ya' 
  */
 function doTranslit(dir) { if (dir === 'ua') { let src = document.getElementById('tr-ua').value; let out = ""; let temp = src.replace(/зг/g, "zgh").replace(/Зг/g, "Zgh").replace(/ЗГ/g, "ZGH"); for (let i = 0; i < temp.length; i++) { const c = temp[i]; const low = c.toLowerCase(); const isUp = c !== low; const isStart = (i === 0 || /[\s\n\t\.,!?]/.test(temp[i - 1])); let tr = ""; if (isStart && mapUA_Start[low]) tr = mapUA_Start[low]; else if (mapUA[low] !== undefined) tr = mapUA[low]; else tr = c; if (tr.length > 0) { if (isUp) { if (tr.length > 1 && temp[i + 1] && temp[i + 1] === temp[i + 1].toUpperCase()) tr = tr.toUpperCase(); else tr = tr.charAt(0).toUpperCase() + tr.slice(1); } } out += tr; } document.getElementById('tr-en').value = out; } else { let src = document.getElementById('tr-en').value; src = src.replace(/zgh/gi, "зг"); const revMapMulti = [{ k: 'shch', v: 'щ' }, { k: 'zh', v: 'ж' }, { k: 'kh', v: 'х' }, { k: 'ts', v: 'ц' }, { k: 'ch', v: 'ч' }, { k: 'sh', v: 'ш' }, { k: 'ye', v: 'є' }, { k: 'yi', v: 'ї' }, { k: 'yu', v: 'ю' }, { k: 'ya', v: 'я' }, { k: 'ia', v: 'я' }, { k: 'ie', v: 'є' }, { k: 'iu', v: 'ю' }]; for (let pair of revMapMulti) { const reg = new RegExp(pair.k, "gi"); src = src.replace(reg, (match) => { const isUp = match[0] === match[0].toUpperCase(); return isUp ? pair.v.toUpperCase() : pair.v; }); } const revMapSingle = { 'a': 'а', 'b': 'б', 'v': 'в', 'h': 'г', 'g': 'ґ', 'd': 'д', 'e': 'е', 'z': 'з', 'y': 'и', 'i': 'і', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф' }; let out = ""; for (let i = 0; i < src.length; i++) { const c = src[i]; const low = c.toLowerCase(); const isUp = c !== low; if (revMapSingle[low]) out += isUp ? revMapSingle[low].toUpperCase() : revMapSingle[low]; else out += c; } document.getElementById('tr-ua').value = out; } }
 
-// --- QR GENERATOR (VERSION 1-L, OFFLINE, PAGED UP TO 5KB) ---
+// --- QR GENERATOR (VERSION 1 OFFLINE FALLBACK + REMOTE SINGLE CODE) ---
 const qrEncoder = (() => {
     const gfExp = new Array(512);
     const gfLog = new Array(256);
@@ -1606,7 +1618,7 @@ const qrEncoder = (() => {
             ? Array.from(data)
             : Array.from(new TextEncoder().encode(data));
         const chunkLimit = 17;
-        if (bytes.length > chunkLimit) throw new Error('Chunk too long for offline QR page (17 bytes max).');
+        if (bytes.length > chunkLimit) throw new Error('Offline QR supports up to 17 bytes.');
         const bits = [];
         const pushBits = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
         pushBits(0b0100, 4); // Byte mode
@@ -1649,8 +1661,8 @@ const qrEncoder = (() => {
             for (let rowOffset = 0; rowOffset < size; rowOffset++) {
                 const row = upward ? size - 1 - rowOffset : rowOffset;
                 for (let dx = 0; dx < 2; dx++) {
+                    if (m[row][col - dx] !== null) continue;
                     const c = col - dx;
-                    if (m[row][c] !== null) continue;
                     const bit = bitIdx < dataBits.length ? dataBits[bitIdx++] : 0;
                     const masked = bit ^ ((row + c) % 2 === 0 ? 1 : 0);
                     m[row][c] = !!masked;
@@ -1670,9 +1682,6 @@ const qrEncoder = (() => {
 
     return { buildQRMatrix };
 })();
-
-let lastQRPages = [];
-let lastQRIndex = 0;
 
 function drawQRToCanvas(matrix, size, canvas) {
     const ctx = canvas.getContext('2d');
@@ -1704,7 +1713,7 @@ function matrixToSVG(matrix, size) {
 }
 
 function autoPreviewQR() { setTimeout(generateQR, 10); }
-function generateQR() {
+async function generateQR() {
     const txtEl = document.getElementById('qr-text');
     const sizeEl = document.getElementById('qr-size');
     const formatEl = document.getElementById('qr-format');
@@ -1712,90 +1721,99 @@ function generateQR() {
     const size = parseInt((sizeEl && sizeEl.value) ? sizeEl.value : '256');
     const format = formatEl && formatEl.value ? formatEl.value : 'png';
     lastQRFormat = format; lastQRSize = size; lastQRText = txt;
+    lastQRMatrix = null; lastQRDataUrl = ''; lastQRSvgMarkup = '';
+
     const info = document.getElementById('qr-page-info');
-    if (info) info.innerText = '';
-    if (!txt.trim()) { const canvas = document.getElementById('qr-canvas'); if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillText('Enter text', 10, 20); } return; }
+    if (info) info.innerText = 'SINGLE QR';
+    const prevBtn = document.querySelector('button[onclick="shiftQRPage(-1)"]');
+    const nextBtn = document.querySelector('button[onclick="shiftQRPage(1)"]');
+    [prevBtn, nextBtn].forEach(btn => { if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; } });
+
+    if (!txt.trim()) {
+        const canvas = document.getElementById('qr-canvas');
+        if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillText('Enter text', 10, 20); }
+        const svgBox = document.getElementById('qr-svg');
+        if (svgBox) svgBox.innerHTML = '';
+        return;
+    }
     const bytes = Array.from(new TextEncoder().encode(txt.trim()));
     const maxBytes = 5120;
-    if (bytes.length > maxBytes) {
-        showModal({ title: 'QR LIMIT', body: `Please keep QR content within ${maxBytes} bytes (~5KB).` });
-        return;
-    }
+    if (bytes.length > maxBytes) { showModal({ title: 'QR LIMIT', body: `Please keep QR content within ${maxBytes} bytes (~5KB).` }); return; }
 
-    const chunkSize = 17;
-    const chunked = [];
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-        const slice = bytes.slice(i, i + chunkSize);
-        chunked.push(slice);
-    }
-
-    lastQRPages = [];
-    lastQRIndex = 0;
-    try {
-        chunked.forEach((chunk) => {
-            lastQRPages.push(qrEncoder.buildQRMatrix(chunk));
-        });
-        lastQRMatrix = lastQRPages[0];
-    } catch (e) {
-        showModal({ title: 'QR ERROR', body: e.message || 'Unable to build QR' });
-        return;
-    }
-
-    renderQRPage(size, format);
-}
-
-function renderQRPage(size, format) {
-    if (!lastQRPages.length) return;
-    if (lastQRIndex >= lastQRPages.length) lastQRIndex = lastQRPages.length - 1;
-    if (lastQRIndex < 0) lastQRIndex = 0;
-    lastQRMatrix = lastQRPages[lastQRIndex];
     const canvas = document.getElementById('qr-canvas');
     const svgBox = document.getElementById('qr-svg');
-    if (canvas) drawQRToCanvas(lastQRMatrix, size, canvas);
-    if (svgBox) {
-        if (format === 'svg') {
-            svgBox.style.display = 'block';
-            canvas.style.display = 'none';
-            svgBox.innerHTML = matrixToSVG(lastQRMatrix, size);
-        } else {
-            svgBox.style.display = 'none';
-            canvas.style.display = 'block';
-            svgBox.innerHTML = '';
+    const offlineCap = 17;
+    if (bytes.length <= offlineCap) {
+        try {
+            lastQRMatrix = qrEncoder.buildQRMatrix(bytes);
+            if (format === 'svg') {
+                const svg = matrixToSVG(lastQRMatrix, size);
+                lastQRSvgMarkup = svg;
+                if (svgBox) { svgBox.style.display = 'block'; if (canvas) canvas.style.display = 'none'; svgBox.innerHTML = svg; }
+            } else if (canvas) {
+                drawQRToCanvas(lastQRMatrix, size, canvas);
+                lastQRDataUrl = canvas.toDataURL('image/png');
+                canvas.style.display = 'block';
+                if (svgBox) { svgBox.innerHTML = ''; svgBox.style.display = 'none'; }
+            }
+            return;
+        } catch (e) {
+            showModal({ title: 'QR ERROR', body: e && e.message ? e.message : 'Unable to build offline QR' });
         }
     }
-    const info = document.getElementById('qr-page-info');
-    if (info) info.innerText = lastQRPages.length > 1 ? `PAGE ${lastQRIndex + 1} / ${lastQRPages.length}` : 'SINGLE QR';
+
+    const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(txt)}&size=${size}&format=${format === 'svg' ? 'svg' : 'png'}`;
+    try {
+        if (format === 'svg') {
+            const res = await fetch(qrUrl);
+            if (!res || !res.ok) throw new Error('QR request failed');
+            const markup = await res.text();
+            lastQRSvgMarkup = markup;
+            if (svgBox) {
+                svgBox.style.display = 'block';
+                if (canvas) canvas.style.display = 'none';
+                svgBox.innerHTML = markup;
+            }
+        } else {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise((resolve, reject) => { img.onload = () => resolve(true); img.onerror = () => reject(new Error('QR image load failed')); img.src = qrUrl; });
+            if (canvas) {
+                canvas.width = size; canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+                ctx.drawImage(img, 0, 0, size, size);
+                lastQRDataUrl = canvas.toDataURL('image/png');
+                canvas.style.display = 'block';
+                if (svgBox) { svgBox.innerHTML = ''; svgBox.style.display = 'none'; }
+            }
+        }
+    } catch (e) {
+        showModal({ title: 'QR ERROR', body: e && e.message ? e.message : 'Unable to build QR' });
+    }
 }
 
 function downloadQR() {
-    if (!lastQRMatrix || !lastQRText.trim()) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
+    if (!lastQRText.trim()) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
     if (lastQRFormat === 'svg') {
-        const svg = matrixToSVG(lastQRMatrix, lastQRSize);
+        let svg = lastQRSvgMarkup;
+        if (!svg && lastQRMatrix) svg = matrixToSVG(lastQRMatrix, lastQRSize);
+        if (!svg) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
         const blob = new Blob([svg], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        const suffix = lastQRPages.length > 1 ? `-${lastQRIndex + 1}` : '';
-        a.href = url; a.download = `qr${suffix}.svg`; a.click(); URL.revokeObjectURL(url);
+        a.href = url; a.download = 'qr.svg'; a.click(); URL.revokeObjectURL(url);
     } else {
         const canvas = document.getElementById('qr-canvas');
-        drawQRToCanvas(lastQRMatrix, lastQRSize, canvas);
-        canvas.toBlob((blob) => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const suffix = lastQRPages.length > 1 ? `-${lastQRIndex + 1}` : '';
-            a.href = url; a.download = `qr${suffix}.png`; a.click(); URL.revokeObjectURL(url);
-        });
+        if (!canvas) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
+        if (lastQRMatrix) drawQRToCanvas(lastQRMatrix, lastQRSize, canvas);
+        if (!lastQRDataUrl) lastQRDataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = lastQRDataUrl; a.download = 'qr.png'; a.click();
     }
 }
 
-function shiftQRPage(dir) {
-    if (!lastQRPages.length) return;
-    lastQRIndex += dir;
-    if (lastQRIndex < 0) lastQRIndex = 0;
-    if (lastQRIndex >= lastQRPages.length) lastQRIndex = lastQRPages.length - 1;
-    renderQRPage(lastQRSize, lastQRFormat);
-}
-
+function shiftQRPage() { return; }
 // --- CRYPTO HELPER ---
 /**
  * hashPass - Генерує SHA-256 хеш рядка
