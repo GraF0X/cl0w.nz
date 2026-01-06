@@ -1764,7 +1764,7 @@
             overflow: hidden;
         }
 
-        .pg-window-wide { width: 620px; }
+        .pg-window-wide { width: 780px; }
 
         .pg-titlebar {
             display: flex;
@@ -1825,7 +1825,7 @@
             font-size: 0.9rem;
         }
 
-        .pg-three { gap: 12px; }
+        .pg-three { gap: 12px; display: grid; grid-template-columns: 1.2fr 1fr; align-items: flex-start; }
         .pg-fox-shell { display: flex; flex-direction: column; gap: 8px; }
         .pg-three-demos { display: flex; flex-direction: column; gap: 8px; }
         .pg-demo-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1839,7 +1839,7 @@
 
         .pg-demo-frame iframe {
             width: 100%;
-            height: 240px;
+            height: 200px;
             border: none;
             background: #000;
         }
@@ -1855,7 +1855,7 @@
 
         .fox-stage {
             width: 100%;
-            height: 220px;
+            height: 180px;
             border: 2px inset #fff;
             background: radial-gradient(circle at 20% 20%, rgba(255, 176, 0, 0.2), transparent 60%),
                 radial-gradient(circle at 80% 30%, rgba(0, 255, 65, 0.15), transparent 60%),
