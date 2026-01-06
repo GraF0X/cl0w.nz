@@ -1118,6 +1118,119 @@
             background: #000;
         }
 
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
         .saver-action-buttons { display: flex; gap: 8px; }
 
         .gallery-grid {
@@ -1699,41 +1812,99 @@
             flex-direction: column;
         }
 
-        /* PLAYGROUND POLYGON */
-        .playground-shell {
-            height: calc(100vh - 220px);
-            min-height: 520px;
-            overflow: hidden;
-            border: 1px dashed var(--dim);
+        /* PLAYGROUND POLYGON — Windows 98 vibe */
+        .win98-desktop {
+            background: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05) 8px, transparent 8px, transparent 16px), #008080;
+            border: 2px solid var(--dim);
             padding: 12px;
-        }
-
-        .playground-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 12px;
-            height: 100%;
-        }
-
-        .playground-panel {
-            border: 1px solid var(--dim);
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.25);
+            min-height: calc(100vh - 220px);
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
             overflow: hidden;
         }
 
-        .playground-panel.wide {
+        .win98-icons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .win98-shortcut {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            width: 96px;
+            padding: 8px 6px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px outset #fff;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.8rem;
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+        }
+
+        .win98-shortcut:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .shortcut-icon {
+            font-size: 1.4rem;
+        }
+
+        .win98-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            grid-auto-rows: minmax(220px, auto);
+            gap: 12px;
+            padding: 8px;
+            background: #9ea1a5;
+            border: 2px inset #fff;
+            overflow: auto;
+        }
+
+        .win98-window {
+            background: #c0c0c0;
+            border: 2px outset #fff;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .win98-window.wide {
             grid-column: span 2;
         }
 
-        .panel-title {
+        .win98-titlebar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            background: linear-gradient(180deg, #000080, #0a2c8c);
+            color: #fff;
             font-weight: bold;
             letter-spacing: 0.5px;
-            border-bottom: 1px dashed var(--dim);
-            padding-bottom: 4px;
+        }
+
+        .win98-controls span {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 0 4px;
+            border: 1px solid #b0b0b0;
+            background: #dcdcdc;
+            color: #000;
+        }
+
+        .win98-body {
+            padding: 10px;
+            background: #efefef;
+            color: #111;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .panel-sub {
@@ -1757,32 +1928,26 @@
             font-size: 0.9rem;
         }
 
-        .desktop-icons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
+        .hud-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 6px;
         }
 
-        .desktop-icon {
-            border: 1px dashed var(--dim);
-            background: rgba(255, 255, 255, 0.04);
-            color: var(--text);
-            padding: 6px 10px;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-
-        .desktop-icon:hover {
-            border-color: var(--text);
+        .hud-card {
+            border: 1px solid #9a9a9a;
+            background: #dcdcdc;
+            padding: 6px 8px;
+            font-size: 0.85rem;
         }
 
         .fox-stage {
             width: 100%;
             height: 220px;
-            border: 1px dashed var(--dim);
-            background: radial-gradient(circle at 20% 20%, rgba(255, 176, 0, 0.05), transparent 60%),
-                radial-gradient(circle at 80% 30%, rgba(0, 255, 65, 0.05), transparent 60%),
-                rgba(0, 0, 0, 0.2);
+            border: 2px inset #fff;
+            background: radial-gradient(circle at 20% 20%, rgba(255, 176, 0, 0.2), transparent 60%),
+                radial-gradient(circle at 80% 30%, rgba(0, 255, 65, 0.15), transparent 60%),
+                #1a1a1a;
         }
 
         .panel-note {
@@ -1793,9 +1958,9 @@
         .playground-code {
             width: 100%;
             min-height: 70px;
-            border: 1px dashed var(--dim);
-            background: rgba(0, 0, 0, 0.3);
-            color: var(--text);
+            border: 2px inset #fff;
+            background: #000;
+            color: #0f0;
             padding: 8px;
             font-family: 'JetBrains Mono', monospace;
         }
@@ -1803,18 +1968,18 @@
         .playground-term {
             width: 100%;
             margin-top: 6px;
-            border: 1px solid var(--dim);
+            border: 2px inset #fff;
             padding: 6px 8px;
-            background: rgba(0, 0, 0, 0.25);
-            color: var(--text);
+            background: #222;
+            color: #0f0;
             font-family: 'JetBrains Mono', monospace;
         }
 
         .playground-output {
-            border: 1px dashed var(--dim);
+            border: 2px inset #fff;
             padding: 8px;
             min-height: 60px;
-            background: rgba(0, 0, 0, 0.25);
+            background: #000;
             color: #0f0;
             font-family: 'JetBrains Mono', monospace;
             overflow: auto;
@@ -1826,18 +1991,37 @@
             margin-top: 6px;
         }
 
-        .hud-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 6px;
+        .win98-taskbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 8px;
+            background: #c0c0c0;
+            border: 2px outset #fff;
+            color: #000;
         }
 
-        .hud-card {
-            border: 1px dashed var(--dim);
-            padding: 8px;
-            font-size: 0.9rem;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 6px;
+        .start-btn {
+            background: #dcdcdc;
+            border: 2px outset #fff;
+            padding: 4px 10px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .task-label {
+            flex: 1;
+            padding: 4px 8px;
+            border: 2px inset #fff;
+            background: #e8e8e8;
+        }
+
+        .task-clock {
+            border: 2px inset #fff;
+            padding: 4px 8px;
+            background: #e8e8e8;
+            min-width: 96px;
+            text-align: center;
         }
 
         .fs-manager {
