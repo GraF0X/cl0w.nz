@@ -10,6 +10,14 @@ const HELP_CONTENT = {
     }
 };
 
+const ADM_SAVER_TYPES = [
+    { id: 'matrix', name: 'Matrix Rain' },
+    { id: 'fire', name: 'Pixel Fire' },
+    { id: 'pipes', name: 'Pipes' },
+    { id: 'dvd', name: 'DVD' },
+    { id: 'trees', name: 'Fractal Trees' }
+];
+
 window.currentHelpContext = null;  // Поточний контекст довідки
 window.currentHelpLang = 'ua';      // Поточна мова довідки
 
@@ -115,6 +123,7 @@ function renderAdminDash(section) {
                         <div style="border-bottom:1px solid var(--dim);padding-bottom:10px;margin-bottom:10px;">
                             <button class="btn ${section === 'gallery' ? 'active' : ''}" onclick="renderAdminDash('gallery')">GALLERY</button>
                             <button class="btn ${section === 'games' ? 'active' : ''}" onclick="renderAdminDash('games')">GAMES</button>
+                            <button class="btn ${section === 'saver' ? 'active' : ''}" onclick="renderAdminDash('saver')">SAVER</button>
                         </div>
                         <div style="border-bottom:1px solid var(--dim);padding-bottom:10px;margin-bottom:10px;">
                             <button class="btn ${section === 'links' ? 'active' : ''}" onclick="renderAdminDash('links')">CONTACTS</button>
@@ -185,12 +194,46 @@ function loadAdminEditor(sec) {
         el.innerHTML = `<h3>Todo List Manager</h3>
                 <div style="margin-bottom:20px; border:1px solid var(--dim); padding:10px;">
                     <label class="opt-check" style="display:flex; align-items:center; gap:10px; cursor:pointer;">
-                        <input type="checkbox" id="adm-todo-editable" ${systemData.todoEditable ? 'checked' : ''} onchange="saveTodoSettings()"> 
+                        <input type="checkbox" id="adm-todo-editable" ${systemData.todoEditable ? 'checked' : ''} onchange="saveTodoSettings()">
                         <span><b>Allow User edit ToDo (Дозволити користувачам редагувати список)</b></span>
                     </label>
                 </div>
-                <div class="todo-input-group"><input type="text" id="adm-new-todo" class="todo-input" placeholder="Admin task..." onkeypress="if(event.key==='Enter') addAdminTodo()"><button class="btn" onclick="addAdminTodo()">ADD</button></div><div class="item-list" id="adm-todo-list"></div>`;
+                <div class="todo-input-group" style="flex-wrap:wrap; gap:8px; align-items:flex-end;">
+                    <input type="text" id="adm-new-todo" class="todo-input" placeholder="Admin task..." onkeypress="if(event.key==='Enter') addAdminTodo()" style="flex:1; min-width:200px;">
+                    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
+                        <span>Due Date</span>
+                        <input type="date" id="adm-new-todo-date" class="todo-input" style="max-width:180px;">
+                    </label>
+                    <label style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem;">
+                        <span>Time</span>
+                        <input type="time" id="adm-new-todo-time" class="todo-input" style="max-width:140px;">
+                    </label>
+                    <button class="btn" onclick="addAdminTodo()">ADD</button>
+                </div>
+                <div class="item-list" id="adm-todo-list"></div>`;
         renderAdminTodo();
+    } else if (sec === 'saver') {
+        ensureSaverData();
+        const timeout = systemData.screensaver.timeout || 60;
+        el.innerHTML = `<h3>Screensaver Manager</h3>
+            <div class="form-group" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:10px; align-items:center;">
+                <label class="opt-check"><input type="checkbox" id="adm-saver-enabled" ${systemData.screensaver.enabled !== false ? 'checked' : ''}> Enable idle trigger</label>
+                <label style="display:flex; flex-direction:column; gap:4px; font-size:0.9rem;">Timeout (seconds)
+                    <input type="number" id="adm-saver-timeout" class="form-control" min="10" max="600" value="${timeout}">
+                </label>
+            </div>
+            <div class="item-list" id="adm-saver-list"></div>
+            <div class="form-group" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:8px;">
+                <input class="form-control" id="adm-saver-name" placeholder="Name e.g. Matrix">
+                <input class="form-control" id="adm-saver-desc" placeholder="Description">
+                <select class="form-control" id="adm-saver-id">${ADM_SAVER_TYPES.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+                <button class="btn" onclick="addSaverEntry()">+ ADD</button>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-green" onclick="saveSaverSettings()">APPLY</button>
+                <button class="btn" onclick="renderAdminDash('saver')">RESET</button>
+            </div>`;
+        renderAdminSaverList();
     } else if (sec === 'gallery') {
         el.innerHTML = `<h3>Manage Gallery (Images)</h3><div class="form-group"><label class="form-label">Upload Image:</label><input type="file" id="adm-img-upload" accept="image/*" class="form-control"></div><div class="form-group"><label class="form-label">Name:</label><input class="form-control" id="adm-img-name" placeholder="IMG_NAME"></div><button class="btn btn-green" onclick="uploadImage()">UPLOAD</button><hr><div class="item-list" id="adm-gal-list"></div>
                  <hr><h3>Manage ASCII Art</h3><div class="form-group"><label class="form-label">New ASCII Name:</label><input class="form-control" id="adm-asc-name" placeholder="ASCII_NAME"></div><div class="form-group"><label class="form-label">ASCII Content:</label><textarea class="form-control" id="adm-asc-content" style="font-family:monospace; height:100px;"></textarea></div><button class="btn btn-green" onclick="addAscii()">ADD ASCII</button><div class="item-list" id="adm-asc-list" style="margin-top:10px;"></div>`;
@@ -429,6 +472,20 @@ window.saveJob = function (i) { const j = systemData.resume.jobs[i]; j.co = docu
 
 // --- EDUCATION ---
 /** renderAdminEdu - Рендерить список освіти */
+window.renderAdminEdu = function () {
+    const l = document.getElementById('adm-edu-list');
+    if (!l) return;
+
+    const education = (systemData.resume && Array.isArray(systemData.resume.education)) ? systemData.resume.education : [];
+    if (!education.length) {
+        l.innerHTML = '<div class="item-row" style="opacity:0.6;">No education records</div>';
+        return;
+    }
+
+    l.innerHTML = education.map((e, i) =>
+        `<div class="item-row"><span>${e.inst || 'Institution'}</span> <div><button class="btn btn-sm" onclick="editEdu(${i})">EDIT</button> <button class="btn btn-red btn-sm" onclick="delEdu(${i})">DEL</button></div></div>`
+    ).join('');
+};
 window.addEdu = function () { systemData.resume.education.unshift({ inst: "University", year: "2020-2024", deg: "Degree" }); saveData(); renderAdminEdu(); editEdu(0); }
 window.delEdu = function (i) { if (confirm("Delete?")) { systemData.resume.education.splice(i, 1); saveData(); renderAdminEdu(); document.getElementById('edu-editor-area').style.display = 'none'; } }
 window.editEdu = function (i) { const e = systemData.resume.education[i]; const area = document.getElementById('edu-editor-area'); area.style.display = 'block'; area.innerHTML = `<h4>Editing: ${e.inst}</h4><div class="form-group"><label>Institution:</label><input class="form-control" id="ee-inst" value="${e.inst}"></div><div class="form-group"><label>Year:</label><input class="form-control" id="ee-year" value="${e.year}"></div><div class="form-group"><label>Degree:</label><input class="form-control" id="ee-deg" value="${e.deg}"></div><button class="btn btn-green" onclick="saveEdu(${i})">SAVE EDU</button> <button class="btn" onclick="document.getElementById('edu-editor-area').style.display='none'">CLOSE</button>`; }
@@ -525,11 +582,130 @@ window.delBlog = function (i) { if (confirm("Delete?")) { systemData.blog.splice
 
 /** renderAdminTodo - Рендерить список завдань */
 // TODO
-window.renderAdminTodo = function () { const l = document.getElementById('adm-todo-list'); l.innerHTML = systemData.todos.map((t, i) => `<div class="item-row" style="${t.d ? 'opacity:0.5' : ''}"><span><input type="checkbox" ${t.d ? 'checked' : ''} onchange="toggleTodo(${i})"> ${t.t}</span><button class="btn btn-red btn-sm" onclick="delTodo(${i})">DEL</button></div>`).join(''); }
-window.addAdminTodo = function () { const inp = document.getElementById('adm-new-todo'); if (inp.value.trim()) { systemData.todos.push({ t: inp.value.trim(), d: false }); saveData(); renderAdminTodo(); inp.value = ''; } }
+window.renderAdminTodo = function () {
+    const l = document.getElementById('adm-todo-list');
+    const rows = systemData.todos.map((t, i) => {
+        const dueVal = t.due ? t.due : '';
+        const timeVal = t.time ? t.time : '';
+        return `<div class="item-row" style="gap:10px; align-items:center; ${t.d ? 'opacity:0.6' : ''}">
+            <input type="checkbox" ${t.d ? 'checked' : ''} onchange="toggleTodo(${i})" aria-label="Mark done">
+            <input type="text" class="form-control" style="flex:1;" value="${t.t}" onchange="editAdminTodo(${i}, 't', this.value)">
+            <input type="date" class="form-control" style="max-width:170px;" value="${dueVal}" onchange="editAdminTodo(${i}, 'due', this.value)">
+            <input type="time" class="form-control" style="max-width:130px;" value="${timeVal}" onchange="editAdminTodo(${i}, 'time', this.value)">
+            <button class="btn btn-red btn-sm" onclick="delTodo(${i})">DEL</button>
+        </div>`;
+    });
+    l.innerHTML = rows.join('');
+};
+window.addAdminTodo = function () {
+    const inp = document.getElementById('adm-new-todo');
+    const date = document.getElementById('adm-new-todo-date');
+    const time = document.getElementById('adm-new-todo-time');
+    const title = inp && inp.value ? inp.value.trim() : '';
+    if (!title) return;
+    const item = { t: title, d: false };
+    if (date && date.value) item.due = date.value;
+    if (time && time.value) item.time = time.value;
+    systemData.todos.push(item);
+    saveData();
+    renderAdminTodo();
+    if (inp) inp.value = '';
+    if (date) date.value = '';
+    if (time) time.value = '';
+};
+window.editAdminTodo = function (i, key, value) {
+    if (!systemData.todos[i]) return;
+    if (key === 't') systemData.todos[i].t = value.trim();
+    if (key === 'due') systemData.todos[i].due = value ? value : undefined;
+    if (key === 'time') systemData.todos[i].time = value ? value : undefined;
+    saveData();
+};
 window.toggleTodo = function (i) { systemData.todos[i].d = !systemData.todos[i].d; saveData(); renderAdminTodo(); }
 window.delTodo = function (i) { systemData.todos.splice(i, 1); saveData(); renderAdminTodo(); }
 window.saveTodoSettings = function () { systemData.todoEditable = document.getElementById('adm-todo-editable').checked; saveData(); }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_SAVER - Screensaver config
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ensureSaverData() {
+    if (!systemData.screensaver) systemData.screensaver = JSON.parse(JSON.stringify(defaultData.screensaver));
+    if (!Array.isArray(systemData.screensaver.catalog)) systemData.screensaver.catalog = JSON.parse(JSON.stringify(defaultData.screensaver.catalog || ADM_SAVER_TYPES));
+    if (systemData.screensaver.catalog.length === 0) systemData.screensaver.catalog = JSON.parse(JSON.stringify(defaultData.screensaver.catalog || ADM_SAVER_TYPES));
+    if (!systemData.screensaver.type) systemData.screensaver.type = systemData.screensaver.catalog[0] ? systemData.screensaver.catalog[0].id : 'matrix';
+    if (typeof systemData.screensaver.enabled === 'undefined') systemData.screensaver.enabled = true;
+    if (!systemData.screensaver.timeout) systemData.screensaver.timeout = 60;
+}
+
+window.renderAdminSaverList = function () {
+    ensureSaverData();
+    const l = document.getElementById('adm-saver-list');
+    const rows = systemData.screensaver.catalog.map((s, i) => {
+        return `<div class="item-row" style="gap:8px; align-items:center;">
+            <label class="opt-check"><input type="radio" name="adm-saver-default" value="${s.id}" ${systemData.screensaver.type === s.id ? 'checked' : ''}> Default</label>
+            <input class="form-control" style="flex:1;" value="${s.name || ''}" onchange="updateSaverField(${i}, 'name', this.value)">
+            <input class="form-control" style="flex:1;" value="${s.desc || ''}" onchange="updateSaverField(${i}, 'desc', this.value)">
+            <select class="form-control" onchange="updateSaverField(${i}, 'id', this.value)">${ADM_SAVER_TYPES.map(t => `<option value="${t.id}" ${t.id === s.id ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
+            <button class="btn btn-red btn-sm" onclick="delSaver(${i})">DEL</button>
+        </div>`;
+    });
+    l.innerHTML = rows.join('');
+};
+
+window.updateSaverField = function (i, key, value) {
+    ensureSaverData();
+    if (!systemData.screensaver.catalog[i]) return;
+    if (key === 'id' && systemData.screensaver.catalog.some((s, idx) => s.id === value && idx !== i)) {
+        showToast('ID already exists', 'error');
+        return;
+    }
+    systemData.screensaver.catalog[i][key] = value;
+    saveData();
+};
+
+window.addSaverEntry = function () {
+    ensureSaverData();
+    const name = document.getElementById('adm-saver-name').value || 'New Saver';
+    const desc = document.getElementById('adm-saver-desc').value || '';
+    const idSel = document.getElementById('adm-saver-id');
+    const idVal = idSel && idSel.value ? idSel.value : 'matrix';
+    if (systemData.screensaver.catalog.find(s => s.id === idVal)) {
+        showToast('Saver with this ID already exists', 'error');
+        return;
+    }
+    systemData.screensaver.catalog.push({ id: idVal, name, desc });
+    saveData();
+    renderAdminSaverList();
+    document.getElementById('adm-saver-name').value = '';
+    document.getElementById('adm-saver-desc').value = '';
+};
+
+window.delSaver = function (i) {
+    ensureSaverData();
+    const target = systemData.screensaver.catalog[i];
+    systemData.screensaver.catalog.splice(i, 1);
+    if (target && systemData.screensaver.type === target.id) {
+        systemData.screensaver.type = systemData.screensaver.catalog[0] ? systemData.screensaver.catalog[0].id : 'matrix';
+    }
+    saveData();
+    renderAdminSaverList();
+};
+
+window.saveSaverSettings = function () {
+    ensureSaverData();
+    const timeout = document.getElementById('adm-saver-timeout');
+    const enabled = document.getElementById('adm-saver-enabled');
+    const defaultSel = document.querySelector('input[name="adm-saver-default"]:checked');
+    const tVal = timeout && timeout.value ? parseInt(timeout.value, 10) : 60;
+    systemData.screensaver.timeout = isNaN(tVal) ? 60 : Math.max(10, Math.min(600, tVal));
+    systemData.screensaver.enabled = enabled ? enabled.checked !== false : true;
+    if (defaultSel && systemData.screensaver.catalog.find(s => s.id === defaultSel.value)) {
+        systemData.screensaver.type = defaultSel.value;
+    }
+    saveData();
+    resetIdleTimer();
+    showToast('Screensaver settings saved', 'success');
+};
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_GALLERY - Галерея (фото + ASCII арт)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -593,11 +769,34 @@ window.renderAdminGameList = function () { const l = document.getElementById('ad
 /** createNewGame - Створює нову гру з шаблоном коду */
 window.createNewGame = function () { editingGameId = 'game_' + Date.now(); document.getElementById('game-editor-area').style.display = 'block'; document.getElementById('ge-heading').innerText = 'Creating New Game'; document.getElementById('ge-name').value = 'My New Game'; document.getElementById('ge-code').value = `// Game Code Here. \n// Container: document.getElementById('arena')\n\nconst arena = document.getElementById('arena');\narena.innerHTML = '<div style="padding:20px">Hello World</div>';`; }
 /** editGame - Відкриває редактор коду гри */
-window.editGame = function (id) { const g = systemData.games.find(x => x.id === id); if (!g) return; editingGameId = id; document.getElementById('game-editor-area').style.display = 'block'; document.getElementById('ge-heading').innerText = 'Editing: ' + g.name; document.getElementById('ge-name').value = g.name; document.getElementById('ge-code').value = g.code; }
+window.editGame = function (id) { const g = systemData.games.find(x => x.id === id); if (!g) return; editingGameId = id; document.getElementById('game-editor-area').style.display = 'block'; document.getElementById('ge-heading').innerText = 'Editing: ' + g.name; document.getElementById('ge-name').value = g.name; document.getElementById('ge-code').value = g.code || ''; document.getElementById('ge-name').focus(); }
 /** saveGameCode - Зберігає код гри */
-window.saveGameCode = function () { if (!editingGameId) return; const name = document.getElementById('ge-name').value; const code = document.getElementById('ge-code').value; const existingIndex = systemData.games.findIndex(x => x.id === editingGameId); if (existingIndex >= 0) { systemData.games[existingIndex].name = name; systemData.games[existingIndex].code = code; } else { systemData.games.push({ id: editingGameId, name: name, code: code }); } saveData(); renderAdminGameList(); alert("Game Saved!"); }
+window.saveGameCode = function () {
+    if (!editingGameId) return;
+    const name = document.getElementById('ge-name').value;
+    const code = document.getElementById('ge-code').value;
+    const existingIndex = systemData.games.findIndex(x => x.id === editingGameId);
+    if (existingIndex >= 0) {
+        systemData.games[existingIndex].name = name;
+        systemData.games[existingIndex].code = code;
+    } else {
+        systemData.games.push({ id: editingGameId, name: name, code: code });
+    }
+    saveData();
+    renderAdminGameList();
+    showToast('Game saved', 'success');
+};
 /** delGame - Видаляє гру */
-window.delGame = function (id) { if (confirm("Delete Game?")) { systemData.games = systemData.games.filter(x => x.id !== id); saveData(); renderAdminGameList(); closeGameEditor(); } }
+window.delGame = function (id) {
+    showConfirm('Delete this game?').then((ok) => {
+        if (!ok) return;
+        systemData.games = systemData.games.filter(x => x.id !== id);
+        saveData();
+        renderAdminGameList();
+        closeGameEditor();
+        showToast('Game removed', 'info');
+    });
+};
 /** closeGameEditor - Закриває редактор гри */
 window.closeGameEditor = function () { document.getElementById('game-editor-area').style.display = 'none'; editingGameId = null; }
 
