@@ -1,4 +1,4 @@
-// Three.js lab helpers isolated for Playground Polygon
+// Local demo lab helpers for Playground Polygon (no external deps)
 (function () {
     const examples = [
         { id: 'fox-local', label: 'Fox Lab (local)', type: 'fox' },
@@ -9,36 +9,11 @@
         { id: 'spot', label: 'Spotlight Lab (local)', type: 'spot' }
     ];
 
-    let foxRenderer = null;
-    let foxScene = null;
-    let foxCamera = null;
-    let foxGroup = null;
+    // Fox lab (canvas-based)
+    let foxCanvas = null;
+    let foxCtx = null;
     let foxAnimHandle = null;
     let foxResizeHandler = null;
-    let threeLoading = false;
-    let threeQueue = [];
-
-    function ensureThree(callback, onError) {
-        const fail = typeof onError === 'function' ? onError : function () { };
-        if (window.THREE) { callback(); return; }
-        threeQueue.push(callback);
-        if (threeLoading) return;
-        threeLoading = true;
-        const s = document.createElement('script');
-        s.src = 'https://unpkg.com/three@0.160.0/build/three.min.js';
-        s.onload = function () {
-            threeLoading = false;
-            const queue = threeQueue.slice();
-            threeQueue = [];
-            queue.forEach(fn => { if (typeof fn === 'function') fn(); });
-        };
-        s.onerror = function () {
-            threeLoading = false; threeQueue = [];
-            fail();
-            if (typeof showToast === 'function') showToast('Three.js failed to load', 'error');
-        };
-        document.head.appendChild(s);
-    }
 
     function teardownFoxLab() {
         if (foxResizeHandler) {
@@ -49,102 +24,101 @@
             cancelAnimationFrame(foxAnimHandle);
             foxAnimHandle = null;
         }
-        if (foxRenderer) {
-            foxRenderer.dispose();
-            foxRenderer = null;
-        }
-        foxScene = null; foxCamera = null; foxGroup = null;
+        foxCanvas = null;
+        foxCtx = null;
     }
 
-    function resizeFoxLab(container) {
-        if (!foxRenderer || !foxCamera || !container) return;
-        const w = container.clientWidth;
-        const h = container.clientHeight;
-        foxCamera.aspect = w / h;
-        foxCamera.updateProjectionMatrix();
-        foxRenderer.setSize(w, h);
+    function resizeFoxLab(holder) {
+        if (!foxCanvas || !holder) return;
+        foxCanvas.width = holder.clientWidth || 640;
+        foxCanvas.height = holder.clientHeight || 360;
+    }
+
+    function drawFoxScene(time, holder) {
+        if (!foxCtx || !foxCanvas) return;
+        const w = foxCanvas.width;
+        const h = foxCanvas.height;
+        foxCtx.clearRect(0, 0, w, h);
+        foxCtx.save();
+        foxCtx.translate(w / 2, h / 2 + 30);
+        const t = time * 0.001;
+        const wobble = Math.sin(t) * 0.1;
+        foxCtx.scale(1 + wobble * 0.2, 1 + wobble * 0.2);
+        foxCtx.rotate(Math.sin(t * 0.7) * 0.15);
+
+        const drawBox = (x, y, wBox, hBox, color) => {
+            foxCtx.fillStyle = color;
+            foxCtx.fillRect(x, y, wBox, hBox);
+        };
+
+        drawBox(-90, -40, 160, 70, '#f58a2c'); // body
+        drawBox(60, -30, 70, 55, '#f58a2c'); // head
+        drawBox(120, -15, 35, 30, '#111'); // nose
+        drawBox(-150, -10, 90, 25, '#f58a2c'); // tail base
+        drawBox(-65, -40, 20, 90, '#1a1a1a'); // leg 1
+        drawBox(-20, -40, 20, 90, '#1a1a1a'); // leg 2
+        drawBox(25, -40, 20, 90, '#1a1a1a'); // leg 3
+        drawBox(70, -40, 20, 90, '#1a1a1a'); // leg 4
+        drawBox(70, -65, 25, 25, '#fff'); // ear
+        drawBox(85, -65, 25, 25, '#fff'); // ear
+        drawBox(-170, -20, 45, 20, '#fff'); // tail tip
+
+        foxCtx.fillStyle = '#f0f0f0';
+        foxCtx.fillRect(52, -8, 14, 14);
+        foxCtx.fillRect(86, -8, 14, 14);
+        foxCtx.fillStyle = '#111';
+        foxCtx.fillRect(56, -4, 6, 6);
+        foxCtx.fillRect(90, -4, 6, 6);
+
+        foxCtx.restore();
+
+        foxCtx.save();
+        foxCtx.fillStyle = 'rgba(255,255,255,0.05)';
+        foxCtx.translate(w / 2, h / 2 + 80);
+        foxCtx.scale(1.4 + Math.sin(time / 400) * 0.05, 0.4);
+        foxCtx.beginPath();
+        foxCtx.arc(0, 0, 150, 0, Math.PI * 2);
+        foxCtx.fill();
+        foxCtx.restore();
+
+        foxAnimHandle = requestAnimationFrame((ts) => drawFoxScene(ts, holder));
     }
 
     function setupFoxLab() {
         const holder = document.getElementById('fox-stage');
         if (!holder) return;
-        holder.innerHTML = '<div class="fox-loading">Loading fox lab…</div>';
-        ensureThree(() => {
-            if (!holder) return;
-            teardownFoxLab();
-            const THREE = window.THREE;
-            if (!THREE) { holder.innerHTML = '<div class="fox-loading">Three.js unavailable</div>'; return; }
-            foxRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            foxRenderer.setPixelRatio(window.devicePixelRatio || 1);
-            foxRenderer.setSize(holder.clientWidth, holder.clientHeight);
-            holder.innerHTML = '';
-            holder.appendChild(foxRenderer.domElement);
+        teardownFoxLab();
+        foxCanvas = document.createElement('canvas');
+        foxCanvas.className = 'fox-canvas';
+        holder.innerHTML = '';
+        holder.appendChild(foxCanvas);
+        foxCtx = foxCanvas.getContext('2d');
+        resizeFoxLab(holder);
+        foxResizeHandler = function () { resizeFoxLab(holder); };
+        window.addEventListener('resize', foxResizeHandler);
+        foxAnimHandle = requestAnimationFrame((ts) => drawFoxScene(ts, holder));
+    }
 
-            foxScene = new THREE.Scene();
-            foxCamera = new THREE.PerspectiveCamera(50, holder.clientWidth / holder.clientHeight, 0.1, 100);
-            foxCamera.position.set(2, 1.4, 3);
+    // Demo builder (local canvas-based)
+    let currentDemoUrl = null;
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-            const spot = new THREE.DirectionalLight(0xffb000, 0.8);
-            spot.position.set(3, 4, 2);
-            foxScene.add(ambient);
-            foxScene.add(spot);
+    function buildDemoHtml(type) {
+        const baseStyles = `body,html{margin:0;width:100%;height:100%;background:#050505;color:#cfcfcf;font-family:monospace;overflow:hidden;}canvas{display:block;width:100%;height:100%;background:#040404;}`;
+        const script = `(() => {\n  const canvas=document.querySelector('canvas');\n  const ctx=canvas.getContext('2d');\n  function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}\n  window.addEventListener('resize',resize);\n  resize();\n  let t=0;\n  function loop(ts){t=ts*0.001;ctx.clearRect(0,0,canvas.width,canvas.height);${demoBody(type)}requestAnimationFrame(loop);}\n  requestAnimationFrame(loop);\n})();`;
+        return `<!doctype html><html><head><style>${baseStyles}</style></head><body><canvas></canvas><script>${script}<\/script></body></html>`;
+    }
 
-            foxGroup = new THREE.Group();
-            const orange = new THREE.MeshStandardMaterial({ color: 0xffa040, roughness: 0.6, metalness: 0.1 });
-            const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-            const black = new THREE.MeshStandardMaterial({ color: 0x111111 });
-
-            const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 0.6), orange);
-            body.position.set(0, 0.3, 0);
-            foxGroup.add(body);
-
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), orange);
-            head.position.set(0.9, 0.55, 0);
-            foxGroup.add(head);
-
-            const nose = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.2), black);
-            nose.position.set(1.3, 0.45, 0);
-            foxGroup.add(nose);
-
-            const earL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.1), white);
-            earL.position.set(0.75, 0.85, 0.2);
-            const earR = earL.clone(); earR.position.z = -0.2;
-            foxGroup.add(earL); foxGroup.add(earR);
-
-            const tail = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.2), orange);
-            tail.position.set(-1.0, 0.35, 0);
-            tail.rotation.z = 0.25;
-            foxGroup.add(tail);
-
-            const legs = new THREE.BoxGeometry(0.15, 0.3, 0.15);
-            const legOffsets = [ [0.4, 0, 0.2], [0.4, 0, -0.2], [-0.4, 0, 0.2], [-0.4, 0, -0.2] ];
-            legOffsets.forEach((p) => {
-                const leg = new THREE.Mesh(legs, black);
-                leg.position.set(p[0], 0.15, p[2]);
-                foxGroup.add(leg);
-            });
-
-            foxScene.add(foxGroup);
-            const ground = new THREE.Mesh(new THREE.CircleGeometry(3, 40), new THREE.MeshBasicMaterial({ color: 0x101010 }));
-            ground.rotation.x = -Math.PI / 2;
-            foxScene.add(ground);
-
-            const animateFox = function () {
-                if (!foxRenderer || !foxScene || !foxCamera) return;
-                foxGroup.rotation.y += 0.01;
-                foxGroup.position.y = 0.05 + Math.sin(Date.now() / 500) * 0.02;
-                foxRenderer.render(foxScene, foxCamera);
-                foxAnimHandle = requestAnimationFrame(animateFox);
-            };
-            animateFox();
-
-            foxResizeHandler = function () { resizeFoxLab(holder); };
-            window.addEventListener('resize', foxResizeHandler);
-            resizeFoxLab(holder);
-        }, () => {
-            if (holder) holder.innerHTML = '<div class="fox-loading">Fox lab failed to load</div>';
-        });
+    function demoBody(type) {
+        const common = `ctx.save();ctx.translate(canvas.width/2,canvas.height/2);`;
+        const end = `ctx.restore();`;
+        const bodies = {
+            transmission: `${common}const r=140+Math.sin(t*2)*20;const g=ctx.createRadialGradient(0,0,10,0,0,r);g.addColorStop(0,'rgba(136,199,255,0.7)');g.addColorStop(1,'rgba(15,15,25,0.1)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='rgba(180,220,255,0.6)';ctx.stroke();${end}`,
+            toon: `${common}for(let i=0;i<14;i++){ctx.save();ctx.rotate(t*0.8+i*0.45);ctx.fillStyle=i%2?'#ff8844':'#2c1a0f';ctx.fillRect(60, -14, 140, 28);ctx.restore();}${end}`,
+            pixel: `${common}const size=18;for(let x=-8;x<=8;x++){for(let y=-8;y<=8;y++){const fx=Math.sin(t+x*0.3+y*0.2);const fy=Math.cos(t*1.3+x*0.25);const c=Math.floor((fx+fy+2)/4*255);ctx.fillStyle='rgb('+c+','+(120+c/2)+','+(80+c/3)+')';ctx.fillRect(x*size+Math.sin(t+x*0.2)*6,y*size+Math.cos(t+y*0.25)*6,size,size);}}${end}`,
+            'md2-lite': `${common}for(let i=0;i<6;i++){ctx.save();ctx.translate(-160+i*60,Math.sin(t+i)*12);ctx.fillStyle=i%2?'#6bf0a7':'#f06b6b';ctx.fillRect(-10,-40,20,40);ctx.fillRect(-18,-60,36,18);ctx.fillRect(-6,0,12,34);ctx.fillRect(-12,28,24,14);ctx.restore();}${end}`,
+            spot: `${common}ctx.fillStyle='#0a0a0a';ctx.fillRect(-260,-160,520,320);const bx=Math.sin(t)*80;const by=Math.cos(t*0.6)*40;const grd=ctx.createRadialGradient(bx,by,10,bx,by,200);grd.addColorStop(0,'rgba(255,221,136,0.8)');grd.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=grd;ctx.fillRect(-260,-160,520,320);ctx.fillStyle='#44aaff';ctx.beginPath();ctx.arc(bx*0.3,by*0.4,50,0,Math.PI*2);ctx.fill();${end}`
+        };
+        return bodies[type] || `${common}ctx.fillStyle='#66ccff';ctx.beginPath();ctx.arc(0,0,120,0,Math.PI*2);ctx.fill();${end}`;
     }
 
     function loadThreeExample(id) {
@@ -154,14 +128,19 @@
         const demo = examples.find(d => d.id === id);
         if (!demo) { status.innerText = 'Demo unavailable'; return; }
         if (id === 'fox-local') {
+            if (currentDemoUrl) { URL.revokeObjectURL(currentDemoUrl); currentDemoUrl = null; }
             frame.src = '';
-            status.innerText = 'Fox lab runs locally above; remote iframe cleared.';
+            status.innerText = 'Fox lab runs locally above; inline demo cleared.';
             return;
         }
         status.innerText = 'Loading ' + demo.label + '...';
-        frame.src = demo.url;
+        const html = buildDemoHtml(demo.type);
+        const blob = new Blob([html], { type: 'text/html' });
+        if (currentDemoUrl) URL.revokeObjectURL(currentDemoUrl);
+        currentDemoUrl = URL.createObjectURL(blob);
+        frame.src = currentDemoUrl;
         frame.onload = function () { status.innerText = 'Loaded: ' + demo.label; };
-        frame.onerror = function () { status.innerText = 'Unable to load demo (offline?)'; };
+        frame.onerror = function () { status.innerText = 'Unable to load local demo'; };
     }
 
     window.threeLab = {
