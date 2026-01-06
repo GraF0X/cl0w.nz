@@ -223,6 +223,22 @@ function loadAdminEditor(sec) {
                 </label>
             </div>
             <div class="item-list" id="adm-saver-list"></div>
+            <div id="saver-editor-area" style="display:none; border:1px solid var(--dim); padding:10px; margin:12px 0;">
+                <h4 id="saver-editor-heading">Edit saver</h4>
+                <div class="form-group" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:8px;">
+                    <input class="form-control" id="adm-saver-edit-name" placeholder="Name">
+                    <input class="form-control" id="adm-saver-edit-desc" placeholder="Description">
+                    <select class="form-control" id="adm-saver-edit-id">${ADM_SAVER_TYPES.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Canvas script (function(canvas, ctx, requestFrame, isActive, isPreview)):</label>
+                    <textarea class="form-control code-block" id="adm-saver-code" style="height:180px; font-family:monospace;"></textarea>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-green" onclick="saveSaverEdit()">SAVE</button>
+                    <button class="btn" onclick="closeSaverEditor()">CLOSE</button>
+                </div>
+            </div>
             <div class="form-group" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:8px;">
                 <input class="form-control" id="adm-saver-name" placeholder="Name e.g. Matrix">
                 <input class="form-control" id="adm-saver-desc" placeholder="Description">
@@ -348,6 +364,25 @@ function loadAdminEditor(sec) {
                     <select id="adm-trigger-theme" class="form-control" onchange="setAdminTriggerTheme(this.value)">
                         ${[...themesList, ...systemData.themes.custom].map(t => `<option value="${t.id}" ${systemData.themes.adminTriggerTheme === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}
                     </select>
+                </div>
+                <div class="form-group" style="border:1px solid var(--text); padding:10px; margin-bottom:15px;">
+                    <h4>Effects, Icons & Fonts</h4>
+                    <div class="theme-toggle-row" style="flex-wrap:wrap; gap:10px;">
+                        <label class="opt-check"><input type="checkbox" id="adm-fx-glow" ${systemData.effects.glow ? 'checked' : ''}> Glow</label>
+                        <label class="opt-check"><input type="checkbox" id="adm-fx-flicker" ${systemData.effects.flicker ? 'checked' : ''}> Flicker</label>
+                        <label class="opt-check"><input type="checkbox" id="adm-fx-scan" ${systemData.effects.scanline ? 'checked' : ''}> Scanlines</label>
+                        <label class="opt-check"><input type="checkbox" id="adm-fx-svg" ${systemData.effects.svgGlow !== false ? 'checked' : ''}> SVG Icons</label>
+                        <label class="opt-check"><input type="checkbox" id="adm-fx-pulse" ${systemData.effects.screenPulse ? 'checked' : ''}> Screen Pulse</label>
+                        <label class="opt-check"><input type="checkbox" id="adm-home-icons" ${systemData.home.showIcons !== false ? 'checked' : ''}> Show Menu Icons</label>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+                        <label class="form-label" for="adm-font-choice" style="margin:0;">Font:</label>
+                        <select id="adm-font-choice" class="form-control" style="max-width:220px;">
+                            <option value="modern" ${systemData.themes.font === 'modern' ? 'selected' : ''}>Mono (JetBrains/Fira)</option>
+                            <option value="pixel" ${systemData.themes.font === 'pixel' ? 'selected' : ''}>Pixel</option>
+                        </select>
+                        <button class="btn btn-green" onclick="saveThemeExtras()">APPLY</button>
+                    </div>
                 </div>
                 <div style="border:1px solid var(--text); padding:10px; margin-bottom:15px">
                     <h4>Create Custom Theme</h4>
@@ -632,6 +667,7 @@ function ensureSaverData() {
     if (!systemData.screensaver) systemData.screensaver = JSON.parse(JSON.stringify(defaultData.screensaver));
     if (!Array.isArray(systemData.screensaver.catalog)) systemData.screensaver.catalog = JSON.parse(JSON.stringify(defaultData.screensaver.catalog || ADM_SAVER_TYPES));
     if (systemData.screensaver.catalog.length === 0) systemData.screensaver.catalog = JSON.parse(JSON.stringify(defaultData.screensaver.catalog || ADM_SAVER_TYPES));
+    systemData.screensaver.catalog = systemData.screensaver.catalog.map((s) => ({ code: '', desc: '', name: '', ...s }));
     if (!systemData.screensaver.type) systemData.screensaver.type = systemData.screensaver.catalog[0] ? systemData.screensaver.catalog[0].id : 'matrix';
     if (typeof systemData.screensaver.enabled === 'undefined') systemData.screensaver.enabled = true;
     if (!systemData.screensaver.timeout) systemData.screensaver.timeout = 60;
@@ -646,10 +682,61 @@ window.renderAdminSaverList = function () {
             <input class="form-control" style="flex:1;" value="${s.name || ''}" onchange="updateSaverField(${i}, 'name', this.value)">
             <input class="form-control" style="flex:1;" value="${s.desc || ''}" onchange="updateSaverField(${i}, 'desc', this.value)">
             <select class="form-control" onchange="updateSaverField(${i}, 'id', this.value)">${ADM_SAVER_TYPES.map(t => `<option value="${t.id}" ${t.id === s.id ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
-            <button class="btn btn-red btn-sm" onclick="delSaver(${i})">DEL</button>
+            <div style="display:flex; gap:6px;">
+                <button class="btn btn-sm" onclick="openSaverEditor(${i})">EDIT</button>
+                <button class="btn btn-red btn-sm" onclick="delSaver(${i})">DEL</button>
+            </div>
         </div>`;
     });
     l.innerHTML = rows.join('');
+};
+
+let currentSaverEdit = -1;
+
+window.openSaverEditor = function (i) {
+    ensureSaverData();
+    const target = systemData.screensaver.catalog[i];
+    if (!target) return;
+    currentSaverEdit = i;
+    document.getElementById('saver-editor-heading').innerText = `Editing: ${target.name || target.id}`;
+    document.getElementById('adm-saver-edit-name').value = target.name || '';
+    document.getElementById('adm-saver-edit-desc').value = target.desc || '';
+    const idSel = document.getElementById('adm-saver-edit-id');
+    if (idSel) idSel.value = target.id;
+    document.getElementById('adm-saver-code').value = target.code || '';
+    const area = document.getElementById('saver-editor-area');
+    if (area) area.style.display = 'block';
+    const nameEl = document.getElementById('adm-saver-edit-name');
+    if (nameEl) nameEl.focus();
+};
+
+window.closeSaverEditor = function () {
+    const area = document.getElementById('saver-editor-area');
+    if (area) area.style.display = 'none';
+    currentSaverEdit = -1;
+};
+
+window.saveSaverEdit = function () {
+    ensureSaverData();
+    if (currentSaverEdit < 0 || !systemData.screensaver.catalog[currentSaverEdit]) return;
+    const name = document.getElementById('adm-saver-edit-name').value || '';
+    const desc = document.getElementById('adm-saver-edit-desc').value || '';
+    const idSel = document.getElementById('adm-saver-edit-id');
+    const idVal = idSel && idSel.value ? idSel.value : systemData.screensaver.catalog[currentSaverEdit].id;
+    const code = document.getElementById('adm-saver-code').value || '';
+    if (systemData.screensaver.catalog.some((s, idx) => idx !== currentSaverEdit && s.id === idVal)) {
+        showToast('Saver ID already exists', 'error');
+        return;
+    }
+    const target = systemData.screensaver.catalog[currentSaverEdit];
+    target.name = name;
+    target.desc = desc;
+    target.id = idVal;
+    target.code = code;
+    saveData();
+    renderAdminSaverList();
+    closeSaverEditor();
+    showToast('Saver updated', 'success');
 };
 
 window.updateSaverField = function (i, key, value) {
@@ -673,7 +760,7 @@ window.addSaverEntry = function () {
         showToast('Saver with this ID already exists', 'error');
         return;
     }
-    systemData.screensaver.catalog.push({ id: idVal, name, desc });
+    systemData.screensaver.catalog.push({ id: idVal, name, desc, code: '' });
     saveData();
     renderAdminSaverList();
     document.getElementById('adm-saver-name').value = '';
@@ -950,7 +1037,7 @@ window.uploadAboutPhoto = function () {
 window.setAdminTriggerTheme = function (id) {
     systemData.themes.adminTriggerTheme = id;
     saveData();
-    alert("Admin trigger theme updated to: " + id);
+    showToast("Admin trigger theme updated to: " + id, 'success');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1107,7 +1194,7 @@ window.createCustomTheme = function () {
     const bg = document.getElementById('adm-theme-bg').value;
     const text = document.getElementById('adm-theme-text').value;
 
-    if (!name) return alert("Enter theme name!");
+    if (!name) return showToast("Enter theme name!", 'error');
 
     const id = 'custom-' + Date.now();
     const newTheme = { id, name, bg, text };
@@ -1118,7 +1205,7 @@ window.createCustomTheme = function () {
     renderAdminThemeList();
     setTheme(id);
 
-    alert("Theme Created!");
+    showToast("Theme Created!", 'success');
     document.getElementById('adm-theme-name').value = '';
 }
 
@@ -1139,8 +1226,29 @@ window.setDefaultTheme = function (id) {
     systemData.themes.defaultId = id;
     saveData();
     renderAdminThemeList();
-    alert("Default Theme Updated!");
+    showToast("Default Theme Updated!", 'success');
 }
+
+window.saveThemeExtras = function () {
+    if (!systemData.effects) systemData.effects = JSON.parse(JSON.stringify(defaultData.effects));
+    if (!systemData.home) systemData.home = {};
+    if (!systemData.themes) systemData.themes = JSON.parse(JSON.stringify(defaultData.themes));
+
+    systemData.effects.glow = document.getElementById('adm-fx-glow').checked;
+    systemData.effects.flicker = document.getElementById('adm-fx-flicker').checked;
+    systemData.effects.scanline = document.getElementById('adm-fx-scan').checked;
+    systemData.effects.svgGlow = document.getElementById('adm-fx-svg').checked;
+    systemData.effects.screenPulse = document.getElementById('adm-fx-pulse').checked;
+    systemData.home.showIcons = document.getElementById('adm-home-icons').checked;
+    const fontSelect = document.getElementById('adm-font-choice');
+    systemData.themes.font = fontSelect ? fontSelect.value : 'modern';
+
+    saveData();
+    if (typeof applyEffects === 'function') applyEffects();
+    if (typeof applyFontChoice === 'function') applyFontChoice(systemData.themes.font);
+    if (typeof toggleIcons === 'function') toggleIcons(systemData.home.showIcons);
+    showToast('Theme extras applied', 'success');
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_DOWNLOAD - Завантаження data.js

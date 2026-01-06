@@ -834,12 +834,8 @@ window.startScreensaver = function (previewType) {
     }
 
     ssActive = true;
-
-    if (type === 'matrix') runMatrixSS();
-    else if (type === 'fire') runFireSS();
-    else if (type === 'pipes') runPipesSS();
-    else if (type === 'dvd') runDvdSS();
-    else if (type === 'trees') runTreesSS();
+    saverPreviewActive = false;
+    runSaverEffect(type, ssCanvas, ssCtx, false);
 }
 
 window.stopScreensaver = function () {
@@ -1126,14 +1122,33 @@ function startSaverPreview(type) {
 }
 
 function runSaverEffect(type, canvas, ctx, isPreview) {
-    const makeReq = (fn) => { saverPreviewReq = requestAnimationFrame(fn); };
+    const active = () => isPreview ? saverPreviewActive : ssActive;
+    const makeReq = (fn) => {
+        if (isPreview) saverPreviewReq = requestAnimationFrame(fn);
+        else ssReq = requestAnimationFrame(fn);
+    };
+    const catalog = getSaverCatalog();
+    const entry = catalog.find(c => c.id === type);
+    const tryCustom = () => {
+        if (!entry || !entry.code) return false;
+        try {
+            const runner = new Function('canvas', 'ctx', 'requestFrame', 'isActive', 'isPreview', entry.code);
+            runner(canvas, ctx, (cb) => { if (typeof cb === 'function' && active()) makeReq(cb); }, active, !!isPreview);
+            return true;
+        } catch (err) {
+            console.error('Custom saver failed', err);
+            showToast('Failed to run custom saver', 'error');
+            return false;
+        }
+    };
+    if (tryCustom()) return;
     if (type === 'matrix') {
         const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
         const fontSize = 14;
         const columns = Math.floor(canvas.width / fontSize);
         const drops = new Array(columns).fill(1);
         function draw() {
-            if (!saverPreviewActive) return;
+            if (!active()) return;
             ctx.fillStyle = "rgba(0,0,0,0.08)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#0F0";
@@ -1153,7 +1168,7 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         const firePixels = new Array(w * h).fill(0);
         const palette = ["#000", "#070707", "#1f0707", "#2f0f07", "#470f07", "#571707", "#671f07", "#771f07", "#8f2707", "#9f2f07", "#af3f07", "#bf4707", "#c74707", "#DF4F07", "#DF5707", "#DF5707", "#D75F07", "#D7670F", "#cf6f0f", "#cf770f", "#cf7f0f", "#CF8717", "#C78717", "#C78F17", "#C7971F", "#BF9F1F", "#BF9F1F", "#BFA727", "#BFA727", "#BFAF2F", "#B7AF2F", "#B7B72F", "#B7B737", "#CFCF6F", "#DFDF9F", "#EFEFC7", "#FFFFFF"];
         function draw() {
-            if (!saverPreviewActive) return;
+            if (!active()) return;
             for (let x = 0; x < w; x++) firePixels[(h - 1) * w + x] = Math.floor(Math.random() * 36);
             for (let y = 1; y < h; y++) {
                 for (let x = 0; x < w; x++) {
@@ -1182,7 +1197,7 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         }
         addPipe();
         function draw() {
-            if (!saverPreviewActive) return;
+            if (!active()) return;
             ctx.fillStyle = 'rgba(0,0,0,0.12)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             pipes.forEach(p => {
@@ -1202,7 +1217,7 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
     } else if (type === 'dvd') {
         const logo = { x: 30, y: 30, dx: 3, dy: 2.5, w: 80, h: 40 };
         function draw() {
-            if (!saverPreviewActive) return;
+            if (!active()) return;
             ctx.fillStyle = 'rgba(0,0,0,0.2)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = `hsl(${Date.now() % 360}, 80%, 60%)`;
@@ -1218,7 +1233,7 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
     } else {
         let trees = [];
         function grow(t) {
-            if (!saverPreviewActive) return;
+            if (!active()) return;
             const len = (Math.random() * 0.5 + 0.5) * t.len;
             const nx = t.x + Math.cos(t.a) * len;
             const ny = t.y + Math.sin(t.a) * len;
@@ -1238,7 +1253,7 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         }
         trees.push({ x: canvas.width / 2, y: canvas.height, a: -Math.PI / 2, len: 10, w: 10, d: 0, done: false });
         function draw() {
-            if (!saverPreviewActive) return;
+            if (!active()) return;
             ctx.fillStyle = 'rgba(0,0,0,0.05)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             if (Math.random() < 0.02) {
@@ -1250,7 +1265,6 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         }
         draw();
     }
-    if (!isPreview) ssReq = saverPreviewReq;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1274,18 +1288,6 @@ let pendingNavId = null;
 function nav(id) {
     if (isTyping) return;
     stopSaverPreview();
-
-    if (!dataReady) {
-        pendingNavId = id;
-        const v = document.getElementById('view');
-        if (v) v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading data...</div>';
-        return;
-    }
-
-    if (typeof pcScrollCleanup === 'function') {
-        pcScrollCleanup();
-        pcScrollCleanup = null;
-    }
 
     if (!dataReady) {
         pendingNavId = id;

@@ -19,11 +19,11 @@ const defaultData = {
         "timeout": 60,
         "type": "matrix",
         "catalog": [
-            { "id": "matrix", "name": "Matrix Rain", "desc": "Green code rain inspired by classic terminals." },
-            { "id": "fire", "name": "Pixel Fire", "desc": "Retro fire simulation with palette cycling." },
-            { "id": "pipes", "name": "Pipes", "desc": "Colorful wandering pipes across the screen." },
-            { "id": "dvd", "name": "DVD", "desc": "Bouncing DVD logo with rainbow tints." },
-            { "id": "trees", "name": "Fractal Trees", "desc": "Procedural trees growing across the canvas." }
+            { "id": "matrix", "name": "Matrix Rain", "desc": "Green code rain inspired by classic terminals.", "code": "" },
+            { "id": "fire", "name": "Pixel Fire", "desc": "Retro fire simulation with palette cycling.", "code": "" },
+            { "id": "pipes", "name": "Pipes", "desc": "Colorful wandering pipes across the screen.", "code": "" },
+            { "id": "dvd", "name": "DVD", "desc": "Bouncing DVD logo with rainbow tints.", "code": "" },
+            { "id": "trees", "name": "Fractal Trees", "desc": "Procedural trees growing across the canvas.", "code": "" }
         ]
     },
     "todoEditable": false,
