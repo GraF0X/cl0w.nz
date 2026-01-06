@@ -1,12 +1,12 @@
 // Three.js lab helpers isolated for Playground Polygon
 (function () {
     const examples = [
-        { id: 'fox-local', label: 'Fox Lab (local)', url: '' },
-        { id: 'transmission', label: 'Physical Transmission', url: 'https://threejs.org/examples/webgl_materials_physical_transmission_alpha.html' },
-        { id: 'toon', label: 'Toon Materials', url: 'https://threejs.org/examples/webgl_materials_toon.html' },
-        { id: 'pixel', label: 'Pixel Post FX', url: 'https://threejs.org/examples/webgl_postprocessing_pixel.html' },
-        { id: 'md2', label: 'MD2 Loader', url: 'https://threejs.org/examples/webgl_loader_md2.html' },
-        { id: 'spot', label: 'Spotlight Lab', url: 'https://threejs.org/examples/webgl_lights_spotlight.html' }
+        { id: 'fox-local', label: 'Fox Lab (local)', type: 'fox' },
+        { id: 'transmission', label: 'Physical Transmission (local)', type: 'transmission' },
+        { id: 'toon', label: 'Toon Materials (local)', type: 'toon' },
+        { id: 'pixel', label: 'Pixel Post FX (local)', type: 'pixel' },
+        { id: 'md2', label: 'Walker Parade (local)', type: 'md2-lite' },
+        { id: 'spot', label: 'Spotlight Lab (local)', type: 'spot' }
     ];
 
     let foxRenderer = null;
