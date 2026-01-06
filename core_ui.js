@@ -1155,15 +1155,15 @@ function renderPlaygroundPolygon() {
                     <div class="pg-fox-shell">
                         <div class="panel-sub">Low-poly fox</div>
                         <div id="fox-stage" class="fox-stage"></div>
-                        <div class="panel-note">Powered by Three.js with theme-aware chrome.</div>
+                        <div class="panel-note">Local WebGL scenes rendered with theme-aware chrome.</div>
                     </div>
                     <div class="pg-three-demos">
-                        <div class="panel-sub">Three.js demos</div>
+                        <div class="panel-sub">WebGL demos</div>
                         <div class="pg-demo-list">
                             ${threeDemos.map(d => `<button class="btn btn-sm" onclick="loadThreeExample('${d.id}')">${d.label}</button>`).join('') || '<div class="panel-note">No demos available</div>'}
                         </div>
                         <div class="pg-demo-frame">
-                            <iframe id="pg-demo-frame" title="Three.js demo" loading="lazy"></iframe>
+                            <canvas id="pg-demo-canvas"></canvas>
                             <div id="pg-demo-status" class="panel-note">Select a demo to load it inline.</div>
                         </div>
                     </div>
