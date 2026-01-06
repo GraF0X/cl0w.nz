@@ -115,47 +115,168 @@
         return p;
     }
 
+    function createGeometry(gl, positions, indices) {
+        const normals = new Float32Array(positions.length);
+        for (let i = 0; i < indices.length; i += 3) {
+            const i0 = indices[i] * 3, i1 = indices[i + 1] * 3, i2 = indices[i + 2] * 3;
+            const v0 = [positions[i0], positions[i0 + 1], positions[i0 + 2]];
+            const v1 = [positions[i1], positions[i1 + 1], positions[i1 + 2]];
+            const v2 = [positions[i2], positions[i2 + 1], positions[i2 + 2]];
+            const ux = v1[0] - v0[0], uy = v1[1] - v0[1], uz = v1[2] - v0[2];
+            const vx = v2[0] - v0[0], vy = v2[1] - v0[1], vz = v2[2] - v0[2];
+            const nx = uy * vz - uz * vy;
+            const ny = uz * vx - ux * vz;
+            const nz = ux * vy - uy * vx;
+            const len = Math.hypot(nx, ny, nz) || 1;
+            const fnx = nx / len, fny = ny / len, fnz = nz / len;
+            normals[i0] += fnx; normals[i0 + 1] += fny; normals[i0 + 2] += fnz;
+            normals[i1] += fnx; normals[i1 + 1] += fny; normals[i1 + 2] += fnz;
+            normals[i2] += fnx; normals[i2 + 1] += fny; normals[i2 + 2] += fnz;
+        }
+        for (let i = 0; i < normals.length; i += 3) {
+            const len = Math.hypot(normals[i], normals[i + 1], normals[i + 2]) || 1;
+            normals[i] /= len; normals[i + 1] /= len; normals[i + 2] /= len;
+        }
+
+        const posBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+        const normBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
+        const idxBuf = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+        return { posBuf, normBuf, idxBuf, count: indices.length };
+    }
+
     function cubeGeometry(gl) {
-        const positions = new Float32Array([
-            // front
-            -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
-            // back
-            -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1,
-            // left
-            -1, -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1,
-            // right
-            1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1,
-            // top
-            -1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, -1,
-            // bottom
-            -1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1
-        ]);
-        const normals = new Float32Array([
-            0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
-            0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1,
-            -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0,
-            1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
-            0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0,
-            0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0
-        ]);
-        const indices = new Uint16Array([
+        const p = [
+            -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1, // front
+            -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1, -1, // back
+            -1, -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1, // left
+            1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, // right
+            -1, 1, -1, -1, 1, 1, 1, 1, 1, 1, 1, -1, // top
+            -1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1 // bottom
+        ];
+        const idx = [
             0, 1, 2, 0, 2, 3,
             4, 5, 6, 4, 6, 7,
             8, 9, 10, 8, 10, 11,
             12, 13, 14, 12, 14, 15,
             16, 17, 18, 16, 18, 19,
             20, 21, 22, 20, 22, 23
-        ]);
-        const posBuf = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-        gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-        const normBuf = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
-        gl.bufferData(gl.ARRAY_BUFFER, normals, gl.STATIC_DRAW);
-        const idxBuf = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-        return { posBuf, normBuf, idxBuf, count: indices.length };
+        ];
+        return createGeometry(gl, p, idx);
+    }
+
+    function octaGeometry(gl) {
+        const p = [0, 1, 0, -1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, -1, 0, -1, 0];
+        const idx = [0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4];
+        return createGeometry(gl, p, idx);
+    }
+
+    function prismGeometry(gl) {
+        const p = [
+            -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1, // front quad
+            -1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, // back
+            -1, 1, -1, -1, 1, 1, 0, 1.6, 0, // top ridge
+            1, 1, 1, 1, 1, -1, 0, 1.6, 0 // top ridge
+        ];
+        const idx = [
+            0, 1, 2, 0, 2, 3,
+            4, 5, 6, 4, 6, 7,
+            0, 3, 9, 0, 9, 8,
+            1, 10, 11, 1, 2, 10,
+            2, 9, 10, 2, 3, 9,
+            0, 8, 6, 0, 6, 4,
+            1, 5, 11, 1, 11, 10,
+            6, 11, 5, 6, 10, 11,
+            6, 8, 9, 6, 9, 10
+        ];
+        return createGeometry(gl, p, idx);
+    }
+
+    function groundGeometry(gl) {
+        const p = [-2, -1, -2, 2, -1, -2, 2, -1, 2, -2, -1, 2];
+        const idx = [0, 1, 2, 0, 2, 3];
+        return createGeometry(gl, p, idx);
+    }
+
+    function foxGeometry(gl) {
+        // Low poly fox assembled from body, head, tail wedges
+        const verts = [];
+        const idx = [];
+        function addBox(cx, cy, cz, sx, sy, sz, tiltX) {
+            const baseIndex = verts.length / 3;
+            const x = sx, y = sy, z = sz;
+            const tx = tiltX || 0;
+            const pts = [
+                [-x, -y, z], [x, -y, z], [x, y, z + tx], [-x, y, z + tx],
+                [-x, -y, -z], [-x, y, -z + tx], [x, y, -z + tx], [x, -y, -z]
+            ];
+            for (let i = 0; i < pts.length; i++) {
+                verts.push(cx + pts[i][0], cy + pts[i][1], cz + pts[i][2]);
+            }
+            const faces = [
+                [0, 1, 2, 3], [4, 5, 6, 7], [0, 3, 5, 4], [1, 7, 6, 2], [3, 2, 6, 5], [0, 4, 7, 1]
+            ];
+            faces.forEach(f => {
+                idx.push(baseIndex + f[0], baseIndex + f[1], baseIndex + f[2]);
+                idx.push(baseIndex + f[0], baseIndex + f[2], baseIndex + f[3]);
+            });
+        }
+        function addPyramid(cx, cy, cz, sx, sy, sz) {
+            const base = verts.length / 3;
+            const pts = [
+                [cx - sx, cy - sy, cz - sz],
+                [cx + sx, cy - sy, cz - sz],
+                [cx + sx, cy - sy, cz + sz],
+                [cx - sx, cy - sy, cz + sz],
+                [cx, cy + sy, cz]
+            ];
+            pts.forEach(p => verts.push(p[0], p[1], p[2]));
+            idx.push(base, base + 1, base + 4, base + 1, base + 2, base + 4, base + 2, base + 3, base + 4, base + 3, base, base + 4, base, base + 3, base + 2, base, base + 2, base + 1);
+        }
+        // body + head + tail
+        addBox(0, -0.2, 0, 1.2, 0.35, 0.4, 0.18);
+        addBox(1.2, 0, 0, 0.45, 0.3, 0.35, 0.25);
+        addPyramid(1.55, 0.25, 0, 0.2, 0.35, 0.25);
+        addPyramid(1.1, 0.55, 0.2, 0.12, 0.3, 0.12);
+        addPyramid(1.1, 0.55, -0.2, 0.12, 0.3, 0.12);
+        addPyramid(-1.25, 0.05, 0, 0.4, 0.25, 0.2);
+        // legs
+        addBox(0.4, -0.6, 0.25, 0.18, 0.25, 0.18);
+        addBox(0.4, -0.6, -0.25, 0.18, 0.25, 0.18);
+        addBox(-0.6, -0.6, 0.25, 0.18, 0.25, 0.18);
+        addBox(-0.6, -0.6, -0.25, 0.18, 0.25, 0.18);
+        return createGeometry(gl, verts, idx);
+    }
+
+    function walkerGeometry(gl) {
+        const verts = [];
+        const idx = [];
+        function addCapsule(cx, cy, cz, r, h) {
+            const base = verts.length / 3;
+            const top = cy + h * 0.5, bottom = cy - h * 0.5;
+            const circle = [[r, 0, 0], [-r, 0, 0], [0, 0, r], [0, 0, -r]];
+            circle.forEach(p => { verts.push(cx + p[0], bottom, cz + p[2]); });
+            circle.forEach(p => { verts.push(cx + p[0] * 0.8, top, cz + p[2] * 0.8); });
+            const faces = [
+                [0, 2, 6, 4], [1, 5, 7, 3], [0, 4, 5, 1], [2, 3, 7, 6], [0, 1, 3, 2], [4, 6, 7, 5]
+            ];
+            faces.forEach(f => {
+                idx.push(base + f[0], base + f[1], base + f[2]);
+                idx.push(base + f[0], base + f[2], base + f[3]);
+            });
+        }
+        addCapsule(0, -0.2, 0, 0.35, 1.8); // body
+        addCapsule(0, 1.0, 0.2, 0.25, 0.8); // head
+        addCapsule(-0.3, -1.2, 0.2, 0.15, 1.0); // leg
+        addCapsule(0.3, -1.2, 0.2, 0.15, 1.0); // leg
+        addCapsule(-0.3, -1.2, -0.2, 0.15, 1.0); // leg
+        addCapsule(0.3, -1.2, -0.2, 0.15, 1.0); // leg
+        return createGeometry(gl, verts, idx);
     }
 
     function fragmentFor(type) {
@@ -183,6 +304,18 @@
         }
     }
 
+    function geometryFor(gl, type) {
+        switch (type) {
+            case 'fox': return foxGeometry(gl);
+            case 'transmission': return octaGeometry(gl);
+            case 'toon': return prismGeometry(gl);
+            case 'pixel': return cubeGeometry(gl);
+            case 'md2-lite': return walkerGeometry(gl);
+            case 'spot': return groundGeometry(gl);
+            default: return cubeGeometry(gl);
+        }
+    }
+
     function startScene(canvas, type, statusEl) {
         if (!canvas) return null;
         const gl = createGl(canvas);
@@ -196,7 +329,7 @@
             if (statusEl) statusEl.innerText = 'Shader error';
             return null;
         }
-        const geo = cubeGeometry(gl);
+        const geo = geometryFor(gl, type);
         const posLoc = gl.getAttribLocation(prog, 'position');
         const normLoc = gl.getAttribLocation(prog, 'normal');
         const projLoc = gl.getUniformLocation(prog, 'proj');
@@ -225,8 +358,9 @@
             const proj = mat4Perspective(Math.PI / 4, size.w / Math.max(1, size.h), 0.1, 50);
             const view = mat4LookAt([3.2, 2.4, 4.2], [0, 0, 0], [0, 1, 0]);
             let model = mat4Identity();
-            model = mat4RotateY(model, ts * 0.0012 + (type === 'pixel' ? 0.7 : 0));
-            model = mat4RotateX(model, 0.6 + Math.sin(ts * 0.0015) * 0.2);
+            const wobble = Math.sin(ts * 0.0015) * 0.3;
+            model = mat4RotateY(model, ts * (type === 'md2-lite' ? 0.0018 : 0.0012) + (type === 'pixel' ? 0.7 : 0));
+            model = mat4RotateX(model, 0.5 + wobble * (type === 'fox' ? 0.5 : 0.3));
 
             gl.uniformMatrix4fv(projLoc, false, proj);
             gl.uniformMatrix4fv(viewLoc, false, view);
