@@ -1118,6 +1118,141 @@
             background: #000;
         }
 
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
         #saver-preview-canvas {
             width: 100%;
             height: 240px;
@@ -1706,104 +1841,109 @@
             flex-direction: column;
         }
 
-        /* PLAYGROUND POLYGON — Windows 98 vibe */
-        .win98-desktop {
-            background: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05) 8px, transparent 8px, transparent 16px), #008080;
-            border: 2px solid var(--dim);
-            padding: 12px;
+        /* PLAYGROUND POLYGON — Theme-aware windows */
+        .pg-desktop {
+            background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08), transparent 40%),
+                        radial-gradient(circle at 80% 40%, rgba(255, 255, 255, 0.06), transparent 42%),
+                        linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent 60%),
+                        var(--bg2, #0b0e17);
+            border: 1px solid var(--dim);
+            padding: 14px;
             min-height: calc(100vh - 220px);
             display: flex;
             flex-direction: column;
             gap: 12px;
             overflow: hidden;
+            position: relative;
         }
 
-        .win98-icons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .win98-shortcut {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            width: 96px;
-            padding: 8px 6px;
-            background: rgba(255, 255, 255, 0.15);
-            border: 2px outset #fff;
-            color: var(--text);
-            cursor: pointer;
-            font-size: 0.8rem;
-            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
-        }
-
-        .win98-shortcut:hover {
-            background: rgba(255, 255, 255, 0.25);
-        }
-
-        .shortcut-icon {
-            font-size: 1.4rem;
-        }
-
-        .win98-grid {
-            flex: 1;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            grid-auto-rows: minmax(220px, auto);
-            gap: 12px;
-            padding: 8px;
-            background: #9ea1a5;
-            border: 2px inset #fff;
-            overflow: auto;
-        }
-
-        .win98-window {
-            background: #c0c0c0;
-            border: 2px outset #fff;
-            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .win98-window.wide {
-            grid-column: span 2;
-        }
-
-        .win98-titlebar {
+        .pg-toolbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 6px 8px;
-            background: linear-gradient(180deg, #000080, #0a2c8c);
-            color: #fff;
-            font-weight: bold;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--dim);
+            border-radius: 10px;
+            padding: 10px 12px;
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+        }
+
+        .pg-title {
+            font-weight: 700;
             letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .win98-controls span {
-            display: inline-block;
-            margin-left: 6px;
-            padding: 0 4px;
-            border: 1px solid #b0b0b0;
-            background: #dcdcdc;
-            color: #000;
+        .pg-toggle-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
-        .win98-body {
-            padding: 10px;
-            background: #efefef;
-            color: #111;
+        .pg-window-area {
+            position: relative;
             flex: 1;
+            min-height: 70vh;
+            border: 1px dashed var(--dim);
+            border-radius: 12px;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 60%);
+        }
+
+        .pg-window {
+            position: absolute;
+            width: 340px;
+            min-height: 240px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--accent);
+            border-radius: 12px;
+            box-shadow: 0 16px 28px rgba(0, 0, 0, 0.35);
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            overflow: hidden;
+        }
+
+        .pg-window-wide { width: 620px; }
+
+        .pg-titlebar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+            color: var(--text);
+            cursor: grab;
+        }
+
+        .pg-titletext { font-weight: 700; letter-spacing: 0.4px; }
+
+        .pg-title-actions { display: flex; gap: 6px; }
+
+        .pg-mini {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 2px 8px;
+            cursor: pointer;
+        }
+
+        .pg-body {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            color: var(--text);
         }
 
         .panel-sub {
             font-size: 0.75rem;
-            opacity: 0.7;
+            opacity: 0.8;
             text-transform: uppercase;
             letter-spacing: 1px;
         }
@@ -1812,27 +1952,49 @@
             display: flex;
             justify-content: space-between;
             gap: 10px;
-            font-size: 0.9rem;
-        }
-
-        .toggle-row {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            font-size: 0.9rem;
+            font-size: 0.95rem;
         }
 
         .hud-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 6px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
         }
 
         .hud-card {
-            border: 1px solid #9a9a9a;
-            background: #dcdcdc;
-            padding: 6px 8px;
-            font-size: 0.85rem;
+            padding: 8px 10px;
+            border: 1px solid var(--dim);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            font-size: 0.9rem;
+        }
+
+        .pg-three { gap: 12px; }
+        .pg-fox-shell { display: flex; flex-direction: column; gap: 8px; }
+        .pg-three-demos { display: flex; flex-direction: column; gap: 8px; }
+        .pg-demo-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
+        .pg-demo-frame {
+            border: 1px solid var(--dim);
+            border-radius: 10px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .pg-demo-frame iframe {
+            width: 100%;
+            height: 240px;
+            border: none;
+            background: #000;
+        }
+
+        .pg-window .fs-manager { height: 100%; }
+
+        .hud-card {
+            border: 1px solid var(--dim);
+            background: rgba(255, 255, 255, 0.04);
+            padding: 8px 10px;
+            font-size: 0.9rem;
         }
 
         .fox-stage {

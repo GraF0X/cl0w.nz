@@ -813,6 +813,7 @@ function nav(id) {
 
 let playgroundFiles = [];
 let playgroundCurrentFileId = '';
+let playgroundWindowState = null;
 let foxRenderer = null;
 let foxScene = null;
 let foxCamera = null;
@@ -840,6 +841,29 @@ function loadPlaygroundFiles() {
         { id: 'ideas.md', name: 'ideas.md', content: '- Toggle shaders\n- Try new sound cues\n- Prototype UI micro-interactions' }
     ];
     return playgroundFiles;
+}
+
+function loadPlaygroundWindowState() {
+    if (playgroundWindowState) return playgroundWindowState;
+    playgroundWindowState = {
+        system: { open: true, x: 24, y: 24 },
+        files: { open: true, x: 360, y: 28 },
+        console: { open: true, x: 24, y: 320 },
+        three: { open: true, x: 360, y: 320 }
+    };
+    try {
+        const raw = localStorage.getItem('playground-windows');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') playgroundWindowState = Object.assign(playgroundWindowState, parsed);
+        }
+    } catch (e) { /* ignore */ }
+    return playgroundWindowState;
+}
+
+function savePlaygroundWindowState() {
+    if (!playgroundWindowState) return;
+    try { localStorage.setItem('playground-windows', JSON.stringify(playgroundWindowState)); } catch (e) { /* ignore */ }
 }
 
 function savePlaygroundFiles() {
@@ -894,7 +918,7 @@ function resizeFoxLab(container) {
 }
 
 function setupFoxLab() {
-    const holder = document.getElementById('fox-lab');
+    const holder = document.getElementById('fox-stage');
     if (!holder) return;
     holder.innerHTML = '<div class="fox-loading">Loading fox lab…</div>';
     ensureThree(() => {
@@ -1044,36 +1068,76 @@ window.runPlayground = function () {
 };
 
 function wirePlaygroundDesktop() {
-    closePlaygroundStartMenu();
-    document.addEventListener('click', handlePlaygroundOutsideClick, { once: true });
+    loadPlaygroundWindowState();
+    updatePlaygroundWindowVisibility();
+    const wins = document.querySelectorAll('.pg-window');
+    wins.forEach(w => makePlaygroundWindowDraggable(w));
+    const toggles = document.querySelectorAll('[data-pg-window]');
+    toggles.forEach(btn => {
+        btn.onclick = function () { togglePlaygroundWindow(btn.getAttribute('data-pg-window')); };
+    });
 }
 
-function togglePlaygroundStartMenu(evt) {
-    evt.stopPropagation();
-    const menu = document.getElementById('pg-start-menu');
-    if (!menu) return;
-    const isOpen = menu.classList.contains('open');
-    if (isOpen) {
-        closePlaygroundStartMenu();
-        return;
-    }
-    menu.classList.add('open');
-    menu.setAttribute('aria-hidden', 'false');
+function togglePlaygroundWindow(id) {
+    if (!playgroundWindowState || !id) return;
+    if (!playgroundWindowState[id]) playgroundWindowState[id] = { open: true, x: 30, y: 30 };
+    playgroundWindowState[id].open = !playgroundWindowState[id].open;
+    updatePlaygroundWindowVisibility();
+    savePlaygroundWindowState();
 }
 
-function closePlaygroundStartMenu() {
-    const menu = document.getElementById('pg-start-menu');
-    if (!menu) return;
-    menu.classList.remove('open');
-    menu.setAttribute('aria-hidden', 'true');
+function updatePlaygroundWindowVisibility() {
+    const state = loadPlaygroundWindowState();
+    const wins = document.querySelectorAll('.pg-window');
+    wins.forEach(w => {
+        const id = w.getAttribute('data-pg-id');
+        const info = state[id] || {};
+        w.style.display = info.open === false ? 'none' : 'flex';
+        if (typeof info.x === 'number' && typeof info.y === 'number') {
+            w.style.left = info.x + 'px';
+            w.style.top = info.y + 'px';
+        }
+    });
+
+    document.querySelectorAll('[data-pg-window]').forEach(btn => {
+        const id = btn.getAttribute('data-pg-window');
+        const info = state[id] || {};
+        if (info.open === false) btn.classList.remove('active'); else btn.classList.add('active');
+    });
 }
 
-function handlePlaygroundOutsideClick(evt) {
-    const menu = document.getElementById('pg-start-menu');
-    const start = document.getElementById('pg-start');
-    if (!menu) return;
-    if (menu.contains(evt.target) || (start && start.contains(evt.target))) return;
-    closePlaygroundStartMenu();
+function makePlaygroundWindowDraggable(win) {
+    if (!win) return;
+    const bar = win.querySelector('.pg-titlebar');
+    if (!bar) return;
+    bar.onpointerdown = function (e) {
+        if (e.button !== 0) return;
+        const id = win.getAttribute('data-pg-id');
+        const area = document.getElementById('pg-window-area');
+        const areaRect = area ? area.getBoundingClientRect() : { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+        const rect = win.getBoundingClientRect();
+        const offsetX = e.clientX - rect.left;
+        const offsetY = e.clientY - rect.top;
+        const move = function (ev) {
+            let x = ev.clientX - areaRect.left - offsetX;
+            let y = ev.clientY - areaRect.top - offsetY;
+            x = Math.max(0, Math.min(areaRect.width - rect.width, x));
+            y = Math.max(0, Math.min(areaRect.height - rect.height, y));
+            win.style.left = x + 'px';
+            win.style.top = y + 'px';
+            if (id && playgroundWindowState && playgroundWindowState[id]) {
+                playgroundWindowState[id].x = x;
+                playgroundWindowState[id].y = y;
+            }
+        };
+        const up = function () {
+            document.removeEventListener('pointermove', move);
+            document.removeEventListener('pointerup', up);
+            savePlaygroundWindowState();
+        };
+        document.addEventListener('pointermove', move);
+        document.addEventListener('pointerup', up);
+    };
 }
 
 function submitPlaygroundCommand(evt) {
@@ -1086,6 +1150,23 @@ function submitPlaygroundCommand(evt) {
     evt.target.value = '';
 }
 
+const playgroundThreeExamples = [
+    { id: 'fox-local', label: 'Fox Lab (local)', url: '' },
+    { id: 'transmission', label: 'Physical Transmission', url: 'https://threejs.org/examples/webgl_materials_physical_transmission_alpha.html' },
+    { id: 'toon', label: 'Toon Materials', url: 'https://threejs.org/examples/webgl_materials_toon.html' },
+    { id: 'pixel', label: 'Pixel Post FX', url: 'https://threejs.org/examples/webgl_postprocessing_pixel.html' },
+    { id: 'md2', label: 'MD2 Loader', url: 'https://threejs.org/examples/webgl_loader_md2.html' },
+    { id: 'spot', label: 'Spotlight Lab', url: 'https://threejs.org/examples/webgl_lights_spotlight.html' }
+];
+
+function playgroundPosStyle(id) {
+    const state = loadPlaygroundWindowState();
+    const info = state[id] || {};
+    const x = typeof info.x === 'number' ? info.x : 20;
+    const y = typeof info.y === 'number' ? info.y : 20;
+    return `style="left:${x}px; top:${y}px;"`;
+}
+
 function renderPlaygroundPolygon() {
     const main = document.querySelector('main');
     if (main) {
@@ -1094,11 +1175,11 @@ function renderPlaygroundPolygon() {
         pcScrollCleanup = function () {
             main.style.overflow = main.dataset.prevOverflow || '';
             teardownFoxLab();
-            closePlaygroundStartMenu();
         };
     }
 
     loadPlaygroundFiles();
+    loadPlaygroundWindowState();
     if (!playgroundFiles.length) newPlaygroundFile();
     if (!playgroundCurrentFileId && playgroundFiles.length) playgroundCurrentFileId = playgroundFiles[0].id;
 
@@ -1114,36 +1195,49 @@ function renderPlaygroundPolygon() {
     const todoCount = Array.isArray(systemData.todos) ? systemData.todos.length : 0;
 
     v.innerHTML = `
-    <div class="win98-desktop">
-        <div class="win98-icons">
-            <button class="win98-shortcut" onclick="fillPlaygroundEditor()"><span class="shortcut-icon">🗂️</span><span>File System</span></button>
-            <button class="win98-shortcut" onclick="setupFoxLab()"><span class="shortcut-icon">🦊</span><span>Fox Lab</span></button>
-            <button class="win98-shortcut" onclick="var t=document.getElementById('pg-lab-terminal'); if(t){t.focus();}"><span class="shortcut-icon">⌨️</span><span>Console</span></button>
-            <button class="win98-shortcut" onclick="runPlayground()"><span class="shortcut-icon">▶️</span><span>Run Code</span></button>
+    <div class="pg-desktop">
+        <div class="pg-toolbar">
+            <div class="pg-title">🎛️ Playground Polygon</div>
+            <div class="pg-toggle-row">
+                <button class="btn btn-sm" data-pg-window="system">System</button>
+                <button class="btn btn-sm" data-pg-window="files">Files</button>
+                <button class="btn btn-sm" data-pg-window="console">Console</button>
+                <button class="btn btn-sm" data-pg-window="three">3D Lab</button>
+                <button class="btn btn-sm" onclick="nav('home')">Exit</button>
+            </div>
         </div>
-        <div class="win98-grid">
-            <section class="win98-window">
-                <div class="win98-titlebar"><span>System Properties</span><div class="win98-controls"><span>_</span><span>□</span><span>×</span></div></div>
-                <div class="win98-body">
+        <div class="pg-window-area" id="pg-window-area">
+            <section class="pg-window" data-pg-id="system" ${playgroundPosStyle('system')}>
+                <div class="pg-titlebar">
+                    <div class="pg-titletext">System Monitor</div>
+                    <div class="pg-title-actions">
+                        <button class="pg-mini" onclick="togglePlaygroundWindow('system')">×</button>
+                    </div>
+                </div>
+                <div class="pg-body">
                     <div class="stat-row"><span>Platform</span><strong>${platform}</strong></div>
                     <div class="stat-row"><span>Cores</span><strong>${cores}</strong></div>
                     <div class="stat-row"><span>RAM</span><strong>${mem} GB</strong></div>
                     <div class="stat-row"><span>Network</span><strong>${navigator.onLine ? 'ONLINE' : 'OFFLINE'} / ${net}</strong></div>
-                    <div class="panel-sub">Quick Toggles</div>
-                    <div class="toggle-row"><label><input type="checkbox" id="pg-audio" checked> Sound FX</label><label><input type="checkbox" id="pg-grid" checked> Grid helpers</label></div>
-                    <div class="panel-sub">Sensors</div>
+                    <div class="panel-sub">Live counts</div>
                     <div class="hud-grid">
                         <div class="hud-card">Saver: <strong>${saverName}</strong></div>
                         <div class="hud-card">Theme: <strong>${themeActive}</strong></div>
                         <div class="hud-card">Games: <strong>${gamesCount}</strong></div>
                         <div class="hud-card">Todos: <strong>${todoCount}</strong></div>
                     </div>
+                    <div class="panel-note">Drag any window by its header. Use the toolbar to reopen closed panels.</div>
                 </div>
             </section>
 
-            <section class="win98-window wide">
-                <div class="win98-titlebar"><span>Playground Explorer</span><div class="win98-controls"><span>_</span><span>□</span><span>×</span></div></div>
-                <div class="win98-body fs-manager">
+            <section class="pg-window" data-pg-id="files" ${playgroundPosStyle('files')}>
+                <div class="pg-titlebar">
+                    <div class="pg-titletext">File System</div>
+                    <div class="pg-title-actions">
+                        <button class="pg-mini" onclick="togglePlaygroundWindow('files')">×</button>
+                    </div>
+                </div>
+                <div class="pg-body fs-manager">
                     <div class="fs-sidebar" id="pg-files"></div>
                     <div class="fs-editor">
                         <div class="fs-header">
@@ -1159,17 +1253,14 @@ function renderPlaygroundPolygon() {
                 </div>
             </section>
 
-            <section class="win98-window">
-                <div class="win98-titlebar"><span>Fox Lab (three.js)</span><div class="win98-controls"><span>_</span><span>□</span><span>×</span></div></div>
-                <div class="win98-body">
-                    <div id="fox-lab" class="fox-stage"></div>
-                    <div class="panel-note">Low-poly fox spins under dual lights. Resize-safe.</div>
+            <section class="pg-window" data-pg-id="console" ${playgroundPosStyle('console')}>
+                <div class="pg-titlebar">
+                    <div class="pg-titletext">Console</div>
+                    <div class="pg-title-actions">
+                        <button class="pg-mini" onclick="togglePlaygroundWindow('console')">×</button>
+                    </div>
                 </div>
-            </section>
-
-            <section class="win98-window">
-                <div class="win98-titlebar"><span>Command Prompt</span><div class="win98-controls"><span>_</span><span>□</span><span>×</span></div></div>
-                <div class="win98-body">
+                <div class="pg-body">
                     <textarea id="code-in" class="playground-code" placeholder="console.log('Hello polygon')"></textarea>
                     <input id="pg-lab-terminal" class="playground-term" placeholder=":> type and press Enter" onkeydown="submitPlaygroundCommand(event)">
                     <div class="btn-row">
@@ -1179,26 +1270,57 @@ function renderPlaygroundPolygon() {
                     <pre id="code-out" class="playground-output">>> ready</pre>
                 </div>
             </section>
-        </div>
-        <div class="win98-taskbar">
-            <button class="start-btn" id="pg-start" onclick="togglePlaygroundStartMenu(event)">Start</button>
-            <div class="task-label">Playground Polygon</div>
-            <div class="task-clock">${new Date().toLocaleTimeString()}</div>
-            <div class="start-menu" id="pg-start-menu" aria-hidden="true">
-                <div class="start-menu-title">Playground</div>
-                <button onclick="fillPlaygroundEditor()">📁 Files</button>
-                <button onclick="setupFoxLab()">🦊 Fox Lab</button>
-                <button onclick="runPlayground()">▶️ Run Code</button>
-                <button onclick="renderPlaygroundPolygon()">🔄 Refresh</button>
-                <button onclick="nav('home')">🏠 Exit playground</button>
-            </div>
+
+            <section class="pg-window pg-window-wide" data-pg-id="three" ${playgroundPosStyle('three')}>
+                <div class="pg-titlebar">
+                    <div class="pg-titletext">3D Lab</div>
+                    <div class="pg-title-actions">
+                        <button class="pg-mini" onclick="togglePlaygroundWindow('three')">×</button>
+                    </div>
+                </div>
+                <div class="pg-body pg-three">
+                    <div class="pg-fox-shell">
+                        <div class="panel-sub">Low-poly fox</div>
+                        <div id="fox-stage" class="fox-stage"></div>
+                        <div class="panel-note">Powered by Three.js with theme-aware chrome.</div>
+                    </div>
+                    <div class="pg-three-demos">
+                        <div class="panel-sub">Three.js demos</div>
+                        <div class="pg-demo-list">
+                            ${playgroundThreeExamples.map(d => `<button class="btn btn-sm" onclick="loadThreeExample('${d.id}')">${d.label}</button>`).join('')}
+                        </div>
+                        <div class="pg-demo-frame">
+                            <iframe id="pg-demo-frame" title="Three.js demo" loading="lazy"></iframe>
+                            <div id="pg-demo-status" class="panel-note">Select a demo to load it inline.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
     </div>`;
 
     renderPlaygroundFilesList();
     fillPlaygroundEditor();
     setupFoxLab();
+    loadThreeExample('fox-local');
     wirePlaygroundDesktop();
+}
+
+function loadThreeExample(id) {
+    const frame = document.getElementById('pg-demo-frame');
+    const status = document.getElementById('pg-demo-status');
+    if (!frame || !status) return;
+    const demo = playgroundThreeExamples.find(d => d.id === id);
+    if (!demo) { status.innerText = 'Demo unavailable'; return; }
+    if (id === 'fox-local') {
+        frame.src = '';
+        status.innerText = 'Fox lab runs locally above; remote iframe cleared.';
+        return;
+    }
+    status.innerText = 'Loading ' + demo.label + '...';
+    frame.src = demo.url;
+    frame.onload = function () { status.innerText = 'Loaded: ' + demo.label; };
+    frame.onerror = function () { status.innerText = 'Unable to load demo (offline?)'; };
 }
 
 function generateFakeProcesses() {
