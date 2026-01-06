@@ -803,6 +803,11 @@ window.startScreensaver = function (previewType) {
         return;
     }
 
+    if (!ssCanvas || !ssCtx) {
+        showToast('Screensaver canvas unavailable', 'error');
+        return;
+    }
+
     ssActive = true;
 
     if (type === 'matrix') runMatrixSS();
