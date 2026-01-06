@@ -28,10 +28,10 @@ function openIRC() {
         <div id="irc-header" style="background:var(--text); color:var(--bg); padding:5px; font-weight:bold; cursor:grab; display:flex; justify-content:space-between; align-items:center;">
             <span>[ #general ]</span>
             <div style="display:flex; gap:5px;">
-                <input id="irc-nick-set" placeholder="Nick" value="${systemData.resume.name || ''}" 
+                <input id="irc-nick-set" placeholder="Nick" value="${systemData.resume.name || ''}"
                        style="background:var(--bg); color:var(--text); border:1px solid var(--bg); width:80px; padding:2px; font-size:0.8rem;"
                        onchange="systemData.resume.name=this.value; saveData(); addIRCMessage('System', 'Nick changed to '+this.value, 'yellow');">
-                <button onclick="closeIRC()" style="background:none; border:none; cursor:pointer; font-weight:bold; color: var(--bg);">X</button>
+                <button onclick="closeIRC()" class="btn btn-sm btn-ghost">X</button>
             </div>
         </div>
         <div id="irc-log" style="flex-grow:1; overflow-y:auto; padding:5px; font-size:0.85rem; font-family:monospace;">
@@ -42,7 +42,7 @@ function openIRC() {
         </div>
         <div style="display:flex; border-top:1px solid var(--text);">
             <input type="text" id="irc-input" style="flex-grow:1; background:rgba(0,0,0,0.1); border:none; color:var(--text); padding:5px; font-family:inherit; outline:none;" placeholder="Type /help..." onkeypress="if(event.key==='Enter') sendIRC()">
-            <button onclick="sendIRC()" style="background:var(--dim); border:none; color:var(--text); padding:0 10px; cursor:pointer;">SEND</button>
+            <button onclick="sendIRC()" class="btn btn-sm">SEND</button>
         </div>
     `;
 
@@ -144,6 +144,96 @@ function dragElement(elmnt) {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// #SECTION_DIALOGS - Уніфіковані модальні вікна/нотифікації
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function ensureModalRoot() {
+    let root = document.getElementById('ui-modal-root');
+    if (!root) {
+        root = document.createElement('div');
+        root.id = 'ui-modal-root';
+        document.body.appendChild(root);
+    }
+    return root;
+}
+
+function showModal({ title = 'Notice', body = '', actions = [{ label: 'OK', variant: 'primary', onClick: null }] }) {
+    const root = ensureModalRoot();
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.tabIndex = -1;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-window';
+    modal.innerHTML = `<div class="modal-header"><span>${title}</span><button class="btn btn-sm" aria-label="Close" onclick="this.closest('.modal-overlay').remove()">✕</button></div>`;
+
+    const bodyWrap = document.createElement('div');
+    bodyWrap.className = 'modal-body';
+    if (typeof body === 'string') bodyWrap.innerHTML = body; else bodyWrap.appendChild(body);
+    modal.appendChild(bodyWrap);
+
+    const actionsBar = document.createElement('div');
+    actionsBar.className = 'modal-actions';
+    actions.forEach((a, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `btn btn-sm ${a.variant === 'danger' ? 'btn-red' : a.variant === 'success' ? 'btn-green' : ''}`;
+        btn.innerText = a.label || 'OK';
+        btn.onclick = () => {
+            overlay.remove();
+            if (typeof a.onClick === 'function') a.onClick();
+        };
+        if (idx === 0) btn.autofocus = true;
+        actionsBar.appendChild(btn);
+    });
+    modal.appendChild(actionsBar);
+    overlay.appendChild(modal);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    root.appendChild(overlay);
+    return overlay;
+}
+
+function showToast(message, tone = 'info') {
+    const root = ensureModalRoot();
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${tone}`;
+    toast.innerText = message;
+    root.appendChild(toast);
+    setTimeout(() => toast.remove(), 2600);
+}
+
+function showConfirm(message, title = 'Confirm') {
+    return new Promise((resolve) => {
+        showModal({
+            title,
+            body: message,
+            actions: [
+                { label: 'Cancel', onClick: () => resolve(false) },
+                { label: 'Confirm', variant: 'success', onClick: () => resolve(true) }
+            ]
+        });
+    });
+}
+
+function showPrompt({ title = 'Input', message = '', placeholder = '', defaultValue = '' }) {
+    return new Promise((resolve) => {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = `${message ? `<div style="margin-bottom:8px;">${message}</div>` : ''}<input type="text" class="form-control" style="width:100%;" placeholder="${placeholder}" value="${defaultValue}">`;
+        const input = wrapper.querySelector('input');
+        showModal({
+            title,
+            body: wrapper,
+            actions: [
+                { label: 'Cancel', onClick: () => resolve(null) },
+                { label: 'Save', variant: 'success', onClick: () => resolve(input.value) }
+            ]
+        });
+        setTimeout(() => {
+            if (input && typeof input.focus === 'function') input.focus();
+        }, 20);
+    });
+}
+
 // Add Keyboard Shortcut for IRC (Alt+I)
 document.addEventListener('keydown', (e) => {
     if (e.altKey && e.code === 'KeyI') openIRC();
@@ -162,6 +252,15 @@ let adMode = 'draw'; // draw, erase
 let adGrid = [];
 let adCx = 0; let adCy = 0; // Cursor pos
 const adW = 40; const adH = 15;
+const adCellSize = 16;
+// QR STATE
+let lastQRMatrix = null;
+let lastQRFormat = 'png';
+let lastQRSize = 256;
+let lastQRText = '';
+let lastQRDataUrl = '';
+let lastQRSvgMarkup = '';
+let pcScrollCleanup = null;
 
 /** renderAsciiDraw - Рендерить інтерфейс малювання */
 function renderAsciiDraw() {
@@ -198,14 +297,14 @@ function renderAsciiDraw() {
         for (let x = 0; x < adW; x++) {
             const isCursor = (x === adCx && y === adCy);
             const cursorStyle = isCursor ? 'background:var(--dim); outline:1px solid var(--text);' : '';
-            gridHtml += `<div class="ascii-cell" data-x="${x}" data-y="${y}" onmousedown="adStart(this)" onmouseenter="adEnter(this)" style="width:15px; height:20px; display:flex; justify-content:center; align-items:center; font-family:'JetBrains Mono', monospace; ${cursorStyle}">${adGrid[y][x]}</div>`;
+            gridHtml += `<div class="ascii-cell" data-x="${x}" data-y="${y}" onmousedown="adStart(this)" onmouseenter="adEnter(this)" style="width:${adCellSize}px; height:${adCellSize}px; display:flex; justify-content:center; align-items:center; font-family:'JetBrains Mono', monospace; font-size:${adCellSize}px; line-height:${adCellSize}px; ${cursorStyle}">${adGrid[y][x]}</div>`;
         }
         gridHtml += `</div>`;
     }
     gridHtml += `</div>
     <div style="margin-top:10px; font-size:0.8rem; opacity:0.7;">
         [Mouse]: Shift+Click=Pick, Drag=Paint. <br>
-        [Keyboard]: Arrows=Move, Space/Enter=PaintChar, Backspace=Erase.
+        [Keyboard]: Arrows/WASD=Move, Space/Enter=PaintChar, Backspace=Erase.
     </div>`;
 
     v.innerHTML = `<h2>ASCII_DRAW STUDIO</h2>${toolsHtml}${gridHtml}`;
@@ -216,11 +315,13 @@ let adIsDrawing = false;
 window.adSetMode = function (m) { adMode = m; renderAsciiDraw(); }
 window.adSetBrush = function (b) { adBrush = b; adMode = 'draw'; renderAsciiDraw(); }
 window.adClear = function () {
-    if (confirm('Clear canvas?')) {
-        adGrid = [];
-        renderAsciiDraw();
-        playSfx(100, 'sawtooth', 0.3);
-    }
+    showConfirm('Clear canvas?').then((ok) => {
+        if (ok) {
+            adGrid = [];
+            renderAsciiDraw();
+            playSfx(100, 'sawtooth', 0.3);
+        }
+    });
 }
 
 window.adStart = function (el) {
@@ -267,10 +368,10 @@ document.addEventListener('keydown', (e) => {
     // We just check if nav buttons aren't focused.
     if (document.activeElement.tagName === 'BUTTON' || document.activeElement.tagName === 'INPUT') return;
 
-    if (e.key === 'ArrowUp') { if (adCy > 0) adCy--; renderAsciiDraw(); }
-    else if (e.key === 'ArrowDown') { if (adCy < adH - 1) adCy++; renderAsciiDraw(); }
-    else if (e.key === 'ArrowLeft') { if (adCx > 0) adCx--; renderAsciiDraw(); }
-    else if (e.key === 'ArrowRight') { if (adCx < adW - 1) adCx++; renderAsciiDraw(); }
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { if (adCy > 0) adCy--; renderAsciiDraw(); }
+    else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { if (adCy < adH - 1) adCy++; renderAsciiDraw(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { if (adCx > 0) adCx--; renderAsciiDraw(); }
+    else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { if (adCx < adW - 1) adCx++; renderAsciiDraw(); }
     else if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
         adApply(adCx, adCy);
@@ -283,8 +384,8 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-window.saveAsciiArt = function () {
-    const name = prompt("Name your artwork:", "Untitled");
+window.saveAsciiArt = async function () {
+    const name = await showPrompt({ title: 'Save ASCII Art', placeholder: 'Untitled' });
     if (!name) return;
 
     const artStr = adGrid.map(row => row.join('')).join('\n');
@@ -299,7 +400,7 @@ window.saveAsciiArt = function () {
     });
 
     saveData();
-    alert("Saved to /gallery > ASCII_ART");
+    showToast("Saved to /gallery > ASCII_ART", 'success');
     playSfx(600, 'square', 0.2);
 }
 /**
@@ -324,7 +425,11 @@ function initData() {
 
             if (!systemData.resume.education) systemData.resume.education = defaultData.resume.education;
             // SCREENSAVER DATA
-            if (!systemData.screensaver) systemData.screensaver = { enabled: true, timeout: 60, type: 'matrix' };
+            if (!systemData.screensaver) systemData.screensaver = JSON.parse(JSON.stringify(defaultData.screensaver));
+            if (!systemData.screensaver.catalog) systemData.screensaver.catalog = JSON.parse(JSON.stringify(defaultData.screensaver.catalog));
+            if (!systemData.screensaver.type) systemData.screensaver.type = 'matrix';
+            if (typeof systemData.screensaver.enabled === 'undefined') systemData.screensaver.enabled = true;
+            if (!systemData.screensaver.timeout) systemData.screensaver.timeout = 60;
 
             if (!systemData.resume.languages) systemData.resume.languages = defaultData.resume.languages;
             if (!systemData.resume.rnd) systemData.resume.rnd = defaultData.resume.rnd;
@@ -357,13 +462,20 @@ function initData() {
 
             if (!systemData.password) systemData.password = defaultData.password;
             if (!systemData.games) systemData.games = defaultData.games;
+            if (!systemData.picoCarts) systemData.picoCarts = JSON.parse(JSON.stringify(defaultData.picoCarts));
             if (typeof systemData.todoEditable === 'undefined') systemData.todoEditable = defaultData.todoEditable;
+
+            if (!systemData.effects) systemData.effects = JSON.parse(JSON.stringify(defaultData.effects));
+            else {
+                systemData.effects = Object.assign({}, JSON.parse(JSON.stringify(defaultData.effects)), systemData.effects);
+            }
 
             if (!systemData.home.logoText) systemData.home.logoText = defaultData.home.logoText;
             if (!systemData.home.browserTitle) systemData.home.browserTitle = defaultData.home.browserTitle || systemData.home.logoText.replace(':~$', '');
 
             if (!systemData.themes) systemData.themes = JSON.parse(JSON.stringify(defaultData.themes));
             if (!systemData.themes.adminTriggerTheme) systemData.themes.adminTriggerTheme = 'mix-eva';
+            if (!systemData.themes.font) systemData.themes.font = 'modern';
 
             updateCustomThemeCSS();
 
@@ -373,15 +485,22 @@ function initData() {
             } else {
                 setTheme(systemData.themes.defaultId);
             }
+            applyFontChoice(systemData.themes.font);
 
         } catch (e) { systemData = JSON.parse(JSON.stringify(defaultData)); }
     } else {
         systemData = JSON.parse(JSON.stringify(defaultData));
         setTheme(systemData.themes.defaultId);
+        applyFontChoice(systemData.themes.font);
     }
     applyMenuVisibility();
     applyEffects();
+    resetIdleTimer();
     renderDynamicLogo();
+    dataReady = true;
+    if (pendingNavId) {
+        const next = pendingNavId; pendingNavId = null; nav(next);
+    }
 }
 
 /** saveData - Зберігає systemData в localStorage */
@@ -469,8 +588,10 @@ function updateCustomThemeCSS() {
 /** toggleThemeMenu - Відкриває/закриває меню тем */
 function toggleThemeMenu() {
     const pop = document.getElementById('theme-popup');
-    if (pop.style.display === 'block') {
-        pop.style.display = 'none';
+    const isOpen = pop.classList.contains('show');
+    if (isOpen) {
+        pop.classList.remove('show');
+        pop.style.display = '';
         return;
     }
 
@@ -483,22 +604,62 @@ function toggleThemeMenu() {
     });
 
     // EFFECTS SECTION
-    const fx = systemData.effects || { glow: false, flicker: false, scanline: false };
+    const fx = systemData.effects || { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
+    const fxBtn = (key, label) => {
+        const on = !!fx[key];
+        const indicator = on ? '✔' : '✖';
+        return `<button class="btn btn-sm ${on ? 'active' : 'btn-ghost'}" onclick="toggleEffect('${key}')">${label}: ${indicator}</button>`;
+    };
 
+    const fontChoice = (systemData.themes && systemData.themes.font) ? systemData.themes.font : 'modern';
     html += `<div class="theme-extras">
-        <label class="opt-check"><input type="checkbox" ${fx.glow ? 'checked' : ''} onchange="toggleEffect('glow')"> Glow FX</label>
-        <label class="opt-check"><input type="checkbox" ${fx.flicker ? 'checked' : ''} onchange="toggleEffect('flicker')"> Flicker</label>
-        <label class="opt-check"><input type="checkbox" ${fx.scanline ? 'checked' : ''} onchange="toggleEffect('scanline')"> Scanline+</label>
-        <label class="opt-check"><input type="checkbox" ${systemData.home.showIcons !== false ? 'checked' : ''} onchange="toggleIcons(this.checked)"> Show Menu Icons</label>
+        <div class="theme-toggle-row">
+            ${fxBtn('glow', 'Glow')}
+            ${fxBtn('flicker', 'Flicker')}
+            ${fxBtn('scanline', 'Scanlines')}
+            ${fxBtn('svgGlow', 'SVG Icons')}
+            ${fxBtn('screenPulse', 'Screen Pulse')}
+            <button class="btn btn-sm ${systemData.home.showIcons !== false ? 'active' : 'btn-ghost'}" onclick="toggleIcons()">Icons: ${systemData.home.showIcons !== false ? '✔' : '✖'}</button>
+        </div>
+        <div class="font-switcher">
+            <div style="font-size:0.75rem; opacity:0.75;">Font</div>
+            <button class="btn btn-sm ${fontChoice === 'modern' ? 'active' : ''}" onclick="setFontChoice('modern')">Mono</button>
+            <button class="btn btn-sm ${fontChoice === 'pixel' ? 'active' : ''}" onclick="setFontChoice('pixel')">Pixel</button>
+        </div>
     </div>`;
 
     pop.innerHTML = html;
-    pop.style.display = 'block';
+    pop.style.display = '';
+    pop.classList.add('show');
+}
+
+/**
+ * setTheme - Встановлює тему оформлення
+ * @param {string} t - ID теми
+ */
+function setTheme(t) {
+    document.body.className = `theme-${t}`;
+    playSfx(1000, 'sine', 0.05);
+    localStorage.setItem('vvs_theme_v13', t);
+
+    // USE CUSTOM ADMIN TRIGGER THEME
+    if (t === systemData.themes.adminTriggerTheme) {
+        mintEvaClicks++; checkAdminUnlock();
+    }
+    if (t === 'eva') {
+        evaCount++;
+        if (evaCount >= 5) {
+            const sound = new Audio('xero.wav');
+            sound.play().catch(e => console.log(e));
+            evaCount = 0;
+        }
+    }
+    document.getElementById('theme-popup').classList.remove('show');
 }
 
 /** toggleEffect - Перемикає візуальні ефекти */
 window.toggleEffect = function (type) {
-    if (!systemData.effects) systemData.effects = { glow: false, flicker: false, scanline: false };
+    if (!systemData.effects) systemData.effects = { glow: false, flicker: false, scanline: false, svgGlow: true, screenPulse: false };
     systemData.effects[type] = !systemData.effects[type];
     applyEffects();
     saveData();
@@ -510,16 +671,36 @@ function applyEffects() {
     document.body.classList.toggle('fx-glow', systemData.effects.glow);
     document.body.classList.toggle('fx-flicker', systemData.effects.flicker);
     document.body.classList.toggle('fx-scanline', systemData.effects.scanline);
+    document.body.classList.toggle('fx-svg', systemData.effects.svgGlow !== false);
+    document.body.classList.toggle('fx-screen-pulse', !!systemData.effects.screenPulse);
 
     // Apply Icons (OnInit)
     document.body.classList.toggle('no-icons', systemData.home.showIcons === false);
 }
 
+/** applyFontChoice - Застосовує вибір шрифту до документа */
+function applyFontChoice(fontId) {
+    const target = fontId === 'pixel'
+        ? "'Press Start 2P', 'VT323', 'Courier New', monospace"
+        : "'JetBrains Mono', 'Fira Code', monospace";
+    document.documentElement.style.setProperty('--font-main', target);
+    document.body.classList.toggle('pixel-font', fontId === 'pixel');
+}
+
+/** setFontChoice - Змінює вибір шрифту в темах */
+window.setFontChoice = function (fontId) {
+    if (!systemData.themes) systemData.themes = { font: 'modern', defaultId: 'amber', custom: [] };
+    systemData.themes.font = fontId;
+    applyFontChoice(fontId);
+    saveData();
+};
+
 window.toggleIcons = function (show) {
     if (!systemData.home) systemData.home = {};
-    systemData.home.showIcons = show;
+    const next = typeof show === 'boolean' ? show : systemData.home.showIcons === false ? true : false;
+    systemData.home.showIcons = next;
     saveData();
-    document.body.classList.toggle('no-icons', !show);
+    document.body.classList.toggle('no-icons', !next);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -536,12 +717,18 @@ document.addEventListener('keydown', (e) => {
     // CLOSE OVERLAYS
     if (e.key === 'Escape') {
         // Close Theme Menu
-        document.getElementById('theme-popup').style.display = 'none';
+        const pop = document.getElementById('theme-popup');
+        if (pop) { pop.classList.remove('show'); pop.style.display = ''; }
         // Close Gallery Overlay
         const overlay = document.querySelector('div[style*="position:fixed; top:0; left:0; width:100%; height:100%"]');
         if (overlay) overlay.click();
         return;
     }
+
+    const modalOpen = document.querySelector('.modal-window');
+    const gameActive = (() => { const area = document.getElementById('game-area'); return area && area.style.display !== 'none'; })();
+    const drawActive = !!document.getElementById('ascii-canvas');
+    if (modalOpen || gameActive || drawActive) return;
 
     // MENU NAV
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -568,11 +755,28 @@ document.addEventListener('keydown', (e) => {
 // #SECTION_SCREENSAVER - Screensavers
 // ═══════════════════════════════════════════════════════════════════════════════
 
+const saverCatalogDefaults = (defaultData && defaultData.screensaver && defaultData.screensaver.catalog)
+    ? JSON.parse(JSON.stringify(defaultData.screensaver.catalog))
+    : [
+        { id: 'matrix', name: 'Matrix Rain', desc: 'Green code rain inspired by classic terminals.' },
+        { id: 'fire', name: 'Pixel Fire', desc: 'Retro fire simulation with palette cycling.' },
+        { id: 'pipes', name: 'Pipes', desc: 'Colorful wandering pipes across the screen.' },
+        { id: 'dvd', name: 'DVD', desc: 'Bouncing DVD logo with rainbow tints.' },
+        { id: 'trees', name: 'Fractal Trees', desc: 'Procedural trees growing across the canvas.' }
+    ];
+
 let ssTimer = null;
 let ssActive = false;
 let ssCanvas = null;
 let ssCtx = null;
 let ssReq = null;
+const saverSlowdown = 2;
+
+let saverPreviewReq = null;
+let saverPreviewActive = false;
+let saverPreviewCanvas = null;
+let saverPreviewCtx = null;
+let saverPreviewType = 'matrix';
 
 function resetIdleTimer() {
     if (ssActive) stopScreensaver();
@@ -582,36 +786,57 @@ function resetIdleTimer() {
     }
 }
 
+function getSaverCatalog() {
+    if (!systemData.screensaver) systemData.screensaver = JSON.parse(JSON.stringify(defaultData.screensaver));
+    if (!Array.isArray(systemData.screensaver.catalog)) systemData.screensaver.catalog = JSON.parse(JSON.stringify(saverCatalogDefaults));
+    if (systemData.screensaver.catalog.length === 0) systemData.screensaver.catalog = JSON.parse(JSON.stringify(saverCatalogDefaults));
+    return systemData.screensaver.catalog;
+}
+
 document.addEventListener('mousemove', resetIdleTimer);
 document.addEventListener('keydown', resetIdleTimer);
 document.addEventListener('click', resetIdleTimer);
 
 window.startScreensaver = function (previewType) {
-    if (ssActive) return;
-    const type = previewType || (systemData.screensaver ? systemData.screensaver.type : 'matrix');
+    if (ssActive) stopScreensaver();
+    const catalog = getSaverCatalog();
+    const fallbackType = catalog[0] ? catalog[0].id : 'matrix';
+    if (!systemData.screensaver) systemData.screensaver = { enabled: true, timeout: 60, type: fallbackType };
+    let type = previewType || (systemData.screensaver ? systemData.screensaver.type : fallbackType);
+    if (!catalog.find(c => c.id === type)) type = fallbackType;
+    systemData.screensaver.type = type;
+    saveData();
+
+    if (ssReq) cancelAnimationFrame(ssReq);
 
     let overlay = document.getElementById('screensaver-overlay');
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'screensaver-overlay';
-        overlay.innerHTML = '<canvas id="screensaver-canvas"></canvas>';
         document.body.appendChild(overlay);
         overlay.onclick = stopScreensaver;
     }
 
     overlay.style.display = 'flex';
-    ssCanvas = document.getElementById('screensaver-canvas');
-    ssCtx = ssCanvas.getContext('2d');
-    ssCanvas.width = window.innerWidth;
-    ssCanvas.height = window.innerHeight;
+    overlay.innerHTML = '<canvas id="screensaver-canvas"></canvas>';
+    ssCanvas = overlay.querySelector('#screensaver-canvas');
+    ssCtx = ssCanvas ? ssCanvas.getContext('2d') : null;
+    if (ssCanvas) {
+        ssCanvas.style.width = '100%';
+        ssCanvas.style.height = '100%';
+        const bounds = overlay.getBoundingClientRect();
+        ssCanvas.width = bounds.width || window.innerWidth;
+        ssCanvas.height = bounds.height || window.innerHeight;
+    }
+
+    if (!ssCanvas || !ssCtx) {
+        showToast('Screensaver canvas unavailable', 'error');
+        return;
+    }
 
     ssActive = true;
-
-    if (type === 'matrix') runMatrixSS();
-    else if (type === 'fire') runFireSS();
-    else if (type === 'pipes') runPipesSS();
-    else if (type === 'dvd') runDvdSS();
-    else if (type === 'trees') runTreesSS();
+    saverPreviewActive = false;
+    runSaverEffect(type, ssCanvas, ssCtx, false);
 }
 
 window.stopScreensaver = function () {
@@ -619,7 +844,19 @@ window.stopScreensaver = function () {
     cancelAnimationFrame(ssReq);
     const overlay = document.getElementById('screensaver-overlay');
     if (overlay) overlay.style.display = 'none';
-}
+};
+
+window.addEventListener('resize', () => {
+    if (ssActive && ssCanvas) {
+        ssCanvas.width = window.innerWidth;
+        ssCanvas.height = window.innerHeight;
+    }
+    if (document.getElementById('saver-preview-canvas')) {
+        const wasActive = saverPreviewActive;
+        startSaverPreview(saverPreviewType);
+        if (!wasActive) stopSaverPreview();
+    }
+});
 
 function runMatrixSS() {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
@@ -804,6 +1041,243 @@ function runTreesSS() {
     draw();
 }
 
+function renderScreensaverMenu() {
+    const v = document.getElementById('view');
+    const catalog = getSaverCatalog();
+    const current = (systemData.screensaver && systemData.screensaver.type) || (catalog[0] ? catalog[0].id : 'matrix');
+    const timeout = systemData.screensaver && systemData.screensaver.timeout ? systemData.screensaver.timeout : 60;
+
+    const cards = catalog.map(l => `<label class="saver-card ${current === l.id ? 'active' : ''}">
+        <input type="radio" name="saver-type" value="${l.id}" ${current === l.id ? 'checked' : ''}>
+        <div class="saver-name">${l.name}</div>
+        <div class="saver-desc">${l.desc || ''}</div>
+        <div class="saver-badge">${l.id}</div>
+    </label>`).join('');
+
+    v.innerHTML = `<h2>SCREENSAVER</h2>
+        <p class="muted">Idle trigger and saver choice are managed in Admin. Preview the animations below.</p>
+        <div class="saver-grid">${cards}</div>
+        <div class="saver-actions">
+            <div class="saver-status">Idle trigger: ${(systemData.screensaver && systemData.screensaver.enabled !== false) ? 'ON' : 'OFF'} (${timeout}s)</div>
+            <div class="saver-action-buttons">
+                <button class="btn" onclick="previewSaverInline()">INLINE PREVIEW</button>
+                <button class="btn btn-green" onclick="previewSaver()">FULLSCREEN</button>
+            </div>
+        </div>
+        <div class="saver-preview-shell">
+            <canvas id="saver-preview-canvas" aria-label="Screensaver preview"></canvas>
+        </div>`;
+
+    v.querySelectorAll('.saver-card input').forEach(inp => {
+        inp.addEventListener('change', () => {
+            v.querySelectorAll('.saver-card').forEach(c => c.classList.remove('active'));
+            inp.closest('.saver-card').classList.add('active');
+            startSaverPreview(inp.value);
+        });
+    });
+
+    startSaverPreview(current);
+}
+
+window.previewSaver = function () {
+    const typeEl = document.querySelector('input[name="saver-type"]:checked');
+    const type = typeEl && typeEl.value ? typeEl.value : 'matrix';
+    startScreensaver(type);
+};
+
+window.previewSaverInline = function () {
+    const typeEl = document.querySelector('input[name="saver-type"]:checked');
+    const type = typeEl && typeEl.value ? typeEl.value : 'matrix';
+    startSaverPreview(type);
+};
+
+function setupSaverPreviewCanvas() {
+    saverPreviewCanvas = document.getElementById('saver-preview-canvas');
+    if (saverPreviewCanvas) {
+        const shell = saverPreviewCanvas.parentElement;
+        const bounds = shell ? shell.getBoundingClientRect() : { width: window.innerWidth, height: 220 };
+        saverPreviewCanvas.width = bounds.width || window.innerWidth;
+        saverPreviewCanvas.height = Math.max(200, Math.min(bounds.height || 240, 320));
+        saverPreviewCanvas.style.width = '100%';
+        saverPreviewCanvas.style.height = saverPreviewCanvas.height + 'px';
+        saverPreviewCtx = saverPreviewCanvas.getContext('2d');
+    }
+}
+
+function stopSaverPreview() {
+    saverPreviewActive = false;
+    cancelAnimationFrame(saverPreviewReq);
+}
+
+function startSaverPreview(type) {
+    setupSaverPreviewCanvas();
+    stopSaverPreview();
+    if (!saverPreviewCanvas || !saverPreviewCtx) return;
+    const catalog = getSaverCatalog();
+    const fallback = catalog[0] ? catalog[0].id : 'matrix';
+    const finalType = catalog.find(c => c.id === type) ? type : fallback;
+    saverPreviewType = finalType;
+    saverPreviewCtx.clearRect(0, 0, saverPreviewCanvas.width, saverPreviewCanvas.height);
+    saverPreviewActive = true;
+    runSaverEffect(finalType, saverPreviewCanvas, saverPreviewCtx, true);
+}
+
+function runSaverEffect(type, canvas, ctx, isPreview) {
+    const active = () => isPreview ? saverPreviewActive : ssActive;
+    const makeReq = (fn) => {
+        if (isPreview) saverPreviewReq = requestAnimationFrame(fn);
+        else ssReq = requestAnimationFrame(fn);
+    };
+    const catalog = getSaverCatalog();
+    const entry = catalog.find(c => c.id === type);
+    const tryCustom = () => {
+        if (!entry || !entry.code) return false;
+        try {
+            const runner = new Function('canvas', 'ctx', 'requestFrame', 'isActive', 'isPreview', entry.code);
+            runner(canvas, ctx, (cb) => { if (typeof cb === 'function' && active()) makeReq(cb); }, active, !!isPreview);
+            return true;
+        } catch (err) {
+            console.error('Custom saver failed', err);
+            showToast('Failed to run custom saver', 'error');
+            return false;
+        }
+    };
+    if (tryCustom()) return;
+    if (type === 'matrix') {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*";
+        const fontSize = 14;
+        const columns = Math.floor(canvas.width / fontSize);
+        const drops = new Array(columns).fill(1);
+        let tick = 0;
+        function draw() {
+            if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
+            ctx.fillStyle = "rgba(0,0,0,0.08)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#0F0";
+            ctx.font = fontSize + "px monospace";
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.99) drops[i] = 0;
+                drops[i] += 0.5;
+            }
+            makeReq(draw);
+        }
+        draw();
+    } else if (type === 'fire') {
+        const w = 80; const h = 50;
+        const fw = canvas.width / w; const fh = canvas.height / h;
+        const firePixels = new Array(w * h).fill(0);
+        const palette = ["#000", "#070707", "#1f0707", "#2f0f07", "#470f07", "#571707", "#671f07", "#771f07", "#8f2707", "#9f2f07", "#af3f07", "#bf4707", "#c74707", "#DF4F07", "#DF5707", "#DF5707", "#D75F07", "#D7670F", "#cf6f0f", "#cf770f", "#cf7f0f", "#CF8717", "#C78717", "#C78F17", "#C7971F", "#BF9F1F", "#BF9F1F", "#BFA727", "#BFA727", "#BFAF2F", "#B7AF2F", "#B7B72F", "#B7B737", "#CFCF6F", "#DFDF9F", "#EFEFC7", "#FFFFFF"];
+        let tick = 0;
+        function draw() {
+            if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
+            for (let x = 0; x < w; x++) firePixels[(h - 1) * w + x] = Math.floor(Math.random() * 26);
+            for (let y = 1; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const src = y * w + x;
+                    const decay = Math.floor(Math.random() * 2);
+                    const below = src + w;
+                    const newVal = firePixels[below] - decay >= 0 ? firePixels[below] - decay : 0;
+                    firePixels[src - decay + 1 >= 0 ? src - decay + 1 : src] = newVal;
+                }
+            }
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const color = palette[firePixels[y * w + x]];
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x * fw, y * fh, fw + 1, fh + 1);
+                }
+            }
+            makeReq(draw);
+        }
+        draw();
+    } else if (type === 'pipes') {
+        const pipes = [];
+        const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+        function addPipe() {
+            pipes.push({ x: canvas.width / 2, y: canvas.height / 2, dir: dirs[Math.floor(Math.random() * dirs.length)], color: `hsl(${Math.random() * 360}, 80%, 60%)` });
+        }
+        addPipe();
+        let tick = 0;
+        function draw() {
+            if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            pipes.forEach(p => {
+                ctx.strokeStyle = p.color;
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                p.x += p.dir.x * 4; p.y += p.dir.y * 4;
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+                if (Math.random() < 0.1) p.dir = dirs[Math.floor(Math.random() * dirs.length)];
+                if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) { p.x = canvas.width / 2; p.y = canvas.height / 2; }
+            });
+            if (pipes.length < 20 && Math.random() < 0.05) addPipe();
+            makeReq(draw);
+        }
+        draw();
+    } else if (type === 'dvd') {
+        const logo = { x: 30, y: 30, dx: 1.4, dy: 1.2, w: 80, h: 40 };
+        let tick = 0;
+        function draw() {
+            if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = `hsl(${Date.now() % 360}, 80%, 60%)`;
+            ctx.fillRect(logo.x, logo.y, logo.w, logo.h);
+            ctx.fillStyle = '#000';
+            ctx.fillText('DVD', logo.x + 20, logo.y + 24);
+            logo.x += logo.dx; logo.y += logo.dy;
+            if (logo.x <= 0 || logo.x + logo.w >= canvas.width) logo.dx *= -1;
+            if (logo.y <= 0 || logo.y + logo.h >= canvas.height) logo.dy *= -1;
+            makeReq(draw);
+        }
+        draw();
+    } else {
+        let trees = [];
+        let tick = 0;
+        function grow(t) {
+            if (!active()) return;
+            const len = (Math.random() * 0.5 + 0.5) * t.len;
+            const nx = t.x + Math.cos(t.a) * len;
+            const ny = t.y + Math.sin(t.a) * len;
+            ctx.strokeStyle = `hsl(${120 + t.d * 10}, 50%, 70%)`;
+            ctx.lineWidth = t.w;
+            ctx.beginPath();
+            ctx.moveTo(t.x, t.y);
+            ctx.lineTo(nx, ny);
+            ctx.stroke();
+            t.x = nx; t.y = ny; t.len *= 0.95; t.w *= 0.9; t.d += 1;
+            if (t.len < 2 || t.w < 0.5) { t.done = true; return; }
+            if (Math.random() < 0.05) {
+                trees.push({ x: t.x, y: t.y, a: t.a - 0.4, len: t.len * 0.8, w: t.w * 0.7, d: t.d + 1, done: false });
+                trees.push({ x: t.x, y: t.y, a: t.a + 0.4, len: t.len * 0.8, w: t.w * 0.7, d: t.d + 1, done: false });
+                t.done = true;
+            }
+        }
+        trees.push({ x: canvas.width / 2, y: canvas.height, a: -Math.PI / 2, len: 10, w: 10, d: 0, done: false });
+        function draw() {
+            if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
+            ctx.fillStyle = 'rgba(0,0,0,0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (Math.random() < 0.02) {
+                trees.push({ x: Math.random() * canvas.width, y: canvas.height, a: -Math.PI / 2 + (Math.random() - 0.5), len: 5 + Math.random() * 5, w: 5 + Math.random() * 5, d: 0, done: false });
+            }
+            trees.forEach(grow);
+            trees = trees.filter(t => !t.done);
+            makeReq(draw);
+        }
+        draw();
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_NAVIGATION - Навігація та глобальні змінні
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -814,6 +1288,8 @@ let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0;
 let currentLang = 'uk'; let adminAuth = false;
 let admNoteCat = ''; let admNoteFile = '';
 let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
+let dataReady = false;
+let pendingNavId = null;
 
 /**
  * nav - Головна функція навігації між секціями
@@ -822,6 +1298,19 @@ let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
  */
 function nav(id) {
     if (isTyping) return;
+    stopSaverPreview();
+
+    if (!dataReady) {
+        pendingNavId = id;
+        const v = document.getElementById('view');
+        if (v) v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading data...</div>';
+        return;
+    }
+
+    if (typeof pcScrollCleanup === 'function') {
+        pcScrollCleanup();
+        pcScrollCleanup = null;
+    }
 
     // Dynamic Title Update
     const baseTitle = systemData.home.browserTitle || "vvs@cl0w.nz";
@@ -842,187 +1331,338 @@ function nav(id) {
     else if (id === 'todo') renderTodo();
     else if (id === 'gallery') renderGallery();
     else if (id === 'draw') renderAsciiDraw();
-    else if (id === 'pc') renderAboutPC();
-    else if (id === 'screensaver') startScreensaver(); // Direct trigger
+    else if (id === 'pc') renderPlaygroundPolygon();
+    else if (id === 'screensaver') renderScreensaverMenu();
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
     else if (id === 'admin') renderAdmin();
 }
 
-/** renderAboutPC - Виводить статистику комп'ютера з віджетами */
-function renderAboutPC() {
-    const v = document.getElementById('view');
-    const ua = navigator.userAgent;
-    const platform = navigator.platform;
-    const cores = navigator.hardwareConcurrency || '?';
-    const mem = navigator.deviceMemory || '?';
+let playgroundFiles = [];
+let playgroundCurrentFileId = '';
+let foxRenderer = null;
+let foxScene = null;
+let foxCamera = null;
+let foxGroup = null;
+let foxAnimHandle = null;
+let foxResizeHandler = null;
+let threeLoading = false;
+let threeQueue = [];
 
-    // Physics Container
-    let physicsHtml = `
-    <div id="pc-physics-world" style="height:150px; border:1px solid var(--text); position:relative; overflow:hidden; margin-bottom:20px; background:rgba(0,0,0,0.2);">
-        <div style="position:absolute; top:5px; left:5px; opacity:0.6; font-size:0.7rem;">[ SCROLLME: UP=PORTAL, DOWN=CRASH ]</div>
-        <div id="pc-avatar" style="font-size:3rem; position:absolute; top:50px; left:50%; transform:translateX(-50%); transition: top 0.1s;">💻</div>
-        <div id="pc-portal" style="font-size:3rem; position:absolute; top:-40px; left:50%; transform:translateX(-50%) rotate(180deg); color:cyan; display:none;">🌀</div>
-        <div id="pc-fire" style="font-size:3rem; position:absolute; bottom:-40px; left:50%; transform:translateX(-50%); color:orange; display:none;">🔥</div>
-    </div>`;
-
-    // Code Playground
-    let codeHtml = `
-    <div class="work-card draggable-card" style="min-width:300px;">
-        <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:10px; font-weight:bold;">:: JS_PLAYGROUND ::</div>
-        <textarea id="code-in" style="width:100%; height:80px; background:rgba(0,0,0,0.3); color:var(--text); border:1px solid var(--dim); font-family:monospace; padding:5px;" placeholder="alert('Hello');"></textarea>
-        <button class="btn btn-sm" onclick="runPlayground()">EXECUTE</button>
-        <div id="code-out" style="margin-top:5px; font-size:0.8rem; color: #0f0;"></div>
-    </div>`;
-
-    v.innerHTML = `<h2>SYSTEM_MONITOR_V2</h2>
-    ${physicsHtml}
-    
-    <div id="pc-widgets-area" style="position:relative; height:600px; border:1px dashed var(--dim); padding:10px; overflow:hidden;">
-        <div class="work-card draggable-card" style="position:absolute; top:10px; left:10px; width:250px;">
-            <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">HOST_INFO</div>
-            <div>PLATFORM: ${platform}</div>
-            <div>CORES: ${cores}</div>
-            <div>RAM: ~${mem} GB</div>
-        </div>
-        
-        <div class="work-card draggable-card" style="position:absolute; top:10px; left:280px; width:250px;">
-            <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">NETWORK</div>
-            <div>STATUS: ${navigator.onLine ? 'ONLINE' : 'OFFLINE'}</div>
-            <div>DL: ${navigator.connection ? navigator.connection.downlink + 'Mbps' : '?'}</div>
-        </div>
-        
-        <div class="work-card draggable-card" style="position:absolute; top:150px; left:10px; width:300px;">
-             <div class="card-header" style="cursor:grab; border-bottom:1px dashed var(--dim); margin-bottom:5px; font-weight:bold;">PROCESS_LIST</div>
-             <div class="scroll-area" style="height:100px; font-size:0.7rem;">
-                <table style="width:100%">${generateFakeProcesses()}</table>
-             </div>
-        </div>
-        
-        <div style="position:absolute; top:150px; left:330px;">
-            ${codeHtml}
-        </div>
-    </div>`;
-
-    initDraggables();
-    initPhysics();
+function loadPlaygroundFiles() {
+    if (playgroundFiles && playgroundFiles.length) return playgroundFiles;
+    try {
+        const raw = localStorage.getItem('playground-files');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                playgroundFiles = parsed;
+                return playgroundFiles;
+            }
+        }
+    } catch (e) { /* ignore */ }
+    playgroundFiles = [
+        { id: 'readme.txt', name: 'readme.txt', content: 'PLAYGROUND_POLYGON\nЛаскаво просимо до полігону — тестуйте UI, ефекти та міні-інструменти без ризику.' },
+        { id: 'fox-notes.txt', name: 'fox-notes.txt', content: 'Fox Lab: low-poly fox built with Three.js primitives. Rotate with time, lit by dual lights.' },
+        { id: 'ideas.md', name: 'ideas.md', content: '- Toggle shaders\n- Try new sound cues\n- Prototype UI micro-interactions' }
+    ];
+    return playgroundFiles;
 }
 
-// PHYSICS
-function initPhysics() {
-    const av = document.getElementById('pc-avatar');
-    const port = document.getElementById('pc-portal');
-    const fire = document.getElementById('pc-fire');
-    if (!av) return;
+function savePlaygroundFiles() {
+    try { localStorage.setItem('playground-files', JSON.stringify(playgroundFiles)); } catch (e) { /* ignore */ }
+}
 
-    const view = document.getElementById('view'); // Scroll container? 
-    // Wait, scroll happens on 'main' usually. 
-
-    const main = document.querySelector('main');
-
-    let lastScroll = main.scrollTop;
-
-    main.onscroll = function () {
-        if (!document.getElementById('pc-avatar')) return; // Exit if changed view
-
-        const diff = main.scrollTop - lastScroll;
-        lastScroll = main.scrollTop;
-
-        let currentTop = parseInt(av.style.top || 50);
-
-        // Inverse physics: Scroll Down -> Object goes Up? Or normal?
-        // Let's do Scroll Down -> Object Falls (Goes Down)
-        // Scroll Up -> Object Flies (Goes Up)
-
-        // Actually user said: scroll UP -> Portal (Up), Scroll DOWN -> Crash (Down)
-
-        // When we scroll down, scrollTop increases. diff > 0.
-        // We want avatar to go down (increase top).
-        currentTop += diff * 1.5;
-
-        av.style.top = currentTop + 'px';
-
-        // Bounds Check
-        if (currentTop < -20) {
-            // PORTAL
-            port.style.display = 'block';
-            port.style.top = '10px';
-            if (currentTop < -50) {
-                // Teleport
-                playSfx(1000, 'sawtooth', 0.2);
-                av.style.top = '140px';
-                port.style.display = 'none';
-            }
-        } else {
-            port.style.display = 'none';
-        }
-
-        if (currentTop > 140) {
-            // FIRE
-            fire.style.display = 'block';
-            fire.style.bottom = '10px';
-            if (currentTop > 170) {
-                // Crash
-                playSfx(100, 'noise', 0.3);
-                av.innerText = '💥';
-                setTimeout(() => { av.innerText = '💻'; av.style.top = '50px'; fire.style.display = 'none'; }, 1000);
-            }
-        } else {
-            fire.style.display = 'none';
-        }
+function ensureThree(callback) {
+    if (window.THREE) { callback(); return; }
+    threeQueue.push(callback);
+    if (threeLoading) return;
+    threeLoading = true;
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/three@0.160.0/build/three.min.js';
+    s.onload = function () {
+        threeLoading = false;
+        const queue = threeQueue.slice();
+        threeQueue = [];
+        queue.forEach(fn => { if (typeof fn === 'function') fn(); });
     };
+    s.onerror = function () { threeLoading = false; threeQueue = []; showToast('Three.js failed to load', 'error'); };
+    document.head.appendChild(s);
 }
 
-// DRAGGABLE
-function initDraggables() {
-    const cards = document.querySelectorAll('.draggable-card');
-    cards.forEach(c => {
-        const header = c.querySelector('.card-header');
-        if (!header) return;
+function teardownFoxLab() {
+    if (foxResizeHandler) {
+        window.removeEventListener('resize', foxResizeHandler);
+        foxResizeHandler = null;
+    }
+    if (foxAnimHandle) {
+        cancelAnimationFrame(foxAnimHandle);
+        foxAnimHandle = null;
+    }
+    if (foxRenderer) {
+        foxRenderer.dispose();
+        foxRenderer = null;
+    }
+    foxScene = null; foxCamera = null; foxGroup = null;
+}
 
-        header.onmousedown = function (e) {
-            e.preventDefault();
-            let pos3 = e.clientX;
-            let pos4 = e.clientY;
+function resizeFoxLab(container) {
+    if (!foxRenderer || !foxCamera || !container) return;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    foxCamera.aspect = w / h;
+    foxCamera.updateProjectionMatrix();
+    foxRenderer.setSize(w, h);
+}
 
-            document.onmouseup = closeDragElement;
-            document.onmousemove = elementDrag;
+function setupFoxLab() {
+    const holder = document.getElementById('fox-lab');
+    if (!holder) return;
+    ensureThree(() => {
+        if (!holder) return;
+        teardownFoxLab();
+        const THREE = window.THREE;
+        foxRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        foxRenderer.setPixelRatio(window.devicePixelRatio || 1);
+        foxRenderer.setSize(holder.clientWidth, holder.clientHeight);
+        holder.innerHTML = '';
+        holder.appendChild(foxRenderer.domElement);
 
-            // Bring to front
-            c.style.zIndex = 100;
+        foxScene = new THREE.Scene();
+        foxCamera = new THREE.PerspectiveCamera(50, holder.clientWidth / holder.clientHeight, 0.1, 100);
+        foxCamera.position.set(2, 1.4, 3);
 
-            function elementDrag(e) {
-                e.preventDefault();
-                let pos1 = pos3 - e.clientX;
-                let pos2 = pos4 - e.clientY;
-                pos3 = e.clientX;
-                pos4 = e.clientY;
-                c.style.top = (c.offsetTop - pos2) + "px";
-                c.style.left = (c.offsetLeft - pos1) + "px";
-            }
+        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+        const spot = new THREE.DirectionalLight(0xffb000, 0.8);
+        spot.position.set(3, 4, 2);
+        foxScene.add(ambient);
+        foxScene.add(spot);
 
-            function closeDragElement() {
-                document.onmouseup = null;
-                document.onmousemove = null;
-                c.style.zIndex = '';
-            }
+        foxGroup = new THREE.Group();
+        const orange = new THREE.MeshStandardMaterial({ color: 0xffa040, roughness: 0.6, metalness: 0.1 });
+        const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+        const black = new THREE.MeshStandardMaterial({ color: 0x111111 });
+
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 0.6), orange);
+        body.position.set(0, 0.3, 0);
+        foxGroup.add(body);
+
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), orange);
+        head.position.set(0.9, 0.55, 0);
+        foxGroup.add(head);
+
+        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.2), black);
+        nose.position.set(1.3, 0.45, 0);
+        foxGroup.add(nose);
+
+        const earL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.1), white);
+        earL.position.set(0.75, 0.85, 0.2);
+        const earR = earL.clone(); earR.position.z = -0.2;
+        foxGroup.add(earL); foxGroup.add(earR);
+
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.2), orange);
+        tail.position.set(-1.0, 0.35, 0);
+        tail.rotation.z = 0.25;
+        foxGroup.add(tail);
+
+        const legs = new THREE.BoxGeometry(0.15, 0.3, 0.15);
+        const legOffsets = [ [0.4, 0, 0.2], [0.4, 0, -0.2], [-0.4, 0, 0.2], [-0.4, 0, -0.2] ];
+        legOffsets.forEach((p, i) => {
+            const leg = new THREE.Mesh(legs, black);
+            leg.position.set(p[0], 0.15, p[2]);
+            foxGroup.add(leg);
+        });
+
+        foxScene.add(foxGroup);
+        const ground = new THREE.Mesh(new THREE.CircleGeometry(3, 40), new THREE.MeshBasicMaterial({ color: 0x101010 }));
+        ground.rotation.x = -Math.PI / 2;
+        foxScene.add(ground);
+
+        const animateFox = function () {
+            if (!foxRenderer || !foxScene || !foxCamera) return;
+            foxGroup.rotation.y += 0.01;
+            foxGroup.position.y = 0.05 + Math.sin(Date.now() / 500) * 0.02;
+            foxRenderer.render(foxScene, foxCamera);
+            foxAnimHandle = requestAnimationFrame(animateFox);
         };
+        animateFox();
+
+        foxResizeHandler = function () { resizeFoxLab(holder); };
+        window.addEventListener('resize', foxResizeHandler);
+        resizeFoxLab(holder);
     });
 }
 
-// PLAYGROUND
-window.runPlayground = function () {
-    const code = document.getElementById('code-in').value;
-    const out = document.getElementById('code-out');
-    try {
-        const res = eval(code);
-        out.innerText = ">> " + res;
-        playSfx(600);
-    } catch (e) {
-        out.innerText = "!! " + e.message;
-        out.style.color = 'red';
-        playSfx(100, 'sawtooth');
+function renderPlaygroundFilesList() {
+    const list = document.getElementById('pg-files');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!playgroundFiles.length) {
+        const e = document.createElement('div');
+        e.className = 'fs-empty';
+        e.innerText = 'No files yet';
+        list.appendChild(e);
+        return;
     }
+    playgroundFiles.forEach(f => {
+        const b = document.createElement('button');
+        b.className = 'fs-item ' + (f.id === playgroundCurrentFileId ? 'active' : '');
+        b.innerText = f.name;
+        b.onclick = function () { playgroundCurrentFileId = f.id; fillPlaygroundEditor(); };
+        list.appendChild(b);
+    });
+}
+
+function fillPlaygroundEditor() {
+    if (!playgroundFiles.length) return;
+    const editor = document.getElementById('pg-file-content');
+    const nameInput = document.getElementById('pg-file-name');
+    const header = document.getElementById('pg-file-heading');
+    const current = playgroundFiles.find(f => f.id === playgroundCurrentFileId) || playgroundFiles[0];
+    playgroundCurrentFileId = current.id;
+    if (editor) editor.value = current.content || '';
+    if (nameInput) nameInput.value = current.name || current.id;
+    if (header) header.innerText = current.name;
+    renderPlaygroundFilesList();
+}
+
+function newPlaygroundFile() {
+    const id = 'note-' + Date.now();
+    playgroundFiles.push({ id: id, name: 'note.txt', content: '' });
+    playgroundCurrentFileId = id;
+    savePlaygroundFiles();
+    fillPlaygroundEditor();
+}
+
+function saveCurrentPlaygroundFile() {
+    const editor = document.getElementById('pg-file-content');
+    const nameInput = document.getElementById('pg-file-name');
+    const current = playgroundFiles.find(f => f.id === playgroundCurrentFileId);
+    if (!current || !editor || !nameInput) return;
+    current.content = editor.value;
+    current.name = nameInput.value || current.name;
+    savePlaygroundFiles();
+    fillPlaygroundEditor();
+    showToast('File saved', 'success');
+}
+
+window.runPlayground = function () {
+    const codeBox = document.getElementById('code-in');
+    const out = document.getElementById('code-out');
+    if (!codeBox || !out) return;
+    out.style.color = '#0f0';
+    try {
+        // eslint-disable-next-line no-eval
+        const res = eval(codeBox.value);
+        out.innerText = '>> ' + res;
+    } catch (e) {
+        out.style.color = 'red';
+        out.innerText = '!! ' + e.message;
+    }
+};
+
+function submitPlaygroundCommand(evt) {
+    if (!evt || evt.key !== 'Enter') return;
+    evt.preventDefault();
+    const cmd = evt.target.value;
+    const codeBox = document.getElementById('code-in');
+    if (codeBox) codeBox.value = cmd;
+    runPlayground();
+    evt.target.value = '';
+}
+
+function renderPlaygroundPolygon() {
+    const main = document.querySelector('main');
+    if (main) {
+        if (!main.dataset.prevOverflow) main.dataset.prevOverflow = main.style.overflow || '';
+        main.style.overflow = 'hidden';
+        pcScrollCleanup = function () {
+            main.style.overflow = main.dataset.prevOverflow || '';
+            teardownFoxLab();
+        };
+    }
+
+    loadPlaygroundFiles();
+    if (!playgroundFiles.length) newPlaygroundFile();
+    if (!playgroundCurrentFileId && playgroundFiles.length) playgroundCurrentFileId = playgroundFiles[0].id;
+
+    const v = document.getElementById('view');
+    const platform = navigator.platform || 'unknown';
+    const cores = navigator.hardwareConcurrency || '?';
+    const mem = navigator.deviceMemory || '?';
+    const net = navigator.connection ? navigator.connection.downlink + 'Mbps' : 'n/a';
+    const themeActive = systemData.theme && systemData.theme.active ? systemData.theme.active : 'amber';
+    const saverCatalog = getSaverCatalog();
+    const saverName = (systemData.screensaver && systemData.screensaver.type) || (saverCatalog[0] ? saverCatalog[0].id : 'none');
+    const gamesCount = Array.isArray(systemData.games) ? systemData.games.length : (Array.isArray(defaultData.games) ? defaultData.games.length : 0);
+    const todoCount = Array.isArray(systemData.todos) ? systemData.todos.length : 0;
+
+    v.innerHTML = `<h2>PLAYGROUND_POLYGON</h2>
+    <div class="playground-shell">
+        <div class="playground-grid">
+            <section class="playground-panel">
+                <div class="panel-title">SYSTEM SNAPSHOT</div>
+                <div class="stat-row"><span>PLATFORM</span><strong>${platform}</strong></div>
+                <div class="stat-row"><span>CORES</span><strong>${cores}</strong></div>
+                <div class="stat-row"><span>RAM</span><strong>${mem} GB</strong></div>
+                <div class="stat-row"><span>NETWORK</span><strong>${navigator.onLine ? 'ONLINE' : 'OFFLINE'} / ${net}</strong></div>
+                <div class="panel-sub">Quick Toggles</div>
+                <div class="toggle-row"><label><input type="checkbox" id="pg-audio" checked> Sound FX</label><label><input type="checkbox" id="pg-grid" checked> Grid helpers</label></div>
+                <div class="panel-sub">Desktop Shortcuts</div>
+                <div class="desktop-icons">
+                    <button class="desktop-icon" onclick="fillPlaygroundEditor()">🗒️ Notes</button>
+                    <button class="desktop-icon" onclick="setupFoxLab()">🦊 Fox Lab</button>
+                    <button class="desktop-icon" onclick="document.getElementById('pg-lab-terminal').focus()">⌨️ Console</button>
+                </div>
+            </section>
+
+            <section class="playground-panel">
+                <div class="panel-title">FOX LAB (three.js)</div>
+                <div id="fox-lab" class="fox-stage"></div>
+                <div class="panel-note">Low-poly fox spins under dual lights. Resize-safe.</div>
+            </section>
+
+            <section class="playground-panel">
+                <div class="panel-title">JS CONSOLE</div>
+                <textarea id="code-in" class="playground-code" placeholder="console.log('Hello polygon')"></textarea>
+                <input id="pg-lab-terminal" class="playground-term" placeholder=":> type and press Enter" onkeydown="submitPlaygroundCommand(event)">
+                <div class="btn-row">
+                    <button class="btn" onclick="runPlayground()">RUN</button>
+                    <button class="btn" onclick="document.getElementById('code-out').innerText='>> cleared'">CLEAR</button>
+                </div>
+                <pre id="code-out" class="playground-output">>> ready</pre>
+                <div class="panel-title" style="margin-top:10px;">SENSOR HUD</div>
+                <div class="hud-grid">
+                    <div class="hud-card">Idle Saver: <strong>${saverName}</strong></div>
+                    <div class="hud-card">Theme: <strong>${themeActive}</strong></div>
+                    <div class="hud-card">Games: <strong>${gamesCount}</strong></div>
+                    <div class="hud-card">Todos: <strong>${todoCount}</strong></div>
+                </div>
+            </section>
+
+            <section class="playground-panel wide">
+                <div class="panel-title">FILE SYSTEM</div>
+                <div class="fs-manager">
+                    <div class="fs-sidebar" id="pg-files"></div>
+                    <div class="fs-editor">
+                        <div class="fs-header">
+                            <div id="pg-file-heading" class="fs-heading">notes</div>
+                            <div class="fs-actions">
+                                <input id="pg-file-name" class="fs-name" value="" />
+                                <button class="btn btn-sm" onclick="saveCurrentPlaygroundFile()">Save</button>
+                                <button class="btn btn-sm" onclick="newPlaygroundFile()">New</button>
+                            </div>
+                        </div>
+                        <textarea id="pg-file-content" class="fs-text"></textarea>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>`;
+
+    renderPlaygroundFilesList();
+    fillPlaygroundEditor();
+    setupFoxLab();
 }
 
 function generateFakeProcesses() {
@@ -1050,13 +1690,20 @@ function generateFakeProcesses() {
 
 function updateTreeVisuals() {
     const contactBtn = document.getElementById('nav-contact');
-    if (adminAuth) {
-        contactBtn.innerHTML = '/link';
-        document.getElementById('nav-admin').style.display = 'block';
-    } else {
-        contactBtn.innerHTML = '/link';
-        document.getElementById('nav-admin').style.display = 'none';
+    if (contactBtn) {
+        let label = contactBtn.querySelector('.nav-label');
+        if (!label) {
+            label = document.createElement('span');
+            label.className = 'nav-label';
+            label.textContent = ' /link';
+            contactBtn.appendChild(label);
+        } else {
+            label.textContent = ' /link';
+        }
     }
+
+    const adminBtn = document.getElementById('nav-admin');
+    if (adminBtn) adminBtn.style.display = adminAuth ? 'block' : 'none';
 }
 
 
@@ -1146,16 +1793,16 @@ async function selectHomeProfile(id) {
 
     if (hasPass) {
         if (!adminAuth) {
-            const att = prompt("ENTER PASSWORD:");
-            const hash = await hashPass(att);
+            const att = await showPrompt({ title: 'ENTER PASSWORD', placeholder: '********' });
+            const hash = await hashPass(att || '');
             if (hash !== profile.password) {
                 playSfx(100, 'sawtooth', 0.5);
-                alert("ACCESS DENIED");
+                showModal({ title: 'ACCESS DENIED', body: 'Wrong password for this profile.' });
                 return;
             }
         } else {
             playSfx(800, 'sine', 0.1);
-            alert("ADMIN: PASSWORD BYPASSED");
+            showToast('ADMIN: PASSWORD BYPASSED', 'info');
         }
     }
 
@@ -1189,15 +1836,89 @@ function selectHomeTag(tag) {
  */
 function renderWork() {
     const v = document.getElementById('view');
-    v.innerHTML = `<h2>WORK_TOOLS</h2><div class="work-grid"><div class="work-card"><h3>SECURE_PASS_GEN</h3><div id="pass-out" class="pass-result">...</div><div class="opts-grid"><label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label><label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label><label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label><label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label></div><div class="form-group" style="margin-bottom:10px;"><label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label><input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value"></div><button class="btn btn-green" onclick="generatePass()">GENERATE</button><button class="btn" onclick="copyPass()">COPY</button></div><div class="work-card"><h3>TRANSLITERATION (KMU 55)</h3><div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div><textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea><div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div><textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea><div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div></div></div>`;
+    const rememberedQR = lastQRText || '';
+    v.innerHTML = `
+        <h2>WORK_TOOLS</h2>
+        <div class="work-grid">
+            <div class="work-card">
+                <h3>SECURE_PASS_GEN</h3>
+                <div id="pass-out" class="pass-result">...</div>
+                <div class="opts-grid">
+                    <label class="opt-check"><input type="checkbox" id="p-upper" checked> A-Z</label>
+                    <label class="opt-check"><input type="checkbox" id="p-nums" checked> 0-9</label>
+                    <label class="opt-check"><input type="checkbox" id="p-syms"> !@#</label>
+                    <label class="opt-check"><input type="checkbox" id="p-phrase"> PHRASE</label>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label style="font-size:0.8rem">Length: <span id="p-len-val">16</span></label>
+                    <input type="range" id="p-len" min="8" max="64" value="16" style="width:100%" oninput="document.getElementById('p-len-val').innerText=this.value">
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-green" onclick="generatePass()">GENERATE</button>
+                    <button class="btn" onclick="copyPass()">COPY</button>
+                </div>
+            </div>
+
+            <div class="work-card">
+                <h3>QR CODE GENERATOR</h3>
+                <div class="form-group">
+                    <label>Text / URL <span style="opacity:0.6; font-size:0.8rem;">(up to 5KB, paged)</span></label>
+                    <textarea id="qr-text" class="translit-area" style="height:80px;" maxlength="5120" placeholder="https://example.com" oninput="autoPreviewQR(); document.getElementById('qr-limit').innerText=this.value.length + '/5120';"></textarea>
+                    <div id="qr-limit" style="font-size:0.8rem; opacity:0.6; text-align:right;">0/5120</div>
+                </div>
+                <div class="form-group" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <label class="opt-check">Size:
+                        <input type="range" id="qr-size" min="120" max="420" value="256" oninput="document.getElementById('qr-size-val').innerText=this.value; autoPreviewQR();">
+                        <span id="qr-size-val">256</span>px
+                    </label>
+                    <label class="opt-check">Format:
+                        <select id="qr-format" onchange="autoPreviewQR()"><option value="png">PNG</option><option value="svg">SVG</option></select>
+                    </label>
+                    <div class="muted" id="qr-page-info" style="margin-left:auto;">SINGLE QR</div>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                    <button class="btn" onclick="generateQR()">GENERATE</button>
+                    <button class="btn" onclick="downloadQR()">DOWNLOAD</button>
+                    <button class="btn btn-sm" onclick="shiftQRPage(-1)">PREV</button>
+                    <button class="btn btn-sm" onclick="shiftQRPage(1)">NEXT</button>
+                </div>
+                <div id="qr-preview" class="qr-preview">
+                    <canvas id="qr-canvas" width="256" height="256" aria-label="QR preview"></canvas>
+                    <div id="qr-svg" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div class="work-card">
+                <h3>TRANSLITERATION (KMU 55)</h3>
+                <div style="margin-bottom:5px; font-size:0.8rem">Ukrainian (Cyrillic):</div>
+                <textarea id="tr-ua" class="translit-area" placeholder="Введіть текст..." oninput="doTranslit('ua')"></textarea>
+                <div style="margin-bottom:5px; font-size:0.8rem">English (Latin):</div>
+                <textarea id="tr-en" class="translit-area" placeholder="Output..." oninput="doTranslit('en')"></textarea>
+                <div style="font-size:0.7rem; opacity:0.6; margin-top:5px;">*Reverse translit is best-effort estimate.</div>
+            </div>
+        </div>`;
+
+    const qrInput = document.getElementById('qr-text');
+    if (qrInput) {
+        qrInput.value = rememberedQR;
+        const limitBox = document.getElementById('qr-limit');
+        if (limitBox) limitBox.innerText = `${qrInput.value.length}/5120`;
+    }
     generatePass();
+    autoPreviewQR();
 }
 /** words - Слова для генерації парольних фраз */
 const words = ["cyber", "secure", "hack", "node", "core", "linux", "root", "admin", "flux", "neon", "grid", "data", "byte", "bit", "net", "web", "cloud", "void", "null", "zero"];
 /** generatePass - Генерує випадковий пароль за налаштуваннями */
 function generatePass() { const isPhrase = document.getElementById('p-phrase').checked; const len = parseInt(document.getElementById('p-len').value); const useUp = document.getElementById('p-upper').checked; const useNum = document.getElementById('p-nums').checked; const useSym = document.getElementById('p-syms').checked; let res = ""; if (isPhrase) { let wCount = Math.floor(len / 4); if (wCount < 3) wCount = 3; let arr = []; for (let i = 0; i < wCount; i++) { let w = words[Math.floor(Math.random() * words.length)]; if (useUp) w = w.charAt(0).toUpperCase() + w.slice(1); arr.push(w); } res = arr.join(useSym ? "-" : ""); if (useNum) res += Math.floor(Math.random() * 100); } else { let chars = "abcdefghijklmnopqrstuvwxyz"; if (useUp) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; if (useNum) chars += "0123456789"; if (useSym) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"; for (let i = 0; i < len; i++) res += chars.charAt(Math.floor(Math.random() * chars.length)); } document.getElementById('pass-out').innerText = res; }
 /** copyPass - Копіює згенерований пароль у буфер обміну */
-function copyPass() { const txt = document.getElementById('pass-out').innerText; if (txt !== "...") { navigator.clipboard.writeText(txt); alert("Copied!"); } }
+function copyPass() {
+    const txt = document.getElementById('pass-out').innerText;
+    if (txt !== "...") {
+        navigator.clipboard.writeText(txt);
+        showToast('Password copied', 'success');
+    }
+}
 
 /** mapUA - Таблиця транслітерації українських літер у латинські (КМУ 55) */
 const mapUA = { 'а': 'a', 'б': 'b', 'в': 'v', 'г': 'h', 'ґ': 'g', 'д': 'd', 'е': 'e', 'ж': 'zh', 'з': 'z', 'и': 'y', 'і': 'i', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ь': '', '\'': '', '’': '', 'ю': 'iu', 'я': 'ia', 'є': 'ie', 'ї': 'i', 'й': 'i' };
@@ -1209,6 +1930,247 @@ const mapUA_Start = { 'є': 'ye', 'ї': 'yi', 'й': 'y', 'ю': 'yu', 'я': 'ya' 
  */
 function doTranslit(dir) { if (dir === 'ua') { let src = document.getElementById('tr-ua').value; let out = ""; let temp = src.replace(/зг/g, "zgh").replace(/Зг/g, "Zgh").replace(/ЗГ/g, "ZGH"); for (let i = 0; i < temp.length; i++) { const c = temp[i]; const low = c.toLowerCase(); const isUp = c !== low; const isStart = (i === 0 || /[\s\n\t\.,!?]/.test(temp[i - 1])); let tr = ""; if (isStart && mapUA_Start[low]) tr = mapUA_Start[low]; else if (mapUA[low] !== undefined) tr = mapUA[low]; else tr = c; if (tr.length > 0) { if (isUp) { if (tr.length > 1 && temp[i + 1] && temp[i + 1] === temp[i + 1].toUpperCase()) tr = tr.toUpperCase(); else tr = tr.charAt(0).toUpperCase() + tr.slice(1); } } out += tr; } document.getElementById('tr-en').value = out; } else { let src = document.getElementById('tr-en').value; src = src.replace(/zgh/gi, "зг"); const revMapMulti = [{ k: 'shch', v: 'щ' }, { k: 'zh', v: 'ж' }, { k: 'kh', v: 'х' }, { k: 'ts', v: 'ц' }, { k: 'ch', v: 'ч' }, { k: 'sh', v: 'ш' }, { k: 'ye', v: 'є' }, { k: 'yi', v: 'ї' }, { k: 'yu', v: 'ю' }, { k: 'ya', v: 'я' }, { k: 'ia', v: 'я' }, { k: 'ie', v: 'є' }, { k: 'iu', v: 'ю' }]; for (let pair of revMapMulti) { const reg = new RegExp(pair.k, "gi"); src = src.replace(reg, (match) => { const isUp = match[0] === match[0].toUpperCase(); return isUp ? pair.v.toUpperCase() : pair.v; }); } const revMapSingle = { 'a': 'а', 'b': 'б', 'v': 'в', 'h': 'г', 'g': 'ґ', 'd': 'д', 'e': 'е', 'z': 'з', 'y': 'и', 'i': 'і', 'k': 'к', 'l': 'л', 'm': 'м', 'n': 'н', 'o': 'о', 'p': 'п', 'r': 'р', 's': 'с', 't': 'т', 'u': 'у', 'f': 'ф' }; let out = ""; for (let i = 0; i < src.length; i++) { const c = src[i]; const low = c.toLowerCase(); const isUp = c !== low; if (revMapSingle[low]) out += isUp ? revMapSingle[low].toUpperCase() : revMapSingle[low]; else out += c; } document.getElementById('tr-ua').value = out; } }
 
+// --- QR GENERATOR (VERSION 1 OFFLINE FALLBACK + REMOTE SINGLE CODE) ---
+const qrEncoder = (() => {
+    const gfExp = new Array(512);
+    const gfLog = new Array(256);
+    (function initGalois() {
+        let x = 1;
+        for (let i = 0; i < 255; i++) {
+            gfExp[i] = x;
+            gfLog[x] = i;
+            x <<= 1;
+            if (x & 0x100) x ^= 0x11d;
+        }
+        for (let i = 255; i < 512; i++) gfExp[i] = gfExp[i - 255];
+    })();
+    function gfMul(a, b) { if (a === 0 || b === 0) return 0; return gfExp[gfLog[a] + gfLog[b]]; }
+    function rsGeneratorPoly(ec) {
+        let poly = [1];
+        for (let i = 0; i < ec; i++) {
+            poly = polyMultiply(poly, [1, gfExp[i]]);
+        }
+        return poly;
+    }
+    function polyMultiply(p, q) {
+        const res = new Array(p.length + q.length - 1).fill(0);
+        for (let i = 0; i < p.length; i++) {
+            for (let j = 0; j < q.length; j++) res[i + j] ^= gfMul(p[i], q[j]);
+        }
+        return res;
+    }
+    function reedSolomon(data, ec) {
+        const gen = rsGeneratorPoly(ec);
+        const res = new Array(ec).fill(0);
+        data.forEach((byte) => {
+            const factor = byte ^ res[0];
+            res.shift(); res.push(0);
+            gen.slice(1).forEach((coef, idx) => { res[idx] ^= gfMul(coef, factor); });
+        });
+        return res;
+    }
+
+    function encodeQRBytes(data) {
+        const bytes = Array.isArray(data) || data instanceof Uint8Array
+            ? Array.from(data)
+            : Array.from(new TextEncoder().encode(data));
+        const chunkLimit = 17;
+        if (bytes.length > chunkLimit) throw new Error('Offline QR supports up to 17 bytes.');
+        const bits = [];
+        const pushBits = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >> i) & 1); };
+        pushBits(0b0100, 4); // Byte mode
+        pushBits(bytes.length, 8);
+        bytes.forEach((b) => pushBits(b, 8));
+        pushBits(0, Math.min(4, 152 - bits.length));
+        while (bits.length % 8 !== 0) bits.push(0);
+        const dataWords = [];
+        for (let i = 0; i < bits.length; i += 8) dataWords.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+        const pad = [0xec, 0x11]; let padIdx = 0;
+        while (dataWords.length < 19) { dataWords.push(pad[padIdx % 2]); padIdx++; }
+        return dataWords;
+    }
+
+    function buildQRMatrix(text) {
+        const data = encodeQRBytes(text);
+        const ecc = reedSolomon(data, 7);
+        const codewords = data.concat(ecc);
+        const size = 21;
+        const m = Array.from({ length: size }, () => Array(size).fill(null));
+
+        const placeFinder = (x, y) => {
+            for (let dy = 0; dy < 7; dy++) {
+                for (let dx = 0; dx < 7; dx++) {
+                    const on = (dx === 0 || dx === 6 || dy === 0 || dy === 6) || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4);
+                    m[y + dy][x + dx] = on;
+                }
+            }
+        };
+        placeFinder(0, 0); placeFinder(size - 7, 0); placeFinder(0, size - 7);
+        for (let i = 0; i < 8; i++) { m[7][i] = false; m[i][7] = false; m[7][size - 1 - i] = false; m[size - 1 - i][7] = false; m[i][size - 8] = false; m[size - 8][i] = false; }
+        for (let i = 0; i < size; i++) { if (m[6][i] === null) m[6][i] = i % 2 === 0; if (m[i][6] === null) m[i][6] = i % 2 === 0; }
+        m[size - 8][8] = true; // Dark module
+
+        const dataBits = [];
+        codewords.forEach((cw) => { for (let i = 7; i >= 0; i--) dataBits.push((cw >> i) & 1); });
+        let bitIdx = 0; let upward = true;
+        for (let col = size - 1; col > 0; col -= 2) {
+            if (col === 6) col--;
+            for (let rowOffset = 0; rowOffset < size; rowOffset++) {
+                const row = upward ? size - 1 - rowOffset : rowOffset;
+                for (let dx = 0; dx < 2; dx++) {
+                    if (m[row][col - dx] !== null) continue;
+                    const c = col - dx;
+                    const bit = bitIdx < dataBits.length ? dataBits[bitIdx++] : 0;
+                    const masked = bit ^ ((row + c) % 2 === 0 ? 1 : 0);
+                    m[row][c] = !!masked;
+                }
+            }
+            upward = !upward;
+        }
+
+        const formatBits = 0b111011111000100; // Level L + mask 0
+        const fmtCoordsA = [[8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 7], [8, 8], [7, 8], [5, 8], [4, 8], [3, 8], [2, 8], [1, 8], [0, 8]];
+        const fmtCoordsB = [[20, 8], [19, 8], [18, 8], [17, 8], [16, 8], [15, 8], [14, 8], [13, 8], [8, 13], [8, 14], [8, 15], [8, 16], [8, 17], [8, 18], [8, 19]];
+        const fmtBit = (idx) => ((formatBits >> (14 - idx)) & 1) === 1;
+        fmtCoordsA.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+        fmtCoordsB.forEach(([r, c], idx) => m[r][c] = fmtBit(idx));
+        return m;
+    }
+
+    return { buildQRMatrix };
+})();
+
+function drawQRToCanvas(matrix, size, canvas) {
+    const ctx = canvas.getContext('2d');
+    const dim = matrix.length;
+    const scale = Math.floor(size / dim);
+    const pad = 2 * scale;
+    const finalSize = dim * scale + pad * 2;
+    canvas.width = finalSize; canvas.height = finalSize;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, finalSize, finalSize);
+    ctx.fillStyle = '#000';
+    for (let y = 0; y < dim; y++) {
+        for (let x = 0; x < dim; x++) {
+            if (matrix[y][x]) ctx.fillRect(pad + x * scale, pad + y * scale, scale, scale);
+        }
+    }
+}
+
+function matrixToSVG(matrix, size) {
+    const dim = matrix.length;
+    const scale = size / dim;
+    let path = '';
+    for (let y = 0; y < dim; y++) {
+        for (let x = 0; x < dim; x++) {
+            if (matrix[y][x]) path += `M${(x * scale).toFixed(2)} ${(y * scale).toFixed(2)}h${scale.toFixed(2)}v${scale.toFixed(2)}h-${scale.toFixed(2)}z`;
+        }
+    }
+    const view = size.toFixed(2);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${view} ${view}" width="${view}" height="${view}"><rect width="100%" height="100%" fill="white"/>${path ? `<path d="${path}" fill="black"/>` : ''}</svg>`;
+}
+
+function autoPreviewQR() { setTimeout(generateQR, 10); }
+async function generateQR() {
+    const txtEl = document.getElementById('qr-text');
+    const sizeEl = document.getElementById('qr-size');
+    const formatEl = document.getElementById('qr-format');
+    const txt = txtEl && typeof txtEl.value === 'string' ? txtEl.value : '';
+    const size = parseInt((sizeEl && sizeEl.value) ? sizeEl.value : '256');
+    const format = formatEl && formatEl.value ? formatEl.value : 'png';
+    lastQRFormat = format; lastQRSize = size; lastQRText = txt;
+    lastQRMatrix = null; lastQRDataUrl = ''; lastQRSvgMarkup = '';
+
+    const info = document.getElementById('qr-page-info');
+    if (info) info.innerText = 'SINGLE QR';
+    const prevBtn = document.querySelector('button[onclick="shiftQRPage(-1)"]');
+    const nextBtn = document.querySelector('button[onclick="shiftQRPage(1)"]');
+    [prevBtn, nextBtn].forEach(btn => { if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; } });
+
+    if (!txt.trim()) {
+        const canvas = document.getElementById('qr-canvas');
+        if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillText('Enter text', 10, 20); }
+        const svgBox = document.getElementById('qr-svg');
+        if (svgBox) svgBox.innerHTML = '';
+        return;
+    }
+    const bytes = Array.from(new TextEncoder().encode(txt.trim()));
+    const maxBytes = 5120;
+    if (bytes.length > maxBytes) { showModal({ title: 'QR LIMIT', body: `Please keep QR content within ${maxBytes} bytes (~5KB).` }); return; }
+
+    const canvas = document.getElementById('qr-canvas');
+    const svgBox = document.getElementById('qr-svg');
+    const offlineCap = 17;
+    if (bytes.length <= offlineCap) {
+        try {
+            lastQRMatrix = qrEncoder.buildQRMatrix(bytes);
+            if (format === 'svg') {
+                const svg = matrixToSVG(lastQRMatrix, size);
+                lastQRSvgMarkup = svg;
+                if (svgBox) { svgBox.style.display = 'block'; if (canvas) canvas.style.display = 'none'; svgBox.innerHTML = svg; }
+            } else if (canvas) {
+                drawQRToCanvas(lastQRMatrix, size, canvas);
+                lastQRDataUrl = canvas.toDataURL('image/png');
+                canvas.style.display = 'block';
+                if (svgBox) { svgBox.innerHTML = ''; svgBox.style.display = 'none'; }
+            }
+            return;
+        } catch (e) {
+            showModal({ title: 'QR ERROR', body: e && e.message ? e.message : 'Unable to build offline QR' });
+        }
+    }
+
+    const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(txt)}&size=${size}&format=${format === 'svg' ? 'svg' : 'png'}`;
+    try {
+        if (format === 'svg') {
+            const res = await fetch(qrUrl);
+            if (!res || !res.ok) throw new Error('QR request failed');
+            const markup = await res.text();
+            lastQRSvgMarkup = markup;
+            if (svgBox) {
+                svgBox.style.display = 'block';
+                if (canvas) canvas.style.display = 'none';
+                svgBox.innerHTML = markup;
+            }
+        } else {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise((resolve, reject) => { img.onload = () => resolve(true); img.onerror = () => reject(new Error('QR image load failed')); img.src = qrUrl; });
+            if (canvas) {
+                canvas.width = size; canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+                ctx.drawImage(img, 0, 0, size, size);
+                lastQRDataUrl = canvas.toDataURL('image/png');
+                canvas.style.display = 'block';
+                if (svgBox) { svgBox.innerHTML = ''; svgBox.style.display = 'none'; }
+            }
+        }
+    } catch (e) {
+        showModal({ title: 'QR ERROR', body: e && e.message ? e.message : 'Unable to build QR' });
+    }
+}
+
+function downloadQR() {
+    if (!lastQRText.trim()) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
+    if (lastQRFormat === 'svg') {
+        let svg = lastQRSvgMarkup;
+        if (!svg && lastQRMatrix) svg = matrixToSVG(lastQRMatrix, lastQRSize);
+        if (!svg) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'qr.svg'; a.click(); URL.revokeObjectURL(url);
+    } else {
+        const canvas = document.getElementById('qr-canvas');
+        if (!canvas) { showModal({ title: 'NO QR', body: 'Generate QR first.' }); return; }
+        if (lastQRMatrix) drawQRToCanvas(lastQRMatrix, lastQRSize, canvas);
+        if (!lastQRDataUrl) lastQRDataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = lastQRDataUrl; a.download = 'qr.png'; a.click();
+    }
+}
+
+function shiftQRPage() { return; }
 // --- CRYPTO HELPER ---
 /**
  * hashPass - Генерує SHA-256 хеш рядка
@@ -1370,33 +2332,89 @@ window.genMD = function () {
  * Підтримує категорії, файли та захист паролем
  */
 function renderObsidian() {
-    const v = document.getElementById('view'); const content = currentObsFile ? systemData.obsidian[currentObsCat][currentObsFile].replace(/\\\\/g, '\\') : "Оберіть нотатку для зчитування..."; v.innerHTML = `<h2>Obsidian.Vault</h2><div class="obs-container"><div class="obs-tabs" id="o-t"></div><div class="obs-main"><div class="obs-files" id="o-f"></div><div class="obs-viewer" id="o-v"><pre>${content}</pre></div></div></div>`; const tabBox = document.getElementById('o-t');
-    systemData.obsidian.cats.forEach(c => {
-        const b = document.createElement('button');
-        b.className = `obs-tab-btn ${c === currentObsCat ? 'active' : ''}`;
-        // Lock icon in tab
-        const isLocked = systemData.obsidian.catAuth && systemData.obsidian.catAuth[c];
-        b.innerText = (isLocked ? '🔒 ' : '') + c;
+    const v = document.getElementById('view');
+    if (!v) return;
 
-        b.onclick = () => {
-            if (isLocked) { // Check lock existence first
-                if (!adminAuth) {
-                    const p = prompt("ENTER PASSWORD for " + c + ":");
-                    if (p !== systemData.obsidian.catAuth[c]) {
-                        playSfx(100, 'sawtooth', 0.5); alert("ACCESS DENIED"); return;
+    const obs = (systemData && systemData.obsidian && typeof systemData.obsidian === 'object') ? systemData.obsidian : {};
+    const cats = Array.isArray(obs.cats) ? obs.cats : [];
+
+    if (!dataReady) {
+        v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading Obsidian data...</div>';
+        return;
+    }
+
+    // Ensure current category is valid
+    if (!cats.includes(currentObsCat)) {
+        currentObsCat = cats.length ? cats[0] : '';
+        currentObsFile = '';
+    }
+
+    const currentCatFiles = currentObsCat && obs[currentObsCat] && typeof obs[currentObsCat] === 'object'
+        ? obs[currentObsCat]
+        : {};
+    const fileKeys = Object.keys(currentCatFiles);
+
+    if (currentObsFile && !fileKeys.includes(currentObsFile)) currentObsFile = '';
+    const displayFile = currentObsFile || fileKeys[0] || '';
+
+    const content = displayFile && currentCatFiles[displayFile]
+        ? String(currentCatFiles[displayFile]).replace(/\\\\/g, '\\')
+        : (cats.length ? "Оберіть нотатку для зчитування або створіть нову..." : "Немає доступних категорій нотаток.");
+
+    v.innerHTML = `<h2>Obsidian.Vault</h2>
+        <div class="obs-container">
+            <div class="obs-tabs" id="o-t"></div>
+            <div class="obs-main">
+                <div class="obs-files" id="o-f"></div>
+                <div class="obs-viewer" id="o-v"><pre>${content}</pre></div>
+            </div>
+        </div>`;
+
+    const tabBox = document.getElementById('o-t');
+    if (tabBox && cats.length) {
+        cats.forEach(c => {
+            const b = document.createElement('button');
+            b.className = `obs-tab-btn ${c === currentObsCat ? 'active' : ''}`;
+            const isLocked = obs.catAuth && obs.catAuth[c];
+            b.innerText = (isLocked ? '🔒 ' : '') + c;
+
+            b.onclick = () => {
+                if (isLocked) {
+                    if (!adminAuth) {
+                        showPrompt({ title: 'ENTER PASSWORD', message: `Category ${c} is locked`, placeholder: '********' }).then((p) => {
+                            if (p !== obs.catAuth[c]) {
+                                playSfx(100, 'sawtooth', 0.5); showModal({ title: 'ACCESS DENIED', body: 'Wrong category password.' }); return;
+                            }
+                            currentObsCat = c; currentObsFile = ''; renderObsidian();
+                        });
+                        return;
+                    } else {
+                        playSfx(800, 'sine', 0.1);
+                        showToast('ADMIN: PASSWORD BYPASSED', 'info');
                     }
-                } else {
-                    // Admin feedback
-                    playSfx(800, 'sine', 0.1);
-                    alert("ADMIN: PASSWORD BYPASSED");
                 }
-            }
-            currentObsCat = c; currentObsFile = ''; renderObsidian();
-        };
-        tabBox.appendChild(b);
-    });
+                currentObsCat = c; currentObsFile = ''; renderObsidian();
+            };
+            tabBox.appendChild(b);
+        });
+    } else if (tabBox) {
+        tabBox.innerHTML = '<div style="opacity:0.6; padding:8px;">No note categories</div>';
+    }
 
-    const fileBox = document.getElementById('o-f'); Object.keys(systemData.obsidian[currentObsCat]).forEach(f => { const b = document.createElement('button'); b.className = `obs-file-item ${f === currentObsFile ? 'active' : ''}`; b.innerText = '> ' + f; b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); }; fileBox.appendChild(b); });
+    const fileBox = document.getElementById('o-f');
+    if (fileBox) {
+        if (!fileKeys.length) {
+            fileBox.innerHTML = '<div style="opacity:0.6; padding:8px;">No files in this category</div>';
+        } else {
+            fileKeys.forEach(f => {
+                const b = document.createElement('button');
+                b.className = `obs-file-item ${f === displayFile ? 'active' : ''}`;
+                b.innerText = '> ' + f;
+                b.onclick = () => { currentObsFile = f; playSfx(600); renderObsidian(); };
+                fileBox.appendChild(b);
+            });
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1516,28 +2534,48 @@ window.addBlogComment = function (postId) {
 // #SECTION_TODO - Список справ
 // ═══════════════════════════════════════════════════════════════════════════════
 
+function computeTodoStats(list) {
+    const todos = Array.isArray(list) ? list : [];
+    const total = todos.length;
+    const done = todos.filter(t => t.d).length;
+    const scheduled = todos.filter(t => t.due).length;
+    const progress = total ? Math.round((done / total) * 100) : 0;
+    return { total, done, scheduled, progress };
+}
+
 /** renderTodo - Рендерить контейнер списку справ */
 function renderTodo() {
     const v = document.getElementById('view');
     const editable = systemData.todoEditable;
-
-    // Initialize events
-    if (!systemData.calendarEvents) systemData.calendarEvents = [];
+    const stats = computeTodoStats(systemData.todos);
 
     let html = `<h2>TODO_MANAGER ${editable ? '[EDIT_MODE]' : '[READ_ONLY]'}</h2>`;
+    html += `<div class="todo-stats">
+        <div><strong>${stats.done}/${stats.total}</strong> completed</div>
+        <div class="progress"><span style="width:${stats.progress}%;"></span></div>
+        <div>${stats.scheduled} scheduled</div>
+    </div>`;
 
     if (editable) {
         html += `<div class="todo-input-group" style="margin-bottom:15px; flex-wrap:wrap;">
             <input type="text" id="new-todo-input" class="todo-input" placeholder="New task..." onkeypress="if(event.key==='Enter') addTodoItem()">
+            <input type="date" id="new-todo-date" class="todo-input" style="max-width:180px;" aria-label="Due date">
+            <input type="time" id="new-todo-time" class="todo-input" style="max-width:140px;" aria-label="Due time">
             <button class="btn" onclick="addTodoItem()">ADD_TASK</button>
             <button class="btn" onclick="renderCalendar()" style="margin-left:auto;">[ CALENDAR_VIEW ]</button>
             <button class="btn" onclick="renderTodoList()" id="list-view-btn" style="display:none;">[ LIST_VIEW ]</button>
         </div>
         <div style="margin-bottom:15px; display:flex; gap:10px;">
              <button class="btn" onclick="exportTodoData()">EXPORT (JSON)</button>
+             <button class="btn" onclick="exportTodoICS()">EXPORT (ICS)</button>
              <label class="btn" style="cursor:pointer;">
                 IMPORT (JSON) <input type="file" id="todo-imp" style="display:none" onchange="importTodoData(this)">
              </label>
+        </div>`;
+    } else {
+        html += `<div style="margin-bottom:15px; display:flex; gap:10px;">
+            <button class="btn" onclick="renderCalendar()">[ CALENDAR_VIEW ]</button>
+            <button class="btn" onclick="exportTodoICS()">EXPORT (ICS)</button>
         </div>`;
     }
     html += `<div class="todo-container" id="todo-main-box"><div class="todo-list" id="todo-list"></div></div>`;
@@ -1558,12 +2596,19 @@ function renderTodoList() {
     systemData.todos.forEach((t, i) => {
         const el = document.createElement('div');
         el.className = `todo-item ${t.d ? 'todo-done' : ''}`;
+        const dueInfo = t.due ? `<span class="todo-due">${t.due}${t.time ? ' ' + t.time : ''}</span>` : '<span class="todo-due muted">No date</span>';
         if (editable) {
-            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span> 
-                           <span class="todo-text">${t.t}</span>
-                           <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})" style="margin-left:auto">X</button>`;
+            el.innerHTML = `<span class="todo-check" onclick="toggleTodoDone(${i})" style="cursor:pointer">[${t.d ? 'x' : ' '}]</span>
+                           <div class="todo-meta" onclick="openTodoDetail(${i})">
+                                <div class="todo-text">${t.t}</div>
+                                <div class="todo-meta-line">${dueInfo} <span class="todo-status">${t.d ? 'DONE' : 'ACTIVE'}</span></div>
+                           </div>
+                           <div class="todo-actions">
+                                <button class="btn btn-sm" onclick="openTodoDetail(${i})">DETAILS</button>
+                                <button class="btn btn-red btn-sm todo-del" onclick="removeTodoItem(${i})">X</button>
+                           </div>`;
         } else {
-            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <span class="todo-text">${t.t}</span>`;
+            el.innerHTML = `<span class="todo-check">[${t.d ? 'x' : ' '}]</span> <div class="todo-meta"><div class="todo-text">${t.t}</div><div class="todo-meta-line">${dueInfo}</div></div>`;
         }
         l.appendChild(el);
     });
@@ -1575,34 +2620,30 @@ function renderCalendar() {
     const listBtn = document.getElementById('list-view-btn');
     if (listBtn) listBtn.style.display = 'inline-block';
 
-    // Ensure data exists
-    if (!systemData.calendarEvents) systemData.calendarEvents = [];
-
     const now = new Date();
-    // Use current view state if we want to navigate months, but for now simple:
     const m = now.getMonth();
     const y = now.getFullYear();
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+    const editable = !!systemData.todoEditable;
 
-    let html = `<div class="calendar-grid">`;
-    // Headers
+    const events = (systemData.todos || []).filter(t => t.due).map((t, idx) => ({ date: t.due, title: t.t, time: t.time || 'All Day', idx }));
+
+    let html = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-weight:bold;">${y}-${String(m + 1).padStart(2, '0')}</div>
+        <button class="btn btn-sm" onclick="renderTodoList()">BACK TO LIST</button>
+    </div>`;
+    html += `<div class="calendar-grid">`;
     ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(d => html += `<div style="text-align:center; font-weight:bold; border-bottom:1px solid var(--text); padding:5px 0;">${d}</div>`);
-
-    // Empty cells
     for (let i = 0; i < firstDay; i++) html += `<div></div>`;
-
-    // Days
     for (let i = 1; i <= daysInMonth; i++) {
         const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        // Find events
-        const events = systemData.calendarEvents.filter(e => e.date === dateStr);
-        const hasEv = events.length > 0;
-
+        const dayEvents = events.filter(e => e.date === dateStr);
+        const hasEv = dayEvents.length > 0;
         html += `<div class="cal-day" onclick="openCalDate('${dateStr}')" style="border:1px solid var(--dim); min-height:80px; padding:5px; cursor:pointer; position:relative;">
             <div style="font-weight:bold; opacity:${hasEv ? 1 : 0.5}; margin-bottom:5px;">${i}</div>
             <div style="font-size:0.65rem; line-height:1.2;">
-                ${events.map(e => `<div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:var(--dim); margin-bottom:2px; padding:1px;">• ${e.title}</div>`).join('')}
+                ${dayEvents.map(e => `<div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; background:var(--dim); margin-bottom:2px; padding:1px;">• ${e.title}</div>`).join('')}
             </div>
             ${i === now.getDate() ? '<div style="position:absolute; top:5px; right:5px; width:8px; height:8px; background:var(--text); border-radius:50%;"></div>' : ''}
         </div>`;
@@ -1613,49 +2654,89 @@ function renderCalendar() {
 }
 
 window.openCalDate = function (date) {
-    const events = systemData.calendarEvents.filter(e => e.date === date);
-    let l = events.map((e, idx) => `<div>[${e.time}] ${e.title} <button onclick="delCalEvent('${date}',${idx})">x</button></div>`).join('');
+    if (!systemData.todos) systemData.todos = [];
+    const editable = !!systemData.todoEditable;
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.flexDirection = 'column';
+    wrapper.style.gap = '10px';
 
-    const name = prompt(`EVENTS FOR ${date}\n\n${l.replace(/<[^>]*>/g, '')}\n\nAdd new event (Format: HH:MM Title):`);
-    if (name) {
-        const parts = name.split(' ');
-        const time = parts[0];
-        const title = parts.slice(1).join(' ');
-        systemData.calendarEvents.push({ date: date, time: time, title: title || 'Event' });
-        saveData();
-        renderCalendar();
-    }
-}
+    const listBox = document.createElement('div');
+    listBox.className = 'cal-event-list';
 
-window.delCalEvent = function (date, idx) {
-    if (!confirm("Delete this event?")) return;
-    const globalIdx = systemData.calendarEvents.findIndex((e, i) => e.date === date && i === (systemData.calendarEvents.filter(x => x.date === date).indexOf(e))); // Tricky to find exact index in global array if multiple events on same day. 
-    // Easier approach: Filter out the specific one.
-    // However, the `idx` passed is the index within the *filtered* array for that day.
-
-    // Let's get the event object first
-    const dayEvents = systemData.calendarEvents.filter(e => e.date === date);
-    const eventToDelete = dayEvents[idx];
-
-    if (eventToDelete) {
-        // Find index in main array
-        const realIdx = systemData.calendarEvents.indexOf(eventToDelete);
-        if (realIdx > -1) {
-            systemData.calendarEvents.splice(realIdx, 1);
-            saveData();
-            // Re-open date view
-            openCalDate(date);
-            // Refresh calendar background
-            renderCalendar();
+    const renderList = () => {
+        const events = systemData.todos.filter(e => e.due === date);
+        if (!events.length) {
+            listBox.innerHTML = '<div style="opacity:0.6;">No events for this date</div>';
+            return;
         }
+        listBox.innerHTML = '';
+        events.forEach((e, idx) => {
+            const row = document.createElement('div');
+            row.className = 'cal-event-row';
+            row.innerHTML = `<span class="badge">${e.time || 'All Day'}</span><span class="cal-event-title">${e.title}</span>`;
+            if (editable) {
+                const delBtn = document.createElement('button');
+                delBtn.className = 'btn btn-sm btn-red';
+                delBtn.innerText = 'Delete';
+                delBtn.onclick = () => {
+                    showConfirm('Delete this event?').then((ok) => {
+                        if (!ok) return;
+                        const target = systemData.todos.filter(t => t.due === date)[idx];
+                        if (!target) return;
+                        const realIdx = systemData.todos.indexOf(target);
+                        if (realIdx > -1) systemData.todos.splice(realIdx, 1);
+                        saveData();
+                        renderList();
+                        renderTodoList();
+                    });
+                };
+                row.appendChild(delBtn);
+            }
+            listBox.appendChild(row);
+        });
+    };
+
+    const form = document.createElement('div');
+    form.style.display = 'flex';
+    form.style.gap = '10px';
+    form.style.flexWrap = 'wrap';
+    form.innerHTML = editable ? `
+        <label class="opt-check">Time <input type="time" id="cal-time" class="todo-input" style="max-width:140px;"></label>
+        <input type="text" id="cal-title" class="todo-input" placeholder="Title..." style="flex:1; min-width:180px;">
+        <button class="btn btn-green" id="cal-add-btn">Add</button>
+    ` : `<div style="opacity:0.7;">Calendar is read-only</div>`;
+
+    wrapper.appendChild(listBox);
+    wrapper.appendChild(form);
+
+    const overlay = showModal({ title: `Events for ${date}`, body: wrapper, actions: [{ label: 'Close' }] });
+    const addBtn = form.querySelector('#cal-add-btn');
+    if (addBtn) {
+        addBtn.onclick = () => {
+            if (!editable) return;
+            const time = form.querySelector('#cal-time').value || 'All Day';
+            const title = form.querySelector('#cal-title').value.trim() || 'Event';
+            systemData.todos.push({ t: title, due: date, time, d: false });
+            saveData();
+            form.querySelector('#cal-title').value = '';
+            renderList();
+            renderTodoList();
+        };
     }
-}
+
+    renderList();
+    setTimeout(() => {
+        const firstInput = overlay ? overlay.querySelector('input') : null;
+        if (firstInput && typeof firstInput.focus === 'function') firstInput.focus();
+    }, 30);
+};
 
 // IMPORT / EXPORT
 window.exportTodoData = function () {
     const data = {
         todos: systemData.todos,
-        calendar: systemData.calendarEvents
+        calendar: []
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1665,6 +2746,29 @@ window.exportTodoData = function () {
     link.click();
 }
 
+window.exportTodoICS = function () {
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//cl0w.nz//tasks//EN'];
+    const pushEvent = (title, date, time) => {
+        if (!date) return;
+        const uid = `${title}-${date}-${time || 'allday'}@cl0w.nz`;
+        const dt = date.replace(/-/g, '') + (time ? 'T' + time.replace(/:/g, '') + '00' : '');
+        lines.push('BEGIN:VEVENT');
+        lines.push('UID:' + uid);
+        lines.push('DTSTAMP:' + stamp);
+        lines.push('DTSTART:' + dt);
+        lines.push('SUMMARY:' + title);
+        lines.push('END:VEVENT');
+    };
+    (systemData.todos || []).forEach((t) => pushEvent(t.t, t.due, t.time));
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'tasks.ics'; a.click(); URL.revokeObjectURL(url);
+};
+
 window.importTodoData = function (acc) {
     const file = acc.files[0];
     if (!file) return;
@@ -1673,12 +2777,18 @@ window.importTodoData = function (acc) {
         try {
             const d = JSON.parse(e.target.result);
             if (d.todos) systemData.todos = d.todos;
-            if (d.calendar) systemData.calendarEvents = d.calendar;
+            if (Array.isArray(d.calendar)) {
+                d.calendar.forEach(ev => {
+                    if (ev && ev.date && ev.title) {
+                        systemData.todos.push({ t: ev.title, due: ev.date, time: ev.time || 'All Day', d: false });
+                    }
+                });
+            }
             saveData();
-            alert("Tasks Imported!");
+            showToast('Tasks Imported!', 'success');
             renderTodo();
         } catch (err) {
-            alert("Error parsing JSON");
+            showModal({ title: 'Import Error', body: 'Error parsing JSON' });
         }
     };
     r.readAsText(file);
@@ -1688,10 +2798,19 @@ window.importTodoData = function (acc) {
 function addTodoItem() {
     const inp = document.getElementById('new-todo-input');
     if (!inp || !inp.value.trim()) return;
-    systemData.todos.push({ t: inp.value.trim(), d: false });
+    const dueInput = document.getElementById('new-todo-date');
+    const timeInput = document.getElementById('new-todo-time');
+    const dueDate = dueInput && dueInput.value ? dueInput.value : '';
+    const dueTime = timeInput && timeInput.value ? timeInput.value : '';
+    const item = { t: inp.value.trim(), d: false };
+    if (dueDate) item.due = dueDate;
+    if (dueTime) item.time = dueTime;
+    systemData.todos.push(item);
     saveData();
     renderTodoList();
     inp.value = '';
+    const dIn = document.getElementById('new-todo-date'); if (dIn) dIn.value = '';
+    const tIn = document.getElementById('new-todo-time'); if (tIn) tIn.value = '';
     playSfx(800);
 }
 /** toggleTodoDone - Змінює статус виконання завдання */
@@ -1703,12 +2822,53 @@ function toggleTodoDone(i) {
 }
 /** removeTodoItem - Видаляє елемент зі списку справ */
 function removeTodoItem(i) {
-    if (confirm("Delete this task?")) {
+    showConfirm('Delete this task?').then((ok) => {
+        if (!ok) return;
         systemData.todos.splice(i, 1);
         saveData();
         renderTodoList();
         playSfx(400);
-    }
+    });
+}
+
+function openTodoDetail(i) {
+    const item = systemData.todos[i];
+    if (!item) return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+        <div class="form-group"><label>Title</label><input type="text" id="todo-edit-title" class="form-control" value="${item.t}"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <label class="opt-check">Due <input type="date" id="todo-edit-date" value="${item.due || ''}" class="todo-input" style="max-width:180px;"></label>
+            <label class="opt-check">Time <input type="time" id="todo-edit-time" value="${item.time || ''}" class="todo-input" style="max-width:140px;"></label>
+            <label class="opt-check"><input type="checkbox" id="todo-edit-done" ${item.d ? 'checked' : ''}> Done</label>
+        </div>
+    `;
+
+    showModal({
+        title: 'Task Details',
+        body: wrapper,
+        actions: [
+            { label: 'Delete', variant: 'danger', onClick: () => removeTodoItem(i) },
+            {
+                label: 'Save', variant: 'success', onClick: () => {
+                    const title = wrapper.querySelector('#todo-edit-title').value.trim() || 'Task';
+                    const due = wrapper.querySelector('#todo-edit-date').value;
+                    const time = wrapper.querySelector('#todo-edit-time').value;
+                    const done = wrapper.querySelector('#todo-edit-done').checked;
+
+                    const prevDue = item.due;
+                    const prevTitle = item.t;
+                    item.t = title;
+                    item.due = due || undefined;
+                    item.time = time || undefined;
+                    item.d = done;
+
+                    saveData();
+                    renderTodoList();
+                }
+            }
+        ]
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1718,72 +2878,407 @@ function removeTodoItem(i) {
 function renderGameMenu() {
     const v = document.getElementById('view');
     // MERGED RENDER GAME MENU
-    const customGames = systemData.games.map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
+    const gameList = Array.isArray(systemData.games) ? systemData.games : [];
+    const reserved = ['snake', 'tetris', 'pico8'];
+    const nameFor = (id, fallback) => {
+        const found = gameList.find((g) => g && g.id === id);
+        if (found && found.name) return found.name;
+        return fallback;
+    };
+    const customGames = gameList
+        .filter((g) => g && g.id && reserved.indexOf(g.id) === -1)
+        .map((g) => `<div class="game-card" onclick="runGame('${g.id}')">${g.name}</div>`).join('');
 
     v.innerHTML = `<h2>GAME_CENTER</h2>
     <div class="game-hub">
-        <div class="game-card" onclick="runGame('snake')">SNAKE</div>
-        <div class="game-card" onclick="runGame('tetris')">TETRIS</div>
-        <div class="game-card" onclick="runGame('pong')">PONG</div>
+        <div class="game-card" onclick="runGame('snake')">${nameFor('snake', 'SNAKE')}</div>
+        <div class="game-card" onclick="runGame('tetris')">${nameFor('tetris', 'TETRIS')}</div>
         <div class="game-card" onclick="runGame('pico8')">PICO-8 (WEB)</div>
         ${customGames}
     </div>
-    <div id="game-area" class="game-area" style="display:none; width:640px; height:480px;">
-        <canvas id="game-canvas" width="640" height="480"></canvas>
+    <div class="game-panels">
+        <div id="game-area" class="game-area" style="display:none;">
+            <div class="game-stage">
+                <canvas id="game-canvas" width="640" height="480"></canvas>
+                <div id="arena" class="custom-game" role="presentation"></div>
+            </div>
+            <div id="game-hint" class="game-hint">Arrows to move. Space/Enter to rotate. Esc to exit.</div>
+        </div>
+        <div id="pico-area" class="pico-panel" style="display:none;">
+            <div class="game-toolbar">
+                <input id="pico-url" class="todo-input" placeholder="PICO-8 widget URL" value="https://www.lexaloffle.com/bbs/widget.php?pid=celeste" aria-label="PICO-8 cart url">
+                <button class="btn" onclick="loadPicoCart()">LOAD CART</button>
+                <button class="btn" onclick="playPicoDemo()">PLAY CELESTE</button>
+            </div>
+            <div class="game-toolbar">
+                <input id="pico-name" class="todo-input" placeholder="Cart name" style="max-width:220px;">
+                <button class="btn btn-sm" onclick="savePicoEntry()">SAVE TO LIST</button>
+            </div>
+            <div id="pico-list" class="pico-list"></div>
+            <iframe id="pico-frame" src="" style="width:100%; height:70vh; border:1px solid var(--text); background:#000;"></iframe>
+        </div>
     </div>
-    <div id="pico-area" style="display:none; width:100%; height:80vh; flex-direction:column;">
-         <div style="margin-bottom:5px; display:flex; gap:10px;">
-            <button class="btn" onclick="loadPicoCart()">LOAD CART URL</button>
-            <button class="btn" onclick="document.getElementById('pico-frame').src='https://www.lexaloffle.com/bbs/widget.php?pid=celeste'">PLAY CELESTE</button>
-         </div>
-        <iframe id="pico-frame" src="" style="width:100%; height:100%; border:none; background:#000;"></iframe>
-    </div>
-    <div style="margin-top:10px;"><button class="btn btn-red" onclick="stopGames()">EXIT_GAME</button></div>`;
+    <div class="game-footer">
+        <div id="game-status" aria-live="polite">Select a game to start.</div>
+        <button class="btn btn-red" onclick="stopGames()">EXIT_GAME</button>
+    </div>`;
+
+    renderPicoList();
 }
 
 window.loadPicoCart = function () {
-    const url = prompt("Enter PICO-8 Web/Widget URL:");
-    if (url) document.getElementById('pico-frame').src = url;
+    const input = document.getElementById('pico-url');
+    const url = input && input.value ? input.value.trim() : '';
+    if (!url) { showModal({ title: 'No URL', body: 'Paste a PICO-8 web cart URL first.' }); return; }
+    document.getElementById('pico-frame').src = url;
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Loading PICO-8 cart...';
 }
+
+window.playPicoDemo = function () {
+    const demo = 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
+    const input = document.getElementById('pico-url');
+    if (input) input.value = demo;
+    document.getElementById('pico-frame').src = demo;
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Playing Celeste demo';
+}
+
+function renderPicoList() {
+    const box = document.getElementById('pico-list');
+    if (!box) return;
+    if (!Array.isArray(systemData.picoCarts)) systemData.picoCarts = [];
+    if (!systemData.picoCarts.length) {
+        box.innerHTML = '<div class="muted">No saved carts yet.</div>';
+        return;
+    }
+    box.innerHTML = '';
+    systemData.picoCarts.forEach((c, idx) => {
+        const row = document.createElement('div');
+        row.className = 'pico-item';
+        row.innerHTML = `<div class="pico-title">${c.name || 'Cart ' + (idx + 1)}</div><div class="pico-url">${c.url}</div>`;
+        const actions = document.createElement('div');
+        actions.className = 'pico-actions';
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'btn btn-sm';
+        loadBtn.innerText = 'LOAD';
+        loadBtn.onclick = () => loadSavedPico(idx);
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-sm btn-red';
+        delBtn.innerText = 'DEL';
+        delBtn.onclick = () => removePicoEntry(idx);
+        actions.appendChild(loadBtn);
+        actions.appendChild(delBtn);
+        row.appendChild(actions);
+        box.appendChild(row);
+    });
+}
+
+window.savePicoEntry = function () {
+    const nameInput = document.getElementById('pico-name');
+    const urlInput = document.getElementById('pico-url');
+    const url = urlInput && urlInput.value ? urlInput.value.trim() : '';
+    const name = nameInput && nameInput.value ? nameInput.value.trim() : 'Cart';
+    if (!url) { showModal({ title: 'No URL', body: 'Paste a PICO-8 cart URL first.' }); return; }
+    if (!Array.isArray(systemData.picoCarts)) systemData.picoCarts = [];
+    systemData.picoCarts.push({ name, url });
+    saveData();
+    renderPicoList();
+    showToast('PICO-8 cart saved', 'success');
+};
+
+window.loadSavedPico = function (idx) {
+    if (!Array.isArray(systemData.picoCarts)) return;
+    const cart = systemData.picoCarts[idx];
+    if (!cart) return;
+    const input = document.getElementById('pico-url');
+    if (input) input.value = cart.url;
+    loadPicoCart();
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = `Loaded ${cart.name || 'cart'}`;
+};
+
+window.removePicoEntry = function (idx) {
+    if (!Array.isArray(systemData.picoCarts)) return;
+    systemData.picoCarts.splice(idx, 1);
+    saveData();
+    renderPicoList();
+};
 
 /** gameInterval - Інтервал активної гри для коректної зупинки */
 var gameInterval = null; // Renamed from gameInt to match new code
+var gameCleanup = null;
+function setGameTimer(handle) {
+    gameInterval = handle;
+    window.gameInt = handle;
+    return handle;
+}
 function stopGames() {
     if (gameInterval) clearInterval(gameInterval);
+    if (window.gameInt) {
+        try { clearInterval(window.gameInt); } catch (e) { }
+    }
+    if (typeof gameCleanup === 'function') {
+        try { gameCleanup(); } catch (e) { }
+    }
+    gameInterval = null;
+    window.gameInt = null;
+    gameCleanup = null;
     const gameArea = document.getElementById('game-area');
     if (gameArea) gameArea.style.display = 'none';
+    const customHost = document.getElementById('arena');
+    if (customHost) { customHost.innerHTML = ''; customHost.style.display = 'none'; }
+    const canvas = document.getElementById('game-canvas');
+    if (canvas) { canvas.style.display = 'block'; }
+    const hint = document.getElementById('game-hint');
+    if (hint) { hint.innerText = 'Arrows to move. Space/Enter to rotate. Esc to exit.'; }
     const picoArea = document.getElementById('pico-area');
     if (picoArea) picoArea.style.display = 'none';
+    const status = document.getElementById('game-status');
+    if (status) status.innerText = 'Game stopped';
     // stopScreensaver(); // Just in case - assuming this function exists elsewhere or is a placeholder
 }
 
-/** runGame - Запускає обрану гру */
-function runGame(id) {
+function sizeGameCanvas() {
     const area = document.getElementById('game-area');
-    const pico = document.getElementById('pico-area');
     const canvas = document.getElementById('game-canvas');
-    if (!canvas) return; // Error safety
-    const ctx = canvas.getContext('2d');
-
-    stopGames(); // Clear previous
-
-    if (id === 'pico8') {
-        pico.style.display = 'block';
-        // Use a generic placeholder or allow input
-        const url = prompt("Enter PICO-8 Web Cart URL (or cancel for demo):", "https://www.lexaloffle.com/bbs/widget.php?pid=celeste");
-        if (url) {
-            document.getElementById('pico-frame').src = url;
-        }
-        return;
-    }
-
-    area.style.display = 'block';
-
-    // Assuming startSnake, startTetris, startPong functions exist
-    if (id === 'snake') startSnake(canvas, ctx);
-    else if (id === 'tetris') startTetris(canvas, ctx);
-    else if (id === 'pong') startPong(canvas, ctx);
+    if (!area || !canvas) return;
+    const baseW = 640, baseH = 480;
+    const maxW = area.parentElement ? area.parentElement.clientWidth - 20 : baseW;
+    const scale = Math.min(1, maxW / baseW);
+    canvas.style.width = Math.floor(baseW * scale) + 'px';
+    canvas.style.height = Math.floor(baseH * scale) + 'px';
 }
+
+window.addEventListener('resize', sizeGameCanvas);
+
+// --- BUILT-IN MINI GAMES (SAFE DEFAULTS) ---
+
+// Predeclare handlers to avoid ReferenceErrors during resolution
+function startSnake(canvas, ctx) {
+    const gridSize = 20;
+    const cols = Math.floor(canvas.width / gridSize);
+    const rows = Math.floor(canvas.height / gridSize);
+    let snake = [{ x: 5, y: 5 }];
+    let dir = { x: 1, y: 0 };
+    let food = { x: 10, y: 10 };
+    let alive = true;
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowUp' && dir.y === 0) dir = { x: 0, y: -1 };
+        if (e.key === 'ArrowDown' && dir.y === 0) dir = { x: 0, y: 1 };
+        if (e.key === 'ArrowLeft' && dir.x === 0) dir = { x: -1, y: 0 };
+        if (e.key === 'ArrowRight' && dir.x === 0) dir = { x: 1, y: 0 };
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const spawnFood = () => {
+        food = {
+            x: Math.floor(Math.random() * cols),
+            y: Math.floor(Math.random() * rows)
+        };
+    };
+
+    const loop = () => {
+        if (!alive) return;
+        const head = { x: (snake[0].x + dir.x + cols) % cols, y: (snake[0].y + dir.y + rows) % rows };
+        // Collision with self
+        if (snake.some((s) => s.x === head.x && s.y === head.y)) {
+            alive = false;
+            ctx.fillStyle = '#f55';
+            ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+        snake.unshift(head);
+        if (head.x === food.x && head.y === food.y) {
+            playSfx(900, 'square', 0.05);
+            spawnFood();
+        } else {
+            snake.pop();
+        }
+
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        snake.forEach((s) => ctx.fillRect(s.x * gridSize, s.y * gridSize, gridSize - 2, gridSize - 2));
+        ctx.fillStyle = '#f50';
+        ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+    };
+
+    setGameTimer(setInterval(loop, 120));
+    gameCleanup = () => document.removeEventListener('keydown', keyHandler);
+}
+
+function startTetris(canvas, ctx) {
+      const cols = 10, rows = 20, size = 24;
+      canvas.width = cols * size;
+      canvas.height = rows * size;
+    const shapes = [
+        [[1, 1, 1, 1]],
+        [[1, 1], [1, 1]],
+        [[0, 1, 0], [1, 1, 1]],
+        [[1, 0, 0], [1, 1, 1]],
+        [[0, 0, 1], [1, 1, 1]],
+    ];
+    const board = Array.from({ length: rows }, () => Array(cols).fill(0));
+    let current = { shape: shapes[Math.floor(Math.random() * shapes.length)], x: 3, y: 0 };
+
+    const canMove = (dx, dy, shape = current.shape) => {
+        for (let y = 0; y < shape.length; y++) {
+            for (let x = 0; x < shape[0].length; x++) {
+                if (!shape[y][x]) continue;
+                const nx = current.x + dx + x;
+                const ny = current.y + dy + y;
+                if (nx < 0 || nx >= cols || ny >= rows) return false;
+                if (ny >= 0 && board[ny][nx]) return false;
+            }
+        }
+        return true;
+    };
+
+    const mergePiece = () => {
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+            if (val) board[current.y + y][current.x + x] = 1;
+        }));
+        clearLines();
+        current = { shape: shapes[Math.floor(Math.random() * shapes.length)], x: 3, y: 0 };
+    };
+
+    const clearLines = () => {
+        for (let y = rows - 1; y >= 0; y--) {
+            if (board[y].every((v) => v)) {
+                board.splice(y, 1);
+                board.unshift(Array(cols).fill(0));
+                playSfx(800, 'sine', 0.05);
+            }
+        }
+    };
+
+    const rotate = () => {
+        const rotated = current.shape[0].map((_, idx) => current.shape.map((row) => row[idx]).reverse());
+        if (canMove(0, 0, rotated)) current.shape = rotated;
+    };
+
+    const keyHandler = (e) => {
+        if (e.key === 'ArrowLeft' && canMove(-1, 0)) current.x -= 1;
+        if (e.key === 'ArrowRight' && canMove(1, 0)) current.x += 1;
+        if (e.key === 'ArrowDown' && canMove(0, 1)) current.y += 1;
+        if (e.key === 'ArrowUp') rotate();
+        if (e.key === ' ') {
+            while (canMove(0, 1)) current.y += 1;
+            mergePiece();
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    const draw = () => {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#0f0';
+        board.forEach((row, y) => row.forEach((val, x) => {
+            if (val) ctx.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+        }));
+        current.shape.forEach((row, y) => row.forEach((val, x) => {
+            if (val) ctx.fillRect((current.x + x) * size + 1, (current.y + y) * size + 1, size - 2, size - 2);
+        }));
+    };
+
+    const tick = () => {
+        if (canMove(0, 1)) {
+            current.y += 1;
+        } else {
+            mergePiece();
+        }
+        draw();
+    };
+
+    draw();
+    setGameTimer(setInterval(tick, 450));
+    gameCleanup = () => document.removeEventListener('keydown', keyHandler);
+}
+
+  /** runGame - Запускає обрану гру */
+  function runGame(id) {
+      const area = document.getElementById('game-area');
+      const pico = document.getElementById('pico-area');
+      const canvas = document.getElementById('game-canvas');
+      const customHost = document.getElementById('arena');
+      const hint = document.getElementById('game-hint');
+      if (!area || !pico || !canvas) return; // Error safety
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      stopGames(); // Clear previous
+
+      if (id === 'pico8') {
+          pico.style.display = 'flex';
+            const input = document.getElementById('pico-url');
+            const url = input && input.value ? input.value : 'https://www.lexaloffle.com/bbs/widget.php?pid=celeste';
+          document.getElementById('pico-frame').src = url;
+          if (customHost) { customHost.innerHTML = ''; customHost.style.display = 'none'; }
+          const status = document.getElementById('game-status');
+          if (status) status.innerText = 'PICO-8 web player ready';
+          return;
+      }
+
+      area.style.display = 'block';
+      sizeGameCanvas();
+      if (customHost) { customHost.innerHTML = ''; customHost.style.display = 'none'; }
+      canvas.style.display = 'block';
+      if (hint) { hint.style.display = 'block'; hint.innerText = 'Arrows to move. Space/Enter to rotate. Esc to exit.'; }
+      const status = document.getElementById('game-status');
+      if (status) status.innerText = `Running ${id.toUpperCase()}`;
+
+      const customGame = (Array.isArray(systemData.games) ? systemData.games : []).find(g => g.id === id);
+      const customCode = customGame && customGame.code ? customGame.code.trim() : '';
+      if (customCode && customHost) {
+          customHost.style.display = 'block';
+          canvas.style.display = 'none';
+          if (hint) hint.innerText = 'Custom game active — code comes from admin.';
+          try {
+              new Function('gameCanvas', 'gameCtx', 'host', 'systemData', 'helpers', customCode)(
+                  canvas,
+                  ctx,
+                  customHost,
+                  systemData,
+                  {
+                      stopGames: stopGames,
+                      playSfx: playSfx,
+                      saveData: saveData,
+                      setInterval: function (fn, t) { return setGameTimer(setInterval(fn, t)); },
+                      setTimeout: setTimeout,
+                      requestAnimationFrame: requestAnimationFrame
+                  }
+              );
+              return;
+          } catch (err) {
+              customHost.innerHTML = '<div class="game-error">Custom game failed to run.</div>';
+              showModal({ title: 'Game Error', body: 'Failed to run custom game: ' + err.message });
+              if (status) status.innerText = 'Custom game error';
+              return;
+          }
+      }
+
+      const handlers = {
+          snake: typeof window.startSnake === 'function' ? window.startSnake : startSnake,
+          tetris: typeof window.startTetris === 'function' ? window.startTetris : startTetris,
+      };
+
+      if (typeof handlers[id] === 'function') {
+          handlers[id](canvas, ctx);
+          return;
+      }
+
+      // Graceful fallback for unknown/missing games
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text') || '#fff';
+      ctx.textAlign = 'center';
+      ctx.font = '16px monospace';
+      ctx.fillText('Game not available', canvas.width / 2, canvas.height / 2);
+  }
+
+  window.startSnake = typeof window.startSnake === 'function' ? window.startSnake : startSnake;
+  window.startTetris = typeof window.startTetris === 'function' ? window.startTetris : startTetris;
 
 /**
  * renderGallery - Рендерить сітку галереї
@@ -1939,30 +3434,6 @@ function renderLinks() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// #SECTION_GAMES - Ігровий центр
-// ═══════════════════════════════════════════════════════════════════════════════
-
-
-
-/** toggleThemeMenu - Відкриває/закриває меню вибору тем */
-function toggleThemeMenu() { const popup = document.getElementById('theme-popup'); popup.innerHTML = ''; themesList.forEach(t => { const el = document.createElement('div'); el.className = 'theme-item'; el.innerHTML = `<div class="color-preview" style="background:${t.c}"></div> ${t.name}`; el.onclick = () => setTheme(t.id); popup.appendChild(el); }); popup.classList.toggle('show'); playSfx(400); }
-/** 
- * setTheme - Встановлює тему оформлення
- * @param {string} t - ID теми
- */
-function setTheme(t) {
-    document.body.className = `theme-${t}`;
-    playSfx(1000, 'sine', 0.05);
-    localStorage.setItem('vvs_theme_v12', t);
-
-    // USE CUSTOM ADMIN TRIGGER THEME
-    if (t === systemData.themes.adminTriggerTheme) {
-        mintEvaClicks++; checkAdminUnlock();
-    }
-    if (t === 'eva') { evaCount++; if (evaCount >= 5) { const sound = new Audio('xero.wav'); sound.play().catch(e => console.log(e)); evaCount = 0; } }
-    document.getElementById('theme-popup').classList.remove('show');
-}
-// ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_EASTER - Великодні яйця (Easter Eggs)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1990,7 +3461,7 @@ function easterEggLogo() {
 function checkAdminUnlock() {
     if (glitchTriggered && mintEvaClicks >= 10) {
         const btn = document.getElementById('nav-admin');
-        if (btn.style.display !== 'block') { btn.style.display = 'block'; playSfx(800, 'square', 0.5); alert("SYSTEM OVERRIDE: ADMIN ACCESS UNLOCKED"); }
+        if (btn.style.display !== 'block') { btn.style.display = 'block'; playSfx(800, 'square', 0.5); showToast('SYSTEM OVERRIDE: ADMIN ACCESS UNLOCKED', 'success'); }
     }
 }
 /** easterEggClown - Секретний оверлей з клоуном */
