@@ -215,7 +215,9 @@ function loadAdminEditor(sec) {
     } else if (sec === 'saver') {
         ensureSaverData();
         const timeout = systemData.screensaver.timeout || 60;
+        const saverIdOptions = buildSaverIdOptions();
         el.innerHTML = `<h3>Screensaver Manager</h3>
+            <datalist id="saver-id-suggestions">${saverIdOptions}</datalist>
             <div class="form-group" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap:10px; align-items:center;">
                 <label class="opt-check"><input type="checkbox" id="adm-saver-enabled" ${systemData.screensaver.enabled !== false ? 'checked' : ''}> Enable idle trigger</label>
                 <label style="display:flex; flex-direction:column; gap:4px; font-size:0.9rem;">Timeout (seconds)
@@ -228,7 +230,7 @@ function loadAdminEditor(sec) {
                 <div class="form-group" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:8px;">
                     <input class="form-control" id="adm-saver-edit-name" placeholder="Name">
                     <input class="form-control" id="adm-saver-edit-desc" placeholder="Description">
-                    <select class="form-control" id="adm-saver-edit-id">${ADM_SAVER_TYPES.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+                    <input class="form-control" id="adm-saver-edit-id" list="saver-id-suggestions" placeholder="ID e.g. matrix">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Canvas script (function(canvas, ctx, requestFrame, isActive, isPreview)):</label>
@@ -242,7 +244,7 @@ function loadAdminEditor(sec) {
             <div class="form-group" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:8px;">
                 <input class="form-control" id="adm-saver-name" placeholder="Name e.g. Matrix">
                 <input class="form-control" id="adm-saver-desc" placeholder="Description">
-                <select class="form-control" id="adm-saver-id">${ADM_SAVER_TYPES.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select>
+                <input class="form-control" id="adm-saver-id" list="saver-id-suggestions" placeholder="ID e.g. matrix">
                 <button class="btn" onclick="addSaverEntry()">+ ADD</button>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -673,15 +675,25 @@ function ensureSaverData() {
     if (!systemData.screensaver.timeout) systemData.screensaver.timeout = 60;
 }
 
+function buildSaverIdOptions() {
+    ensureSaverData();
+    const ids = new Set();
+    ADM_SAVER_TYPES.forEach((s) => ids.add(s.id));
+    systemData.screensaver.catalog.forEach((s) => { if (s && s.id) ids.add(s.id); });
+    return Array.from(ids).map((id) => `<option value="${id}"></option>`).join('');
+}
+
 window.renderAdminSaverList = function () {
     ensureSaverData();
+    const dl = document.getElementById('saver-id-suggestions');
+    if (dl) dl.innerHTML = buildSaverIdOptions();
     const l = document.getElementById('adm-saver-list');
     const rows = systemData.screensaver.catalog.map((s, i) => {
         return `<div class="item-row" style="gap:8px; align-items:center;">
             <label class="opt-check"><input type="radio" name="adm-saver-default" value="${s.id}" ${systemData.screensaver.type === s.id ? 'checked' : ''}> Default</label>
             <input class="form-control" style="flex:1;" value="${s.name || ''}" onchange="updateSaverField(${i}, 'name', this.value)">
             <input class="form-control" style="flex:1;" value="${s.desc || ''}" onchange="updateSaverField(${i}, 'desc', this.value)">
-            <select class="form-control" onchange="updateSaverField(${i}, 'id', this.value)">${ADM_SAVER_TYPES.map(t => `<option value="${t.id}" ${t.id === s.id ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
+            <input class="form-control" list="saver-id-suggestions" value="${s.id || ''}" onchange="updateSaverField(${i}, 'id', this.value)" placeholder="ID">
             <div style="display:flex; gap:6px;">
                 <button class="btn btn-sm" onclick="openSaverEditor(${i})">EDIT</button>
                 <button class="btn btn-red btn-sm" onclick="delSaver(${i})">DEL</button>
@@ -719,20 +731,26 @@ window.closeSaverEditor = function () {
 window.saveSaverEdit = function () {
     ensureSaverData();
     if (currentSaverEdit < 0 || !systemData.screensaver.catalog[currentSaverEdit]) return;
-    const name = document.getElementById('adm-saver-edit-name').value || '';
-    const desc = document.getElementById('adm-saver-edit-desc').value || '';
+    const name = (document.getElementById('adm-saver-edit-name').value || '').trim();
+    const desc = (document.getElementById('adm-saver-edit-desc').value || '').trim();
     const idSel = document.getElementById('adm-saver-edit-id');
-    const idVal = idSel && idSel.value ? idSel.value : systemData.screensaver.catalog[currentSaverEdit].id;
+    const idVal = (idSel && idSel.value ? idSel.value : systemData.screensaver.catalog[currentSaverEdit].id || '').trim();
     const code = document.getElementById('adm-saver-code').value || '';
+    if (!idVal) {
+        showToast('Saver ID is required', 'error');
+        return;
+    }
     if (systemData.screensaver.catalog.some((s, idx) => idx !== currentSaverEdit && s.id === idVal)) {
         showToast('Saver ID already exists', 'error');
         return;
     }
     const target = systemData.screensaver.catalog[currentSaverEdit];
+    const prevId = target.id;
     target.name = name;
     target.desc = desc;
     target.id = idVal;
     target.code = code;
+    if (systemData.screensaver.type === prevId) systemData.screensaver.type = target.id;
     saveData();
     renderAdminSaverList();
     closeSaverEditor();
@@ -742,20 +760,34 @@ window.saveSaverEdit = function () {
 window.updateSaverField = function (i, key, value) {
     ensureSaverData();
     if (!systemData.screensaver.catalog[i]) return;
-    if (key === 'id' && systemData.screensaver.catalog.some((s, idx) => s.id === value && idx !== i)) {
+    const trimmed = (value || '').trim();
+    if (key === 'id') {
+        if (!trimmed) {
+            showToast('ID is required', 'error');
+            return;
+        }
+        if (systemData.screensaver.catalog.some((s, idx) => s.id === trimmed && idx !== i)) {
         showToast('ID already exists', 'error');
         return;
     }
-    systemData.screensaver.catalog[i][key] = value;
+        if (systemData.screensaver.type === systemData.screensaver.catalog[i].id) {
+            systemData.screensaver.type = trimmed;
+        }
+    }
+    systemData.screensaver.catalog[i][key] = key === 'id' ? trimmed : value;
     saveData();
 };
 
 window.addSaverEntry = function () {
     ensureSaverData();
-    const name = document.getElementById('adm-saver-name').value || 'New Saver';
-    const desc = document.getElementById('adm-saver-desc').value || '';
+    const name = (document.getElementById('adm-saver-name').value || 'New Saver').trim();
+    const desc = (document.getElementById('adm-saver-desc').value || '').trim();
     const idSel = document.getElementById('adm-saver-id');
-    const idVal = idSel && idSel.value ? idSel.value : 'matrix';
+    const idVal = (idSel && idSel.value ? idSel.value : 'matrix').trim();
+    if (!idVal) {
+        showToast('Saver ID is required', 'error');
+        return;
+    }
     if (systemData.screensaver.catalog.find(s => s.id === idVal)) {
         showToast('Saver with this ID already exists', 'error');
         return;
