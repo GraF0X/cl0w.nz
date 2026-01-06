@@ -1118,6 +1118,68 @@
             background: #000;
         }
 
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
         .gallery-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
