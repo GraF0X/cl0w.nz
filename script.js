@@ -1287,6 +1287,18 @@ function nav(id) {
         pcScrollCleanup = null;
     }
 
+    if (!dataReady) {
+        pendingNavId = id;
+        const v = document.getElementById('view');
+        if (v) v.innerHTML = '<div style="padding:20px; opacity:0.7;">Loading data...</div>';
+        return;
+    }
+
+    if (typeof pcScrollCleanup === 'function') {
+        pcScrollCleanup();
+        pcScrollCleanup = null;
+    }
+
     // Dynamic Title Update
     const baseTitle = systemData.home.browserTitle || "vvs@cl0w.nz";
     const dir = id === 'home' ? ':~$' : ':~/' + id;
