@@ -770,6 +770,13 @@ let ssActive = false;
 let ssCanvas = null;
 let ssCtx = null;
 let ssReq = null;
+const saverSlowdown = 2;
+
+let saverPreviewReq = null;
+let saverPreviewActive = false;
+let saverPreviewCanvas = null;
+let saverPreviewCtx = null;
+let saverPreviewType = 'matrix';
 
 let saverPreviewReq = null;
 let saverPreviewActive = false;
@@ -1147,8 +1154,10 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         const fontSize = 14;
         const columns = Math.floor(canvas.width / fontSize);
         const drops = new Array(columns).fill(1);
+        let tick = 0;
         function draw() {
             if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
             ctx.fillStyle = "rgba(0,0,0,0.08)";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#0F0";
@@ -1156,8 +1165,8 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
             for (let i = 0; i < drops.length; i++) {
                 const text = chars[Math.floor(Math.random() * chars.length)];
                 ctx.fillText(text, i * fontSize, drops[i] * fontSize);
-                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
-                drops[i]++;
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.99) drops[i] = 0;
+                drops[i] += 0.5;
             }
             makeReq(draw);
         }
@@ -1167,9 +1176,11 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         const fw = canvas.width / w; const fh = canvas.height / h;
         const firePixels = new Array(w * h).fill(0);
         const palette = ["#000", "#070707", "#1f0707", "#2f0f07", "#470f07", "#571707", "#671f07", "#771f07", "#8f2707", "#9f2f07", "#af3f07", "#bf4707", "#c74707", "#DF4F07", "#DF5707", "#DF5707", "#D75F07", "#D7670F", "#cf6f0f", "#cf770f", "#cf7f0f", "#CF8717", "#C78717", "#C78F17", "#C7971F", "#BF9F1F", "#BF9F1F", "#BFA727", "#BFA727", "#BFAF2F", "#B7AF2F", "#B7B72F", "#B7B737", "#CFCF6F", "#DFDF9F", "#EFEFC7", "#FFFFFF"];
+        let tick = 0;
         function draw() {
             if (!active()) return;
-            for (let x = 0; x < w; x++) firePixels[(h - 1) * w + x] = Math.floor(Math.random() * 36);
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
+            for (let x = 0; x < w; x++) firePixels[(h - 1) * w + x] = Math.floor(Math.random() * 26);
             for (let y = 1; y < h; y++) {
                 for (let x = 0; x < w; x++) {
                     const src = y * w + x;
@@ -1196,15 +1207,17 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
             pipes.push({ x: canvas.width / 2, y: canvas.height / 2, dir: dirs[Math.floor(Math.random() * dirs.length)], color: `hsl(${Math.random() * 360}, 80%, 60%)` });
         }
         addPipe();
+        let tick = 0;
         function draw() {
             if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
             ctx.fillStyle = 'rgba(0,0,0,0.12)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             pipes.forEach(p => {
                 ctx.strokeStyle = p.color;
                 ctx.beginPath();
                 ctx.moveTo(p.x, p.y);
-                p.x += p.dir.x * 8; p.y += p.dir.y * 8;
+                p.x += p.dir.x * 4; p.y += p.dir.y * 4;
                 ctx.lineTo(p.x, p.y);
                 ctx.stroke();
                 if (Math.random() < 0.1) p.dir = dirs[Math.floor(Math.random() * dirs.length)];
@@ -1215,9 +1228,11 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         }
         draw();
     } else if (type === 'dvd') {
-        const logo = { x: 30, y: 30, dx: 3, dy: 2.5, w: 80, h: 40 };
+        const logo = { x: 30, y: 30, dx: 1.4, dy: 1.2, w: 80, h: 40 };
+        let tick = 0;
         function draw() {
             if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
             ctx.fillStyle = 'rgba(0,0,0,0.2)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = `hsl(${Date.now() % 360}, 80%, 60%)`;
@@ -1232,6 +1247,7 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         draw();
     } else {
         let trees = [];
+        let tick = 0;
         function grow(t) {
             if (!active()) return;
             const len = (Math.random() * 0.5 + 0.5) * t.len;
@@ -1254,6 +1270,7 @@ function runSaverEffect(type, canvas, ctx, isPreview) {
         trees.push({ x: canvas.width / 2, y: canvas.height, a: -Math.PI / 2, len: 10, w: 10, d: 0, done: false });
         function draw() {
             if (!active()) return;
+            if ((tick++ % saverSlowdown) !== 0) { makeReq(draw); return; }
             ctx.fillStyle = 'rgba(0,0,0,0.05)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             if (Math.random() < 0.02) {
@@ -1581,6 +1598,10 @@ function renderPlaygroundPolygon() {
     const mem = navigator.deviceMemory || '?';
     const net = navigator.connection ? navigator.connection.downlink + 'Mbps' : 'n/a';
     const themeActive = systemData.theme && systemData.theme.active ? systemData.theme.active : 'amber';
+    const saverCatalog = getSaverCatalog();
+    const saverName = (systemData.screensaver && systemData.screensaver.type) || (saverCatalog[0] ? saverCatalog[0].id : 'none');
+    const gamesCount = Array.isArray(systemData.games) ? systemData.games.length : (Array.isArray(defaultData.games) ? defaultData.games.length : 0);
+    const todoCount = Array.isArray(systemData.todos) ? systemData.todos.length : 0;
 
     v.innerHTML = `<h2>PLAYGROUND_POLYGON</h2>
     <div class="playground-shell">
@@ -1618,10 +1639,10 @@ function renderPlaygroundPolygon() {
                 <pre id="code-out" class="playground-output">>> ready</pre>
                 <div class="panel-title" style="margin-top:10px;">SENSOR HUD</div>
                 <div class="hud-grid">
-                    <div class="hud-card">Idle Saver: <strong>${systemData.screensavers.default || 'none'}</strong></div>
+                    <div class="hud-card">Idle Saver: <strong>${saverName}</strong></div>
                     <div class="hud-card">Theme: <strong>${themeActive}</strong></div>
-                    <div class="hud-card">Games: <strong>${(systemData.games || []).length}</strong></div>
-                    <div class="hud-card">Todos: <strong>${(systemData.todo || []).length}</strong></div>
+                    <div class="hud-card">Games: <strong>${gamesCount}</strong></div>
+                    <div class="hud-card">Todos: <strong>${todoCount}</strong></div>
                 </div>
             </section>
 
@@ -2610,6 +2631,7 @@ function renderCalendar() {
     const y = now.getFullYear();
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+    const editable = !!systemData.todoEditable;
 
     const events = (systemData.todos || []).filter(t => t.due).map((t, idx) => ({ date: t.due, title: t.t, time: t.time || 'All Day', idx }));
 
@@ -2639,6 +2661,7 @@ function renderCalendar() {
 
 window.openCalDate = function (date) {
     if (!systemData.todos) systemData.todos = [];
+    const editable = !!systemData.todoEditable;
     const wrapper = document.createElement('div');
     wrapper.style.display = 'flex';
     wrapper.style.flexDirection = 'column';
@@ -2658,22 +2681,24 @@ window.openCalDate = function (date) {
             const row = document.createElement('div');
             row.className = 'cal-event-row';
             row.innerHTML = `<span class="badge">${e.time || 'All Day'}</span><span class="cal-event-title">${e.title}</span>`;
-            const delBtn = document.createElement('button');
-            delBtn.className = 'btn btn-sm btn-red';
-            delBtn.innerText = 'Delete';
-            delBtn.onclick = () => {
-                showConfirm('Delete this event?').then((ok) => {
-                    if (!ok) return;
-                    const target = systemData.todos.filter(t => t.due === date)[idx];
-                    if (!target) return;
-                    const realIdx = systemData.todos.indexOf(target);
-                    if (realIdx > -1) systemData.todos.splice(realIdx, 1);
-                    saveData();
-                    renderList();
-                    renderTodoList();
-                });
-            };
-            row.appendChild(delBtn);
+            if (editable) {
+                const delBtn = document.createElement('button');
+                delBtn.className = 'btn btn-sm btn-red';
+                delBtn.innerText = 'Delete';
+                delBtn.onclick = () => {
+                    showConfirm('Delete this event?').then((ok) => {
+                        if (!ok) return;
+                        const target = systemData.todos.filter(t => t.due === date)[idx];
+                        if (!target) return;
+                        const realIdx = systemData.todos.indexOf(target);
+                        if (realIdx > -1) systemData.todos.splice(realIdx, 1);
+                        saveData();
+                        renderList();
+                        renderTodoList();
+                    });
+                };
+                row.appendChild(delBtn);
+            }
             listBox.appendChild(row);
         });
     };
@@ -2682,26 +2707,29 @@ window.openCalDate = function (date) {
     form.style.display = 'flex';
     form.style.gap = '10px';
     form.style.flexWrap = 'wrap';
-    form.innerHTML = `
+    form.innerHTML = editable ? `
         <label class="opt-check">Time <input type="time" id="cal-time" class="todo-input" style="max-width:140px;"></label>
         <input type="text" id="cal-title" class="todo-input" placeholder="Title..." style="flex:1; min-width:180px;">
         <button class="btn btn-green" id="cal-add-btn">Add</button>
-    `;
+    ` : `<div style="opacity:0.7;">Calendar is read-only</div>`;
 
     wrapper.appendChild(listBox);
     wrapper.appendChild(form);
 
     const overlay = showModal({ title: `Events for ${date}`, body: wrapper, actions: [{ label: 'Close' }] });
     const addBtn = form.querySelector('#cal-add-btn');
-    addBtn.onclick = () => {
-        const time = form.querySelector('#cal-time').value || 'All Day';
-        const title = form.querySelector('#cal-title').value.trim() || 'Event';
-        systemData.todos.push({ t: title, due: date, time, d: false });
-        saveData();
-        form.querySelector('#cal-title').value = '';
-        renderList();
-        renderTodoList();
-    };
+    if (addBtn) {
+        addBtn.onclick = () => {
+            if (!editable) return;
+            const time = form.querySelector('#cal-time').value || 'All Day';
+            const title = form.querySelector('#cal-title').value.trim() || 'Event';
+            systemData.todos.push({ t: title, due: date, time, d: false });
+            saveData();
+            form.querySelector('#cal-title').value = '';
+            renderList();
+            renderTodoList();
+        };
+    }
 
     renderList();
     setTimeout(() => {
