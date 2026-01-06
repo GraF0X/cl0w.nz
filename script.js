@@ -778,12 +778,6 @@ let saverPreviewCanvas = null;
 let saverPreviewCtx = null;
 let saverPreviewType = 'matrix';
 
-let saverPreviewReq = null;
-let saverPreviewActive = false;
-let saverPreviewCanvas = null;
-let saverPreviewCtx = null;
-let saverPreviewType = 'matrix';
-
 function resetIdleTimer() {
     if (ssActive) stopScreensaver();
     clearTimeout(ssTimer);
