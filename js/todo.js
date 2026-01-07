@@ -142,7 +142,7 @@ window.openCalDate = function (date) {
         events.forEach((e, idx) => {
             const row = document.createElement('div');
             row.className = 'cal-event-row';
-            row.innerHTML = `<span class="badge">${e.time || 'All Day'}</span><span class="cal-event-title">${e.title}</span>`;
+            row.innerHTML = `<span class="badge">${e.time || 'All Day'}</span><span class="cal-event-title">${e.t}</span>`;
             if (editable) {
                 const delBtn = document.createElement('button');
                 delBtn.className = 'btn btn-sm btn-red';
