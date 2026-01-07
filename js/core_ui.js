@@ -1,7 +1,7 @@
 /* core_ui.js */
 window.__core_ui_loaded = true;
 
-// Audio state for UI sound effects.
+// Стан аудіо для інтерфейсних звуків.
 let audioCtx = null;
 let soundOn = true;
 let audioUnlocked = false;
@@ -72,7 +72,7 @@ function openIRC() {
     document.body.appendChild(w);
     dragElement(w);
 
-    // Auto-bot messages
+    // Автоматичні повідомлення бота.
     setTimeout(() => addIRCMessage("System", "Welcome, " + (systemData.resume.name || "Guest") + "!", "magenta"), 1000);
 }
 
@@ -89,7 +89,7 @@ window.sendIRC = function () {
     addIRCMessage("Me", txt);
     inp.value = '';
 
-    // Bot logic
+    // Логіка бота.
     if (txt.startsWith('/')) {
         const cmd = txt.split(' ')[0];
         const arg = txt.split(' ').slice(1).join(' ');
@@ -109,7 +109,7 @@ window.sendIRC = function () {
             addIRCMessage("*", "slaps " + target + " around a bit with a large trout", "cyan");
         }
     } else {
-        // Random replies
+        // Випадкові відповіді.
         if (Math.random() > 0.7) {
             setTimeout(() => {
                 const replies = ["Interesting...", "LOL", "AFK", "brb", ":)", "Does it run Doom?", "pwned"];
@@ -135,7 +135,7 @@ function addIRCMessage(user, msg, color) {
     playSfx(1200, 'square', 0.05, 0.05);
 }
 
-/** dragElement - додає можливість перетягування елемента */
+/** dragElement - додає можливість перетягування елемента. */
 function dragElement(elmnt) {
     let deltaX = 0;
     let deltaY = 0;
@@ -285,7 +285,7 @@ const adW = 40;
 const adH = 15;
 const adCellSize = 16;
 
-// QR STATE
+// Стан QR.
 let lastQRMatrix = null;
 let lastQRFormat = 'png';
 let lastQRSize = 256;
@@ -298,12 +298,12 @@ let pcScrollCleanup = null;
 function renderAsciiDraw() {
     const view = document.getElementById('view');
 
-    // Initialize empty grid if fresh.
+    // Ініціалізація порожньої сітки при першому запуску.
     if (adGrid.length === 0) {
         adGrid = Array.from({ length: adH }, () => Array.from({ length: adW }, () => ' '));
     }
 
-    // Extended palette.
+    // Розширена палітра символів.
     const chars = ['#', '@', '%', '*', '+', '=', '-', '.', ':', '/', '\\', '$', '8', '0', '&',
         '█', '▀', '▄', '▌', '▐', '░', '▒', '▓', '■'];
 
@@ -338,7 +338,7 @@ function renderAsciiDraw() {
     view.innerHTML = `<h2>ASCII_DRAW STUDIO</h2>${toolsHtml}${gridHtml}`;
 }
 
-// Flag to track active mouse drawing state.
+// Прапорець активного малювання мишею.
 let adIsDrawing = false;
 
 /** adSetMode - перемикає режим малювання */
@@ -368,7 +368,7 @@ window.adClear = function () {
 /** adStart - стартує малювання або вибір символу */
 window.adStart = function (el) {
     if (event.shiftKey) {
-        // Picker
+        // Піпетка.
         adBrush = el.innerText;
         if (adBrush === '' || adBrush === ' ') adBrush = '#';
         adMode = 'draw';
@@ -398,20 +398,19 @@ function adApply(x, y) {
     const char = adMode === 'erase' ? ' ' : adBrush;
     if (adGrid[y][x] !== char) {
         adGrid[y][x] = char;
-        // Optimization: update DOM directly instead of full rerender to be faster, but renderAsciiDraw is safer for consistency
-        // Let's just do renderAsciiDraw for now, it's small enough 40x15=600 elements
+        // Оптимізація: можна оновлювати DOM локально, але renderAsciiDraw стабільніший.
+        // Зараз залишаємо повний ререндер: 40x15=600 елементів.
         renderAsciiDraw();
         playSfx(800 + Math.random() * 200, 'sine', 0.02, 0.01);
     }
 }
 
-// DRAW KEYBOARD HANDLING
+// Обробка клавіатури для режиму малювання.
 document.addEventListener('keydown', (e) => {
-    // Check if Draw is active
+    // Перевіряємо, чи активне малювання.
     if (!document.getElementById('ascii-canvas')) return;
 
-    // Prevent default scrolling for Space/Arrows if canvas focused? 
-    // We just check if nav buttons aren't focused.
+    // Запобігаємо скролу для Space/Arrows, якщо фокус не на кнопках/інпутах.
     if (document.activeElement.tagName === 'BUTTON' || document.activeElement.tagName === 'INPUT') return;
 
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { if (adCy > 0) adCy--; renderAsciiDraw(); }
