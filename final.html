@@ -172,7 +172,7 @@
             scene.background = new THREE.Color( 0x050505 );
 
             new RGBELoader()
-                .setPath( 'https://threejs.org/examples/textures/equirectangular/' )
+                .setPath( 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/textures/equirectangular/' )
                 .load( 'royal_esplanade_1k.hdr', function ( texture ) {
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture;
