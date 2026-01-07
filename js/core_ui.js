@@ -772,11 +772,19 @@ document.addEventListener('keydown', (e) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /** Глобальні змінні стану додатка */
-let isTyping = false; let currentObsCat = 'SECURITY'; let currentObsFile = '';
-let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0; let clownUnlocked = false;
-let currentLang = 'uk'; let adminAuth = false;
-let admNoteCat = ''; let admNoteFile = '';
-let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
+let isTyping = false;
+let currentObsCat = 'SECURITY';
+let currentObsFile = '';
+let currentGalCat = 'ASCII_ART';
+let logoClicks = 0;
+let clownClicks = 0;
+let clownUnlocked = false;
+let adminAuth = false;
+let admNoteCat = '';
+let admNoteFile = '';
+let glitchTriggered = false;
+let mintEvaClicks = 0;
+let evaCount = 0;
 let dataReady = false;
 let pendingNavId = null;
 
@@ -834,6 +842,18 @@ let playgroundFiles = [];
 let playgroundCurrentFileId = '';
 let playgroundWindowState = null;
 
+/**
+ * isPlaygroundCompact - Перевіряє, чи ввімкнений компактний режим (малі екрани).
+ * У цьому режимі вимикаємо draggable-вікна й даємо можливість скролу.
+ */
+function isPlaygroundCompact() {
+    return window.matchMedia('(max-width: 900px)').matches;
+}
+
+/**
+ * loadPlaygroundFiles - Завантажує список файлів з localStorage або створює дефолтні.
+ * @returns {Array<{id: string, name: string, content: string}>}
+ */
 function loadPlaygroundFiles() {
     if (playgroundFiles && playgroundFiles.length) return playgroundFiles;
     try {
@@ -847,13 +867,29 @@ function loadPlaygroundFiles() {
         }
     } catch (e) { /* ignore */ }
     playgroundFiles = [
-        { id: 'readme.txt', name: 'readme.txt', content: 'PLAYGROUND_POLYGON\nЛаскаво просимо до полігону — тестуйте UI, ефекти та міні-інструменти без ризику.' },
-        { id: 'fox-notes.txt', name: 'fox-notes.txt', content: 'Fox Lab: low-poly fox built with Three.js primitives. Rotate with time, lit by dual lights.' },
-        { id: 'ideas.md', name: 'ideas.md', content: '- Toggle shaders\n- Try new sound cues\n- Prototype UI micro-interactions' }
+        {
+            id: 'readme.txt',
+            name: 'readme.txt',
+            content: 'PLAYGROUND_POLYGON\nЛаскаво просимо до полігону — тестуйте UI, ефекти та міні-інструменти без ризику.'
+        },
+        {
+            id: 'fox-notes.txt',
+            name: 'fox-notes.txt',
+            content: 'Fox Lab: low-poly fox built with Three.js primitives. Rotate with time, lit by dual lights.'
+        },
+        {
+            id: 'ideas.md',
+            name: 'ideas.md',
+            content: '- Toggle shaders\n- Try new sound cues\n- Prototype UI micro-interactions'
+        }
     ];
     return playgroundFiles;
 }
 
+/**
+ * loadPlaygroundWindowState - Підтягує позиції/видимість вікон або повертає дефолт.
+ * @returns {Record<string, {open: boolean, x: number, y: number}>}
+ */
 function loadPlaygroundWindowState() {
     if (playgroundWindowState) return playgroundWindowState;
     playgroundWindowState = {
@@ -866,21 +902,26 @@ function loadPlaygroundWindowState() {
         const raw = localStorage.getItem('playground-windows');
         if (raw) {
             const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === 'object') playgroundWindowState = Object.assign(playgroundWindowState, parsed);
+            if (parsed && typeof parsed === 'object') {
+                playgroundWindowState = Object.assign(playgroundWindowState, parsed);
+            }
         }
     } catch (e) { /* ignore */ }
     return playgroundWindowState;
 }
 
+/** savePlaygroundWindowState - Зберігає позиції вікон в localStorage. */
 function savePlaygroundWindowState() {
     if (!playgroundWindowState) return;
     try { localStorage.setItem('playground-windows', JSON.stringify(playgroundWindowState)); } catch (e) { /* ignore */ }
 }
 
+/** savePlaygroundFiles - Зберігає поточні файли Playground. */
 function savePlaygroundFiles() {
     try { localStorage.setItem('playground-files', JSON.stringify(playgroundFiles)); } catch (e) { /* ignore */ }
 }
 
+/** getPlaygroundThreeExamples - Повертає доступні 3D демо, якщо модуль активний. */
 function getPlaygroundThreeExamples() {
     if (window.threeLab && typeof window.threeLab.getExamples === 'function') {
         return window.threeLab.getExamples();
@@ -888,6 +929,10 @@ function getPlaygroundThreeExamples() {
     return [];
 }
 
+/**
+ * loadThreeExample - Завантажує обране демо у canvas.
+ * @param {string} id - Ідентифікатор демо.
+ */
 function loadThreeExample(id) {
     if (window.threeLab && typeof window.threeLab.loadExample === 'function') {
         window.threeLab.loadExample(id);
@@ -897,6 +942,7 @@ function loadThreeExample(id) {
     if (status) status.innerText = '3D lab unavailable';
 }
 
+/** renderPlaygroundFilesList - Рендерить список файлів у лівій колонці. */
 function renderPlaygroundFilesList() {
     const list = document.getElementById('pg-files');
     if (!list) return;
@@ -908,15 +954,19 @@ function renderPlaygroundFilesList() {
         list.appendChild(e);
         return;
     }
-    playgroundFiles.forEach(f => {
+    playgroundFiles.forEach((file) => {
         const b = document.createElement('button');
-        b.className = 'fs-item ' + (f.id === playgroundCurrentFileId ? 'active' : '');
-        b.innerText = f.name;
-        b.onclick = function () { playgroundCurrentFileId = f.id; fillPlaygroundEditor(); };
+        b.className = 'fs-item ' + (file.id === playgroundCurrentFileId ? 'active' : '');
+        b.innerText = file.name;
+        b.onclick = function () {
+            playgroundCurrentFileId = file.id;
+            fillPlaygroundEditor();
+        };
         list.appendChild(b);
     });
 }
 
+/** fillPlaygroundEditor - Підставляє дані обраного файлу в редактор. */
 function fillPlaygroundEditor() {
     if (!playgroundFiles.length) return;
     const editor = document.getElementById('pg-file-content');
@@ -930,6 +980,7 @@ function fillPlaygroundEditor() {
     renderPlaygroundFilesList();
 }
 
+/** newPlaygroundFile - Створює новий нотатник у Playground. */
 function newPlaygroundFile() {
     const id = 'note-' + Date.now();
     playgroundFiles.push({ id: id, name: 'note.txt', content: '' });
@@ -938,6 +989,7 @@ function newPlaygroundFile() {
     fillPlaygroundEditor();
 }
 
+/** saveCurrentPlaygroundFile - Зберігає поточну нотатку та показує тост. */
 function saveCurrentPlaygroundFile() {
     const editor = document.getElementById('pg-file-content');
     const nameInput = document.getElementById('pg-file-name');
@@ -965,11 +1017,16 @@ window.runPlayground = function () {
     }
 };
 
+/**
+ * wirePlaygroundDesktop - Підключає drag-поведінку та кнопки на панелі.
+ */
 function wirePlaygroundDesktop() {
     loadPlaygroundWindowState();
     updatePlaygroundWindowVisibility();
     const wins = document.querySelectorAll('.pg-window');
-    wins.forEach(w => makePlaygroundWindowDraggable(w));
+    if (!isPlaygroundCompact()) {
+        wins.forEach(w => makePlaygroundWindowDraggable(w));
+    }
     const toggles = document.querySelectorAll('[data-pg-window]');
     toggles.forEach(btn => {
         btn.onclick = function () { togglePlaygroundWindow(btn.getAttribute('data-pg-window')); };
@@ -991,7 +1048,7 @@ function updatePlaygroundWindowVisibility() {
         const id = w.getAttribute('data-pg-id');
         const info = state[id] || {};
         w.style.display = info.open === false ? 'none' : 'flex';
-        if (typeof info.x === 'number' && typeof info.y === 'number') {
+        if (!isPlaygroundCompact() && typeof info.x === 'number' && typeof info.y === 'number') {
             w.style.left = info.x + 'px';
             w.style.top = info.y + 'px';
         }
@@ -1004,6 +1061,10 @@ function updatePlaygroundWindowVisibility() {
     });
 }
 
+/**
+ * makePlaygroundWindowDraggable - Дає можливість перетягувати вікна мишкою.
+ * @param {HTMLElement} win - Елемент вікна для drag.
+ */
 function makePlaygroundWindowDraggable(win) {
     if (!win) return;
     const bar = win.querySelector('.pg-titlebar');
@@ -1049,6 +1110,7 @@ function submitPlaygroundCommand(evt) {
 }
 
 function playgroundPosStyle(id) {
+    if (isPlaygroundCompact()) return '';
     const state = loadPlaygroundWindowState();
     const info = state[id] || {};
     const x = typeof info.x === 'number' ? info.x : 20;
@@ -1056,14 +1118,14 @@ function playgroundPosStyle(id) {
     return `style="left:${x}px; top:${y}px;"`;
 }
 
-
-
 function renderPlaygroundPolygon() {
     const main = document.querySelector('main');
     if (main) {
         if (!main.dataset.prevOverflow) main.dataset.prevOverflow = main.style.overflow || '';
-        main.style.overflow = 'hidden';
+        main.style.overflow = '';
+        main.classList.add('playground-view');
         pcScrollCleanup = function () {
+            main.classList.remove('playground-view');
             main.style.overflow = main.dataset.prevOverflow || '';
             if (window.threeLab && typeof window.threeLab.teardownFoxLab === 'function') {
                 window.threeLab.teardownFoxLab();
@@ -1083,10 +1145,14 @@ function renderPlaygroundPolygon() {
     const net = navigator.connection ? navigator.connection.downlink + 'Mbps' : 'n/a';
     const themeActive = systemData.theme && systemData.theme.active ? systemData.theme.active : 'amber';
     const saverCatalog = getSaverCatalog();
-    const saverName = (systemData.screensaver && systemData.screensaver.type) || (saverCatalog[0] ? saverCatalog[0].id : 'none');
-    const gamesCount = Array.isArray(systemData.games) ? systemData.games.length : (Array.isArray(defaultData.games) ? defaultData.games.length : 0);
+    const saverName = (systemData.screensaver && systemData.screensaver.type)
+        || (saverCatalog[0] ? saverCatalog[0].id : 'none');
+    const gamesCount = Array.isArray(systemData.games)
+        ? systemData.games.length
+        : (Array.isArray(defaultData.games) ? defaultData.games.length : 0);
     const todoCount = Array.isArray(systemData.todos) ? systemData.todos.length : 0;
     const threeDemos = getPlaygroundThreeExamples();
+    const defaultDemoId = threeDemos[0] ? threeDemos[0].id : null;
 
     v.innerHTML = `
     <div class="pg-desktop">
@@ -1201,7 +1267,12 @@ function renderPlaygroundPolygon() {
         const holder = document.getElementById('fox-stage');
         if (holder) holder.innerHTML = '<div class="fox-loading">3D lab unavailable</div>';
     }
-    loadThreeExample('fox');
+    if (defaultDemoId) {
+        loadThreeExample(defaultDemoId);
+    } else {
+        const status = document.getElementById('pg-demo-status');
+        if (status) status.innerText = 'No demos available';
+    }
     wirePlaygroundDesktop();
 }
 
