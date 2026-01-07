@@ -2220,9 +2220,7 @@
 }
 
 .final-shell {
-    max-width: 720px;
     margin: 0 auto;
-    padding: 50px 20px 70px;
     display: flex;
     flex-direction: column;
     gap: 24px;
