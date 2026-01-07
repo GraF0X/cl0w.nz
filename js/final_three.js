@@ -177,6 +177,7 @@ if (!container || container.dataset.ready === 'true') {
 
         renderPass = new RenderPass(scene, camera);
         renderPixelatedPass = new RenderPixelatedPass(6, scene, camera);
+        renderPixelatedPass.enabled = false;
 
         bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 1.5, 0.4, 0.85);
         bloomPass.threshold = postProcessingParams.bloomThreshold;
@@ -232,6 +233,7 @@ if (!container || container.dataset.ready === 'true') {
         gammaPass = new ShaderPass(GammaCorrectionShader);
         outputPass = new OutputPass();
 
+        postProcessingParams.pixelation = false;
         updateComposer();
 
         asciiEffect = new AsciiEffect(renderer, ' .:-+*=%@#', { invert: true });
@@ -468,7 +470,13 @@ if (!container || container.dataset.ready === 'true') {
             pixelAlignedPanning: true
         };
 
-        visualFolder.add(postProcessingParams, 'pixelation').name('Pixelation').onChange(updateComposer);
+        const pixelToggle = visualFolder.add(postProcessingParams, 'pixelation').name('Pixelation').onChange(() => {
+            if (postProcessingParams.pixelation) {
+                postProcessingParams.pixelation = false;
+            }
+            updateComposer();
+        });
+        pixelToggle.domElement.classList.add('control-inactive');
 
         const pixelSub = visualFolder.addFolder('Pixel Details');
         pixelSub.add(pixelParams, 'pixelSize').min(1).max(16).step(1).onChange(() => { renderPixelatedPass.setPixelSize(pixelParams.pixelSize); });
