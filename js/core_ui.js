@@ -548,7 +548,7 @@ function applyMenuVisibility() {
     toggle('nav-todo', mv.todo);
     toggle('nav-gallery', mv.gallery);
     toggle('nav-game', mv.game);
-    toggle('nav-final', mv.final !== false);
+    toggle('nav-finals', mv.final !== false);
     // New ones:
     toggle('nav-draw', mv.draw !== false); // default true
     toggle('nav-pc', mv.pc !== false);
@@ -821,7 +821,7 @@ function nav(id) {
     else if (id === 'gallery') renderGallery();
     else if (id === 'draw') renderAsciiDraw();
     else if (id === 'pc') renderPlaygroundPolygon();
-    else if (id === 'final') renderFinal();
+    else if (id === 'final' || id === 'finals') renderFinals();
     else if (id === 'screensaver') renderScreensaverMenu();
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
@@ -1232,7 +1232,41 @@ function renderPlaygroundPolygon() {
     wirePlaygroundDesktop();
 }
 
-function renderFinal() {
+function ensureFinalsImports() {
+    if (window.__finalsImportsReady) return;
+    window.__finalsImportsReady = true;
+    if (!document.getElementById('finals-importmap')) {
+        const shim = document.createElement('script');
+        shim.async = true;
+        shim.src = 'https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js';
+        document.head.appendChild(shim);
+        const map = document.createElement('script');
+        map.type = 'importmap';
+        map.id = 'finals-importmap';
+        map.textContent = JSON.stringify({
+            imports: {
+                three: 'https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js',
+                'three/addons/': 'https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/'
+            }
+        });
+        document.head.appendChild(map);
+    }
+}
+
+function loadFinalsScene() {
+    if (window.__finalsSceneLoaded) return;
+    window.__finalsSceneLoaded = true;
+    ensureFinalsImports();
+    if (!document.getElementById('finals-module')) {
+        const mod = document.createElement('script');
+        mod.type = 'module';
+        mod.id = 'finals-module';
+        mod.src = 'js/final_three.js';
+        document.body.appendChild(mod);
+    }
+}
+
+function renderFinals() {
     const v = document.getElementById('view');
     v.innerHTML = `
         <div class="final-shell">
@@ -1251,28 +1285,13 @@ function renderFinal() {
                     </div>
                 </div>
                 <div class="final-body">
-                    <div class="final-panel">
-                        <h2>Scene Snapshot</h2>
-                        <ul>
-                            <li>Theme-aware gradients &amp; glow layers</li>
-                            <li>Local-only assets (offline safe)</li>
-                            <li>Locked 3D view (admin + easter)</li>
-                        </ul>
-                    </div>
-                    <div class="final-panel">
-                        <h2>Controls</h2>
-                        <p>Unlock the 3D view using the admin checkbox and the clown easter egg.</p>
-                        <div class="final-actions">
-                            <button id="final-view-3d" class="btn" onclick="openFinalView3D()">View in 3D</button>
-                            <span id="final-view-status" class="panel-note">Admin + clown easter egg required.</span>
-                        </div>
+                    <div class="final-panel final-panel-wide">
+                        <div id="finals-container" class="finals-container"></div>
                     </div>
                 </div>
             </section>
         </div>`;
-    updateView3DButtonState();
-    const status = document.getElementById('final-view-status');
-    if (status) status.textContent = canViewFinal3D() ? 'Unlocked. Launches the 3D lab.' : 'Locked: enable in admin + trigger easter egg.';
+    loadFinalsScene();
 }
 
 function generateFakeProcesses() {
@@ -1521,7 +1540,8 @@ function resolveInitialNavTarget() {
     const hash = (window.location.hash || '').replace('#', '').trim();
     if (!hash) return 'home';
     if (hash === 'playground') return 'pc';
-    const allowed = ['home', 'about', 'resume', 'work', 'obsidian', 'blog', 'todo', 'gallery', 'draw', 'pc', 'final', 'screensaver', 'game', 'contact', 'admin'];
+    if (hash === 'final') return 'finals';
+    const allowed = ['home', 'about', 'resume', 'work', 'obsidian', 'blog', 'todo', 'gallery', 'draw', 'pc', 'finals', 'screensaver', 'game', 'contact', 'admin'];
     return allowed.includes(hash) ? hash : 'home';
 }
 
