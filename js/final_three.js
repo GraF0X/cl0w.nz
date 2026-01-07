@@ -791,7 +791,10 @@ if (!container || container.dataset.ready === 'true') {
             filmPass.uniforms.time.value += delta;
         }
 
+        if (!scene || !camera || !renderer) return;
         if (controls) controls.update();
+        scene.updateMatrixWorld(true);
+        camera.updateMatrixWorld(true);
         if (camera) {
             camera.updateMatrixWorld();
         }
