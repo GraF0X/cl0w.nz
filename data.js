@@ -14,6 +14,9 @@ const defaultData = {
         "svgGlow": true,
         "screenPulse": false
     },
+    "features": {
+        "view3d": false
+    },
     "screensaver": {
         "enabled": true,
         "timeout": 60,

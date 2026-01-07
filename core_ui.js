@@ -469,6 +469,8 @@ function initData() {
             else {
                 systemData.effects = Object.assign({}, JSON.parse(JSON.stringify(defaultData.effects)), systemData.effects);
             }
+            if (!systemData.features) systemData.features = JSON.parse(JSON.stringify(defaultData.features));
+            if (typeof systemData.features.view3d === 'undefined') systemData.features.view3d = defaultData.features.view3d;
 
             if (!systemData.home.logoText) systemData.home.logoText = defaultData.home.logoText;
             if (!systemData.home.browserTitle) systemData.home.browserTitle = defaultData.home.browserTitle || systemData.home.logoText.replace(':~$', '');
@@ -757,7 +759,7 @@ document.addEventListener('keydown', (e) => {
 
 /** Глобальні змінні стану додатка */
 let isTyping = false; let currentObsCat = 'SECURITY'; let currentObsFile = '';
-let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0;
+let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0; let clownUnlocked = false;
 let currentLang = 'uk'; let adminAuth = false;
 let admNoteCat = ''; let admNoteFile = '';
 let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
@@ -1037,6 +1039,27 @@ function playgroundPosStyle(id) {
     return `style="left:${x}px; top:${y}px;"`;
 }
 
+function canViewFinal3D() {
+    return !!(systemData.features && systemData.features.view3d) && !!clownUnlocked;
+}
+
+function updateView3DButtonState() {
+    const btn = document.getElementById('pg-view-3d');
+    if (!btn) return;
+    const allowed = canViewFinal3D();
+    btn.disabled = !allowed;
+    btn.classList.toggle('btn-ghost', !allowed);
+    btn.innerText = allowed ? 'View in 3D' : 'View in 3D (locked)';
+}
+
+function openFinalView3D() {
+    if (!canViewFinal3D()) {
+        showToast('View in 3D locked. Enable in admin and trigger the clown easter egg.', 'warning');
+        return;
+    }
+    window.open('final.html', '_blank');
+}
+
 function renderPlaygroundPolygon() {
     const main = document.querySelector('main');
     if (main) {
@@ -1162,6 +1185,10 @@ function renderPlaygroundPolygon() {
                         <div class="pg-demo-list">
                             ${threeDemos.map(d => `<button class="btn btn-sm" onclick="loadThreeExample('${d.id}')">${d.label}</button>`).join('') || '<div class="panel-note">No demos available</div>'}
                         </div>
+                        <div class="pg-three-actions">
+                            <button id="pg-view-3d" class="btn btn-sm" onclick="openFinalView3D()">View in 3D</button>
+                            <span class="panel-note">Admin + clown easter egg required.</span>
+                        </div>
                         <div class="pg-demo-frame" id="pg-demo-frame">
                             <canvas id="pg-demo-canvas"></canvas>
                             <div id="pg-demo-status" class="panel-note">Select a demo to load it inline.</div>
@@ -1181,6 +1208,7 @@ function renderPlaygroundPolygon() {
         if (holder) holder.innerHTML = '<div class="fox-loading">3D lab unavailable</div>';
     }
     loadThreeExample('skeletal');
+    updateView3DButtonState();
     wirePlaygroundDesktop();
 }
 
@@ -1395,7 +1423,22 @@ function checkAdminUnlock() {
     }
 }
 /** easterEggClown - Секретний оверлей з клоуном */
-function easterEggClown() { clownClicks++; if (clownClicks >= 5) { playSfx(400); setTimeout(() => playSfx(300), 100); const o = document.getElementById('clown-overlay'); o.style.display = 'flex'; setTimeout(() => { o.style.display = 'none'; clownClicks = 0; }, 1000); } }
+function easterEggClown() {
+    clownClicks++;
+    if (clownClicks >= 5) {
+        playSfx(400);
+        setTimeout(() => playSfx(300), 100);
+        const o = document.getElementById('clown-overlay');
+        o.style.display = 'flex';
+        clownUnlocked = true;
+        try { localStorage.setItem('vvs_clown_unlocked', '1'); } catch (e) { /* ignore */ }
+        updateView3DButtonState();
+        setTimeout(() => {
+            o.style.display = 'none';
+            clownClicks = 0;
+        }, 1000);
+    }
+}
 /** easterEggClock - Перемикає матричний фон */
 function easterEggClock() { const m = document.getElementById('matrix-bg'); m.style.display = m.style.display === 'block' ? 'none' : 'block'; if (m.style.display === 'block') startMatrix(); }
 /** startMatrix - Запускає анімацію дощу символів Matrix */
@@ -1411,6 +1454,14 @@ function renderDynamicLogo() {
     }
 }
 
+function resolveInitialNavTarget() {
+    const hash = (window.location.hash || '').replace('#', '').trim();
+    if (!hash) return 'home';
+    if (hash === 'playground') return 'pc';
+    const allowed = ['home', 'about', 'resume', 'work', 'obsidian', 'blog', 'todo', 'gallery', 'draw', 'pc', 'screensaver', 'game', 'contact', 'admin'];
+    return allowed.includes(hash) ? hash : 'home';
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_INIT - Головна ініціалізація (Entry Point)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1418,12 +1469,14 @@ function renderDynamicLogo() {
 /** window.onload - Початкове завантаження, ініціалізація даних та початкова навігація */
 window.onload = () => {
     initData();
+    try { clownUnlocked = localStorage.getItem('vvs_clown_unlocked') === '1'; } catch (e) { clownUnlocked = false; }
     const savedTheme = localStorage.getItem('vvs_theme_v12'); if (savedTheme) document.body.className = `theme-${savedTheme}`;
     renderDynamicLogo();
+    const initialNav = resolveInitialNavTarget();
 
     if (sessionStorage.getItem('boot_shown')) {
         document.getElementById('boot').style.display = 'none';
-        nav('home');
+        nav(initialNav);
     } else {
         let i = 0; const logs = ["BOOTING...", "HACKING PENTAGON: OK", "STATUS: ONLINE"];
         const t = setInterval(() => {
@@ -1439,7 +1492,7 @@ window.onload = () => {
                 setTimeout(() => {
                     document.getElementById('boot').style.display = 'none';
                     sessionStorage.setItem('boot_shown', 'true');
-                    nav('home');
+                    nav(initialNav);
                 }, 400);
             }
         }, 250);
@@ -1449,4 +1502,3 @@ window.onload = () => {
     setInterval(() => { const p = systemData.glitch.footerPhrases; document.getElementById('funny-phrase').innerText = p[Math.floor(Math.random() * p.length)]; }, 5000);
     document.addEventListener('click', (e) => { const menu = document.getElementById('theme-popup'); const btn = document.querySelector('.theme-toggle-btn'); if (!menu.contains(e.target) && e.target !== btn && menu.classList.contains('show')) { menu.classList.remove('show'); } });
 };
-
