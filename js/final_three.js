@@ -469,6 +469,13 @@ if (!container || container.dataset.ready === 'true') {
 
     function createMergedGUI() {
         gui = new GUI({ width: 310 });
+        if (gui.domElement) {
+            gui.domElement.style.position = 'absolute';
+            gui.domElement.style.top = '8px';
+            gui.domElement.style.right = '8px';
+            gui.domElement.style.zIndex = '6';
+            container.appendChild(gui.domElement);
+        }
 
         const visualFolder = gui.addFolder('Visual Settings');
         const pixelParams = {
