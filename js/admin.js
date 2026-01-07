@@ -1286,7 +1286,6 @@ window.saveThemeExtras = function () {
     if (typeof applyEffects === 'function') applyEffects();
     if (typeof applyFontChoice === 'function') applyFontChoice(systemData.themes.font);
     if (typeof toggleIcons === 'function') toggleIcons(systemData.home.showIcons);
-    if (typeof updateView3DButtonState === 'function') updateView3DButtonState();
     showToast('Theme extras applied', 'success');
 };
 

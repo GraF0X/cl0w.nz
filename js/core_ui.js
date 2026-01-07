@@ -1054,35 +1054,7 @@ function playgroundPosStyle(id) {
     return `style="left:${x}px; top:${y}px;"`;
 }
 
-function canViewFinal3D() {
-    return !!(systemData.features && systemData.features.view3d) && !!clownUnlocked;
-}
 
-function updateView3DButtonState() {
-    const buttons = [
-        document.getElementById('pg-view-3d'),
-        document.getElementById('final-view-3d')
-    ].filter(Boolean);
-    if (!buttons.length) return;
-    const allowed = canViewFinal3D();
-    buttons.forEach((btn) => {
-        btn.disabled = !allowed;
-        btn.classList.toggle('btn-ghost', !allowed);
-        btn.innerText = allowed ? 'View in 3D' : 'View in 3D (locked)';
-    });
-}
-
-function openFinalView3D() {
-    if (!canViewFinal3D()) {
-        showToast('View in 3D locked. Enable in admin and trigger the clown easter egg.', 'warning');
-        return;
-    }
-    const state = loadPlaygroundWindowState();
-    if (!state.three) state.three = { open: true, x: 360, y: 320 };
-    state.three.open = true;
-    savePlaygroundWindowState();
-    nav('pc');
-}
 
 function renderPlaygroundPolygon() {
     const main = document.querySelector('main');
@@ -1227,8 +1199,7 @@ function renderPlaygroundPolygon() {
         const holder = document.getElementById('fox-stage');
         if (holder) holder.innerHTML = '<div class="fox-loading">3D lab unavailable</div>';
     }
-    loadThreeExample('skeletal');
-    updateView3DButtonState();
+    loadThreeExample('fox');
     wirePlaygroundDesktop();
 }
 
@@ -1246,7 +1217,7 @@ function ensureFinalsImports() {
         shim.onerror = () => resolve();
         document.head.appendChild(shim);
         const map = document.createElement('script');
-        map.type = 'importmap';
+        map.type = 'importmap-shim';
         map.id = 'finals-importmap';
         map.textContent = JSON.stringify({
             imports: {
@@ -1265,7 +1236,7 @@ function loadFinalsScene() {
     ensureFinalsImports().then(() => {
         if (!document.getElementById('finals-module')) {
             const mod = document.createElement('script');
-            mod.type = 'module';
+            mod.type = 'module-shim';
             mod.id = 'finals-module';
             mod.src = 'js/final_three.js';
             document.body.appendChild(mod);
@@ -1521,7 +1492,6 @@ function easterEggClown() {
         o.style.display = 'flex';
         clownUnlocked = true;
         try { localStorage.setItem('vvs_clown_unlocked', '1'); } catch (e) { /* ignore */ }
-        updateView3DButtonState();
         setTimeout(() => {
             o.style.display = 'none';
             clownClicks = 0;

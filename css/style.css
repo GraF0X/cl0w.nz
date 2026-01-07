@@ -1751,31 +1751,30 @@
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 60%);
         }
 
-        .pg-window {
-            position: absolute;
-            width: 340px;
-            min-height: 240px;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--accent);
-            border-radius: 12px;
-            box-shadow: 0 16px 28px rgba(0, 0, 0, 0.35);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
+.pg-window {
+    position: absolute;
+    width: 340px;
+    min-height: 240px;
+    background: var(--bg);
+    border: 1px solid var(--text);
+    border-radius: 10px;
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
 
         .pg-window-wide { width: 780px; }
 
-        .pg-titlebar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-            color: var(--text);
-            cursor: grab;
-        }
+.pg-titlebar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    cursor: grab;
+}
 
         .pg-titletext { font-weight: 700; letter-spacing: 0.4px; }
 

@@ -2,6 +2,7 @@
 // 3D Lab: self-contained WebGL skeletal showcase (no external deps)
 (function () {
     const examples = [
+        { id: 'fox', label: 'Fox Lab (offline)', type: 'skeletal' },
         { id: 'skeletal', label: 'Skeletal Blend (offline)', type: 'skeletal' }
     ];
 
