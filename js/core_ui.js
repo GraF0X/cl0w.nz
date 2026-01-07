@@ -1,7 +1,12 @@
 /* core_ui.js */
 window.__core_ui_loaded = true;
 
-let audioCtx = null; let soundOn = true; let audioUnlocked = false;
+// Стан аудіо для інтерфейсних звуків.
+let audioCtx = null;
+let soundOn = true;
+let audioUnlocked = false;
+
+/** unlockAudio - дозволяє програвати звук після взаємодії користувача */
 function unlockAudio() {
     if (audioUnlocked) return;
     audioUnlocked = true;
@@ -9,16 +14,21 @@ function unlockAudio() {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     } catch (e) { }
 }
+/** playSfx - відтворює короткий звуковий сигнал */
 function playSfx(f, t = 'sine', d = 0.1, v = 0.05) {
     if (!soundOn || !audioUnlocked) return;
     try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-        o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-        g.gain.setValueAtTime(v, audioCtx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
-        o.connect(g); g.connect(audioCtx.destination);
-        o.start(); o.stop(audioCtx.currentTime + d);
+        const oscillator = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        oscillator.type = t;
+        oscillator.frequency.setValueAtTime(f, audioCtx.currentTime);
+        gain.gain.setValueAtTime(v, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
+        oscillator.connect(gain);
+        gain.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + d);
     } catch (e) { }
 }
 /** toggleSound - Перемикає звук увімкнено/вимкнено */
@@ -62,7 +72,7 @@ function openIRC() {
     document.body.appendChild(w);
     dragElement(w);
 
-    // Auto-bot messages
+    // Автоматичні повідомлення бота.
     setTimeout(() => addIRCMessage("System", "Welcome, " + (systemData.resume.name || "Guest") + "!", "magenta"), 1000);
 }
 
@@ -79,7 +89,7 @@ window.sendIRC = function () {
     addIRCMessage("Me", txt);
     inp.value = '';
 
-    // Bot logic
+    // Логіка бота.
     if (txt.startsWith('/')) {
         const cmd = txt.split(' ')[0];
         const arg = txt.split(' ').slice(1).join(' ');
@@ -99,7 +109,7 @@ window.sendIRC = function () {
             addIRCMessage("*", "slaps " + target + " around a bit with a large trout", "cyan");
         }
     } else {
-        // Random replies
+        // Випадкові відповіді.
         if (Math.random() > 0.7) {
             setTimeout(() => {
                 const replies = ["Interesting...", "LOL", "AFK", "brb", ":)", "Does it run Doom?", "pwned"];
@@ -115,7 +125,7 @@ window.sendIRC = function () {
 function addIRCMessage(user, msg, color) {
     const log = document.getElementById('irc-log');
     if (!log) return;
-    const now = new Date().toTimeString().substr(0, 5);
+    const now = new Date().toTimeString().slice(0, 5);
     const div = document.createElement('div');
     const uColor = color || (user === "Me" ? "inherit" : "lime");
     const nameDisplay = user === "Me" && systemData.resume.name ? systemData.resume.name : user;
@@ -125,17 +135,22 @@ function addIRCMessage(user, msg, color) {
     playSfx(1200, 'square', 0.05, 0.05);
 }
 
+/** dragElement - додає можливість перетягування елемента. */
 function dragElement(elmnt) {
-    var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-    if (document.getElementById(elmnt.id + "-header")) {
-        document.getElementById(elmnt.id + "-header").onmousedown = dragMouseDown;
+    let deltaX = 0;
+    let deltaY = 0;
+    let startX = 0;
+    let startY = 0;
+    const header = document.getElementById(`${elmnt.id}-header`);
+    if (header) {
+        header.onmousedown = dragMouseDown;
     }
 
     function dragMouseDown(e) {
         e = e || window.event;
         e.preventDefault();
-        pos3 = e.clientX;
-        pos4 = e.clientY;
+        startX = e.clientX;
+        startY = e.clientY;
         document.onmouseup = closeDragElement;
         document.onmousemove = elementDrag;
     }
@@ -143,12 +158,12 @@ function dragElement(elmnt) {
     function elementDrag(e) {
         e = e || window.event;
         e.preventDefault();
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        elmnt.style.top = (elmnt.offsetTop - pos2) + "px";
-        elmnt.style.left = (elmnt.offsetLeft - pos1) + "px";
+        deltaX = startX - e.clientX;
+        deltaY = startY - e.clientY;
+        startX = e.clientX;
+        startY = e.clientY;
+        elmnt.style.top = `${elmnt.offsetTop - deltaY}px`;
+        elmnt.style.left = `${elmnt.offsetLeft - deltaX}px`;
     }
 
     function closeDragElement() {
@@ -259,14 +274,18 @@ document.addEventListener('keydown', (e) => {
 /** systemData - Глобальне сховище даних додатка */
 
 let systemData = {};
+
 // ASCII DRAW STATE
 let adBrush = '#';
 let adMode = 'draw'; // draw, erase
 let adGrid = [];
-let adCx = 0; let adCy = 0; // Cursor pos
-const adW = 40; const adH = 15;
+let adCx = 0;
+let adCy = 0;
+const adW = 40;
+const adH = 15;
 const adCellSize = 16;
-// QR STATE
+
+// Стан QR.
 let lastQRMatrix = null;
 let lastQRFormat = 'png';
 let lastQRSize = 256;
@@ -277,22 +296,18 @@ let pcScrollCleanup = null;
 
 /** renderAsciiDraw - Рендерить інтерфейс малювання */
 function renderAsciiDraw() {
-    const v = document.getElementById('view');
+    const view = document.getElementById('view');
 
-    // Initialize empty grid if fresh
+    // Ініціалізація порожньої сітки при першому запуску.
     if (adGrid.length === 0) {
-        for (let y = 0; y < adH; y++) {
-            let row = [];
-            for (let x = 0; x < adW; x++) row.push(' ');
-            adGrid.push(row);
-        }
+        adGrid = Array.from({ length: adH }, () => Array.from({ length: adW }, () => ' '));
     }
 
-    // Extended Palette
-    let chars = ['#', '@', '%', '*', '+', '=', '-', '.', ':', '/', '\\', '$', '8', '0', '&',
+    // Розширена палітра символів.
+    const chars = ['#', '@', '%', '*', '+', '=', '-', '.', ':', '/', '\\', '$', '8', '0', '&',
         '█', '▀', '▄', '▌', '▐', '░', '▒', '▓', '■'];
 
-    let toolsHtml = `<div style="margin-bottom:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    const toolsHtml = `<div style="margin-bottom:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <button class="btn ${adMode === 'draw' ? 'active' : ''}" onclick="adSetMode('draw')">DRAW</button>
         <button class="btn ${adMode === 'erase' ? 'active' : ''}" onclick="adSetMode('erase')">ERASE</button>
         <button class="btn btn-red" onclick="adClear()">CLEAR</button>
@@ -320,13 +335,26 @@ function renderAsciiDraw() {
         [Keyboard]: Arrows/WASD=Move, Space/Enter=PaintChar, Backspace=Erase.
     </div>`;
 
-    v.innerHTML = `<h2>ASCII_DRAW STUDIO</h2>${toolsHtml}${gridHtml}`;
+    view.innerHTML = `<h2>ASCII_DRAW STUDIO</h2>${toolsHtml}${gridHtml}`;
 }
 
+// Прапорець активного малювання мишею.
 let adIsDrawing = false;
 
-window.adSetMode = function (m) { adMode = m; renderAsciiDraw(); }
-window.adSetBrush = function (b) { adBrush = b; adMode = 'draw'; renderAsciiDraw(); }
+/** adSetMode - перемикає режим малювання */
+window.adSetMode = function (m) {
+    adMode = m;
+    renderAsciiDraw();
+};
+
+/** adSetBrush - встановлює пензель і повертає в режим малювання */
+window.adSetBrush = function (b) {
+    adBrush = b;
+    adMode = 'draw';
+    renderAsciiDraw();
+};
+
+/** adClear - очищає полотно після підтвердження */
 window.adClear = function () {
     showConfirm('Clear canvas?').then((ok) => {
         if (ok) {
@@ -335,11 +363,12 @@ window.adClear = function () {
             playSfx(100, 'sawtooth', 0.3);
         }
     });
-}
+};
 
+/** adStart - стартує малювання або вибір символу */
 window.adStart = function (el) {
     if (event.shiftKey) {
-        // Picker
+        // Піпетка.
         adBrush = el.innerText;
         if (adBrush === '' || adBrush === ' ') adBrush = '#';
         adMode = 'draw';
@@ -348,37 +377,40 @@ window.adStart = function (el) {
     }
     adIsDrawing = true;
     adPaint(el);
-}
+};
+
+/** adEnter - продовжує малювання при перетягуванні */
 window.adEnter = function (el) {
     if (adIsDrawing) adPaint(el);
-}
+};
 document.addEventListener('mouseup', () => { adIsDrawing = false; });
 
+/** adPaint - малює символ у комірці */
 function adPaint(el) {
     const x = parseInt(el.dataset.x);
     const y = parseInt(el.dataset.y);
     adApply(x, y);
 }
 
+/** adApply - застосовує символ у координатах сітки */
 function adApply(x, y) {
     if (x < 0 || x >= adW || y < 0 || y >= adH) return;
     const char = adMode === 'erase' ? ' ' : adBrush;
     if (adGrid[y][x] !== char) {
         adGrid[y][x] = char;
-        // Optimization: update DOM directly instead of full rerender to be faster, but renderAsciiDraw is safer for consistency
-        // Let's just do renderAsciiDraw for now, it's small enough 40x15=600 elements
+        // Оптимізація: можна оновлювати DOM локально, але renderAsciiDraw стабільніший.
+        // Зараз залишаємо повний ререндер: 40x15=600 елементів.
         renderAsciiDraw();
         playSfx(800 + Math.random() * 200, 'sine', 0.02, 0.01);
     }
 }
 
-// DRAW KEYBOARD HANDLING
+// Обробка клавіатури для режиму малювання.
 document.addEventListener('keydown', (e) => {
-    // Check if Draw is active
+    // Перевіряємо, чи активне малювання.
     if (!document.getElementById('ascii-canvas')) return;
 
-    // Prevent default scrolling for Space/Arrows if canvas focused? 
-    // We just check if nav buttons aren't focused.
+    // Запобігаємо скролу для Space/Arrows, якщо фокус не на кнопках/інпутах.
     if (document.activeElement.tagName === 'BUTTON' || document.activeElement.tagName === 'INPUT') return;
 
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') { if (adCy > 0) adCy--; renderAsciiDraw(); }
