@@ -308,6 +308,7 @@
             justify-content: space-between;
             align-items: center;
             background: var(--bg);
+            gap: 10px;
         }
 
         .container {
@@ -339,8 +340,13 @@
                 height: auto;
                 border-right: none;
                 border-bottom: 2px solid var(--text);
-                flex-direction: row;
-                flex-wrap: wrap;
+                flex-direction: column;
+                flex-wrap: nowrap;
+                display: none;
+            }
+
+            body.nav-open nav {
+                display: flex;
             }
         }
 
@@ -394,6 +400,25 @@
             margin-top: auto;
             border-top: 2px solid var(--text);
             color: red;
+        }
+
+        .menu-toggle {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            border: 1px solid var(--text);
+            color: var(--text);
+            padding: 6px 10px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 767px) {
+            .menu-toggle {
+                display: inline-flex;
+            }
         }
 
         main {
@@ -976,12 +1001,15 @@
             box-shadow: 0 0 15px var(--dim);
             width: min(100%, 720px);
             margin: 0 auto;
+            max-height: calc(100vh - 240px);
+            overflow: auto;
         }
 
         .game-stage {
             position: relative;
             width: 100%;
             min-height: 320px;
+            max-height: calc(100vh - 300px);
         }
 
         .game-area canvas {
@@ -994,10 +1022,12 @@
         .custom-game {
             display: none;
             min-height: 320px;
+            max-height: calc(100vh - 320px);
             background: #000;
             color: var(--text);
             padding: 10px;
             box-sizing: border-box;
+            overflow: auto;
         }
 
         .custom-game:empty::before {
@@ -1362,11 +1392,12 @@
             background: var(--text);
             color: var(--bg);
             border: none;
-            padding: 5px 10px;
+            padding: 3px 8px;
             cursor: pointer;
             font-weight: bold;
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
+            line-height: 1;
         }
 
         .theme-popup {
@@ -1563,6 +1594,11 @@
             flex-wrap: wrap;
         }
 
+        .admin-sidebar .btn {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+        }
+
         @media(min-width: 768px) {
             .admin-sidebar {
                 width: 160px;
@@ -1593,7 +1629,7 @@
             .admin-sidebar .btn {
                 width: 100%;
                 text-align: left;
-                padding: 6px 10px;
+                padding: 4px 8px;
                 font-size: 0.75rem;
             }
         }
@@ -1783,8 +1819,9 @@
 
 .pg-window {
     position: absolute;
-    width: 340px;
+    width: clamp(280px, 32vw, 360px);
     min-height: 240px;
+    max-height: calc(100vh - 260px);
     background: var(--bg);
     border: 1px solid var(--text);
     border-radius: 10px;
@@ -1795,7 +1832,7 @@
 }
 
 .pg-window-wide {
-    width: 780px;
+    width: clamp(320px, 70vw, 860px);
 }
 
 .pg-titlebar {
@@ -1833,6 +1870,7 @@
     flex-direction: column;
     gap: 10px;
     color: var(--text);
+    overflow: auto;
 }
 
 .panel-sub {
@@ -1897,7 +1935,7 @@
 
 .pg-demo-frame canvas {
     width: 100%;
-    height: 220px;
+    height: clamp(180px, 28vh, 260px);
     display: block;
     background: #000;
 }
@@ -1908,11 +1946,17 @@
 
 .fox-stage {
     width: 100%;
-    height: 180px;
+    height: clamp(180px, 28vh, 240px);
     border: 2px inset #fff;
     background: radial-gradient(circle at 20% 20%, rgba(255, 176, 0, 0.2), transparent 60%),
         radial-gradient(circle at 80% 30%, rgba(0, 255, 65, 0.15), transparent 60%),
         #1a1a1a;
+}
+
+.fox-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 .panel-note {
