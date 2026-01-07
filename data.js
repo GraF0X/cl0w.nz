@@ -1,7 +1,7 @@
-/* core_ui.js loader */
+/* data.js loader */
 (function () {
-    if (window.__core_ui_loaded) return;
+    if (window.__data_loaded) return;
     var s = document.createElement('script');
-    s.src = 'js/core_ui.js';
+    s.src = 'js/data.js';
     document.head.appendChild(s);
 })();

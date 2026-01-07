@@ -1,4 +1,5 @@
 /* screensaver.js */
+window.__screensaver_loaded = true;
 // #SECTION_SCREENSAVER - Screensavers
 // ═══════════════════════════════════════════════════════════════════════════════
 

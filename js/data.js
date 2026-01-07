@@ -1,4 +1,4 @@
-/* data.js */
+
 /* --- DATA START --- */
 const defaultData = {
     "password": "4813494d137e1631bba301d5acab6e7bb7aa74ce1185d456565ef51d737677b2",
@@ -155,7 +155,7 @@ const defaultData = {
     },
     "about": {
         "showPhoto": false,
-        "photo": "./photo.png",
+        "photo": "",
         "activeLang": "uk",
         "languages": [
             { "code": "uk", "label": "UA", "text": "<h2>ROOT@SYSTEM:~# whoami</h2><p style=\"font-size:1.3rem; line-height:1.4; margin-top:20px;\">Вітаю.<br><br>Цей термінал є моїм цифровим відображенням.</p>" },
@@ -167,7 +167,7 @@ const defaultData = {
         "birth": "1650-01-01",
         "email": "mail@example.com",
         "phone": "+1234567890",
-        "photo": "./photo.png",
+        "photo": "",
         "titles": {
             "summary": "ОПИС",
             "skills": "SKILLS",
@@ -397,3 +397,4 @@ const defaultData = {
     "picoCarts": []
 };
 /* --- DATA END --- */
+

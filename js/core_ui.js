@@ -1,8 +1,16 @@
 /* core_ui.js */
+window.__core_ui_loaded = true;
 
-let audioCtx = null; let soundOn = true;
+let audioCtx = null; let soundOn = true; let audioUnlocked = false;
+function unlockAudio() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try {
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) { }
+}
 function playSfx(f, t = 'sine', d = 0.1, v = 0.05) {
-    if (!soundOn) return;
+    if (!soundOn || !audioUnlocked) return;
     try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
@@ -14,7 +22,11 @@ function playSfx(f, t = 'sine', d = 0.1, v = 0.05) {
     } catch (e) { }
 }
 /** toggleSound - Перемикає звук увімкнено/вимкнено */
-function toggleSound() { soundOn = !soundOn; document.getElementById('sound-toggle').innerText = soundOn ? '🕪' : '🕩'; }
+function toggleSound() {
+    soundOn = !soundOn;
+    if (soundOn) unlockAudio();
+    document.getElementById('sound-toggle').innerText = soundOn ? '🕪' : '🕩';
+}
 
 function openIRC() {
     if (document.getElementById('irc-window')) return; // Already open
@@ -1520,6 +1532,8 @@ function resolveInitialNavTarget() {
 /** window.onload - Початкове завантаження, ініціалізація даних та початкова навігація */
 window.onload = () => {
     initData();
+    document.addEventListener('pointerdown', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
     try { clownUnlocked = localStorage.getItem('vvs_clown_unlocked') === '1'; } catch (e) { clownUnlocked = false; }
     const savedTheme = localStorage.getItem('vvs_theme_v12'); if (savedTheme) document.body.className = `theme-${savedTheme}`;
     renderDynamicLogo();
