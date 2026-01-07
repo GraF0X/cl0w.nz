@@ -419,6 +419,12 @@
             font-size: 0.85rem;
         }
 
+        @media (max-width: 767px) {
+            .menu-toggle {
+                display: inline-flex;
+            }
+        }
+
         main {
             flex-grow: 1;
             padding: 20px;
@@ -1390,11 +1396,12 @@
             background: var(--text);
             color: var(--bg);
             border: none;
-            padding: 5px 10px;
+            padding: 3px 8px;
             cursor: pointer;
             font-weight: bold;
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
+            line-height: 1;
         }
 
         .theme-popup {
@@ -1591,6 +1598,11 @@
             flex-wrap: wrap;
         }
 
+        .admin-sidebar .btn {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+        }
+
         @media(min-width: 768px) {
             .admin-sidebar {
                 width: 160px;
@@ -1621,7 +1633,7 @@
             .admin-sidebar .btn {
                 width: 100%;
                 text-align: left;
-                padding: 6px 10px;
+                padding: 4px 8px;
                 font-size: 0.75rem;
             }
         }
