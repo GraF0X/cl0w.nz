@@ -252,7 +252,7 @@ if (!container || container.dataset.ready === 'true') {
 
         clock = new THREE.Clock();
         const loader = new GLTFLoader();
-        const modelUrl = 'https://dl.dropboxusercontent.com/scl/fi/0gdxk6nilh77qvy1zk4fb/Xbot1.glb?rlkey=qmicpwgc1wmri2aeqf2cmb4c5&st=3q1zbgce';
+        const modelUrl = 'https://dl.dropboxusercontent.com/scl/fi/zui9932abn9tvcbawunvl/Xbot.glb?rlkey=m1lqparwj8fl9uu4ab6agr5ef&st=ds3i3i43';
 
         loader.load(modelUrl, function (gltf) {
             model = gltf.scene;
@@ -770,6 +770,10 @@ if (!container || container.dataset.ready === 'true') {
     }
 
     function animate() {
+        if (!container.isConnected) {
+            renderer.setAnimationLoop(null);
+            return;
+        }
         const delta = clock.getDelta();
         const time = clock.elapsedTime;
 

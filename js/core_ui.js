@@ -1233,12 +1233,17 @@ function renderPlaygroundPolygon() {
 }
 
 function ensureFinalsImports() {
-    if (window.__finalsImportsReady) return;
-    window.__finalsImportsReady = true;
-    if (!document.getElementById('finals-importmap')) {
+    if (window.__finalsImportsPromise) return window.__finalsImportsPromise;
+    window.__finalsImportsPromise = new Promise((resolve) => {
+        if (document.getElementById('finals-importmap')) {
+            resolve();
+            return;
+        }
         const shim = document.createElement('script');
         shim.async = true;
         shim.src = 'https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js';
+        shim.onload = () => resolve();
+        shim.onerror = () => resolve();
         document.head.appendChild(shim);
         const map = document.createElement('script');
         map.type = 'importmap';
@@ -1250,20 +1255,22 @@ function ensureFinalsImports() {
             }
         });
         document.head.appendChild(map);
-    }
+    });
+    return window.__finalsImportsPromise;
 }
 
 function loadFinalsScene() {
     if (window.__finalsSceneLoaded) return;
     window.__finalsSceneLoaded = true;
-    ensureFinalsImports();
-    if (!document.getElementById('finals-module')) {
-        const mod = document.createElement('script');
-        mod.type = 'module';
-        mod.id = 'finals-module';
-        mod.src = 'js/final_three.js';
-        document.body.appendChild(mod);
-    }
+    ensureFinalsImports().then(() => {
+        if (!document.getElementById('finals-module')) {
+            const mod = document.createElement('script');
+            mod.type = 'module';
+            mod.id = 'finals-module';
+            mod.src = 'js/final_three.js';
+            document.body.appendChild(mod);
+        }
+    });
 }
 
 function renderFinals() {
