@@ -323,6 +323,7 @@ if (!container || container.dataset.ready === 'true') {
 
     function initIK(mesh) {
         if (!mesh || !mesh.skeleton || !mesh.skeleton.bones || mesh.skeleton.bones.length === 0) return;
+        if (ikSolver) return;
 
         const bones = mesh.skeleton.bones;
         const boneMap = {};
@@ -393,14 +394,8 @@ if (!container || container.dataset.ready === 'true') {
                 scene.add(targetMesh);
 
                 bones.push(targetMesh);
-                if (mesh.skeleton && Array.isArray(mesh.skeleton.boneInverses)) {
+                if (mesh.skeleton && mesh.skeleton.boneInverses) {
                     mesh.skeleton.boneInverses.push(new THREE.Matrix4());
-                    if (mesh.skeleton.boneMatrices.length !== bones.length * 16) {
-                        mesh.skeleton.boneMatrices = new Float32Array(bones.length * 16);
-                    }
-                    if (mesh.skeleton.boneTexture && mesh.skeleton.computeBoneTexture) {
-                        mesh.skeleton.computeBoneTexture();
-                    }
                 }
                 const targetIndex = bones.length - 1;
 
