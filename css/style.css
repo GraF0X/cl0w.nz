@@ -1,7 +1,4 @@
-<<<<<<< HEAD:css/style.css
 /* style.css */
-=======
->>>>>>> main:style.css
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Press+Start+2P&display=swap');
 
         :root {
@@ -979,7 +976,6 @@
             box-shadow: 0 0 15px var(--dim);
             width: min(100%, 720px);
             margin: 0 auto;
-<<<<<<< HEAD:css/style.css
         }
 
         .game-stage {
@@ -1121,8 +1117,1275 @@
             height: 240px;
             display: block;
             background: #000;
-=======
->>>>>>> main:style.css
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            min-height: 320px;
+        }
+
+        .game-area canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .custom-game {
+            display: none;
+            min-height: 320px;
+            background: #000;
+            color: var(--text);
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .custom-game:empty::before {
+            content: 'Custom game output appears here';
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        .game-error {
+            color: #f55;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .game-hint {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .game-panels { display: grid; grid-template-columns: 1fr; gap: 12px; justify-items: center; }
+        .game-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+
+        .pico-panel {
+            border: 1px solid var(--dim);
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pico-list {
+            border: 1px dashed var(--dim);
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .pico-item {
+            border: 1px solid var(--dim);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+
+        .pico-title { font-weight: bold; }
+        .pico-url { font-size: 0.75rem; opacity: 0.7; word-break: break-all; }
+        .pico-actions { display: flex; gap: 6px; }
+
+        .game-toolbar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .saver-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin: 10px 0 14px;
+        }
+
+        .saver-card {
+            border: 1px solid var(--dim);
+            padding: 12px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+        }
+
+        .saver-card input { display: none; }
+
+        .saver-card.active,
+        .saver-card:hover {
+            border-color: var(--text);
+            box-shadow: 0 0 12px var(--dim);
+        }
+
+        .saver-name { font-weight: bold; letter-spacing: 0.5px; }
+        .saver-desc { font-size: 0.85rem; opacity: 0.8; }
+        .saver-badge { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+
+        .saver-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--dim);
+            padding-top: 10px;
+        }
+
+        .saver-action-buttons { display: flex; gap: 8px; }
+
+        .saver-preview-shell {
+            border: 1px solid var(--dim);
+            border-radius: 6px;
+            padding: 8px;
+            background: rgba(0,0,0,0.15);
+            margin-top: 12px;
+        }
+
+        #saver-preview-canvas {
+            width: 100%;
+            height: 240px;
+            display: block;
+            background: #000;
         }
 
         .game-stage {
@@ -2056,12 +3319,8 @@
             overflow: hidden;
         }
 
-<<<<<<< HEAD:css/style.css
-        .pg-window-wide { width: 780px; }
-=======
-        .pg-window-wide { width: 620px; }
->>>>>>> main:style.css
 
+        .pg-window-wide { width: 620px; }
         .pg-titlebar {
             display: flex;
             justify-content: space-between;
@@ -2121,33 +3380,12 @@
             font-size: 0.9rem;
         }
 
-<<<<<<< HEAD:css/style.css
+
         .pg-three { gap: 12px; display: grid; grid-template-columns: 1.2fr 1fr; align-items: flex-start; }
-=======
-        .pg-three { gap: 12px; }
->>>>>>> main:style.css
-        .pg-fox-shell { display: flex; flex-direction: column; gap: 8px; }
-        .pg-three-demos { display: flex; flex-direction: column; gap: 8px; }
-        .pg-demo-list { display: flex; flex-wrap: wrap; gap: 8px; }
-
-        .pg-demo-frame {
-            border: 1px solid var(--dim);
-            border-radius: 10px;
-            overflow: hidden;
-            background: rgba(0, 0, 0, 0.3);
-        }
-
-<<<<<<< HEAD:css/style.css
         .pg-demo-frame canvas {
             width: 100%;
             height: 220px;
             display: block;
-=======
-        .pg-demo-frame iframe {
-            width: 100%;
-            height: 240px;
-            border: none;
->>>>>>> main:style.css
             background: #000;
         }
 
@@ -2162,11 +3400,7 @@
 
         .fox-stage {
             width: 100%;
-<<<<<<< HEAD:css/style.css
-            height: 180px;
-=======
             height: 220px;
->>>>>>> main:style.css
             border: 2px inset #fff;
             background: radial-gradient(circle at 20% 20%, rgba(255, 176, 0, 0.2), transparent 60%),
                 radial-gradient(circle at 80% 30%, rgba(0, 255, 65, 0.15), transparent 60%),

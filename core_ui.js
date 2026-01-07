@@ -469,6 +469,8 @@ function initData() {
             else {
                 systemData.effects = Object.assign({}, JSON.parse(JSON.stringify(defaultData.effects)), systemData.effects);
             }
+            if (!systemData.features) systemData.features = JSON.parse(JSON.stringify(defaultData.features));
+            if (typeof systemData.features.view3d === 'undefined') systemData.features.view3d = defaultData.features.view3d;
 
             if (!systemData.home.logoText) systemData.home.logoText = defaultData.home.logoText;
             if (!systemData.home.browserTitle) systemData.home.browserTitle = defaultData.home.browserTitle || systemData.home.logoText.replace(':~$', '');
@@ -533,6 +535,7 @@ function applyMenuVisibility() {
     toggle('nav-todo', mv.todo);
     toggle('nav-gallery', mv.gallery);
     toggle('nav-game', mv.game);
+    toggle('nav-final', mv.final !== false);
     // New ones:
     toggle('nav-draw', mv.draw !== false); // default true
     toggle('nav-pc', mv.pc !== false);
@@ -757,7 +760,7 @@ document.addEventListener('keydown', (e) => {
 
 /** Глобальні змінні стану додатка */
 let isTyping = false; let currentObsCat = 'SECURITY'; let currentObsFile = '';
-let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0;
+let currentGalCat = 'ASCII_ART'; let logoClicks = 0; let clownClicks = 0; let clownUnlocked = false;
 let currentLang = 'uk'; let adminAuth = false;
 let admNoteCat = ''; let admNoteFile = '';
 let glitchTriggered = false; let mintEvaClicks = 0; let evaCount = 0;
@@ -805,6 +808,7 @@ function nav(id) {
     else if (id === 'gallery') renderGallery();
     else if (id === 'draw') renderAsciiDraw();
     else if (id === 'pc') renderPlaygroundPolygon();
+    else if (id === 'final') renderFinal();
     else if (id === 'screensaver') renderScreensaverMenu();
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
@@ -814,14 +818,6 @@ function nav(id) {
 let playgroundFiles = [];
 let playgroundCurrentFileId = '';
 let playgroundWindowState = null;
-let foxRenderer = null;
-let foxScene = null;
-let foxCamera = null;
-let foxGroup = null;
-let foxAnimHandle = null;
-let foxResizeHandler = null;
-let threeLoading = false;
-let threeQueue = [];
 
 function loadPlaygroundFiles() {
     if (playgroundFiles && playgroundFiles.length) return playgroundFiles;
@@ -870,133 +866,20 @@ function savePlaygroundFiles() {
     try { localStorage.setItem('playground-files', JSON.stringify(playgroundFiles)); } catch (e) { /* ignore */ }
 }
 
-function ensureThree(callback, onError) {
-    const fail = typeof onError === 'function' ? onError : function () { };
-    if (window.THREE) { callback(); return; }
-    threeQueue.push(callback);
-    if (threeLoading) return;
-    threeLoading = true;
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/three@0.160.0/build/three.min.js';
-    s.onload = function () {
-        threeLoading = false;
-        const queue = threeQueue.slice();
-        threeQueue = [];
-        queue.forEach(fn => { if (typeof fn === 'function') fn(); });
-    };
-    s.onerror = function () {
-        threeLoading = false; threeQueue = [];
-        fail();
-        showToast('Three.js failed to load', 'error');
-    };
-    document.head.appendChild(s);
+function getPlaygroundThreeExamples() {
+    if (window.threeLab && typeof window.threeLab.getExamples === 'function') {
+        return window.threeLab.getExamples();
+    }
+    return [];
 }
 
-function teardownFoxLab() {
-    if (foxResizeHandler) {
-        window.removeEventListener('resize', foxResizeHandler);
-        foxResizeHandler = null;
+function loadThreeExample(id) {
+    if (window.threeLab && typeof window.threeLab.loadExample === 'function') {
+        window.threeLab.loadExample(id);
+        return;
     }
-    if (foxAnimHandle) {
-        cancelAnimationFrame(foxAnimHandle);
-        foxAnimHandle = null;
-    }
-    if (foxRenderer) {
-        foxRenderer.dispose();
-        foxRenderer = null;
-    }
-    foxScene = null; foxCamera = null; foxGroup = null;
-}
-
-function resizeFoxLab(container) {
-    if (!foxRenderer || !foxCamera || !container) return;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    foxCamera.aspect = w / h;
-    foxCamera.updateProjectionMatrix();
-    foxRenderer.setSize(w, h);
-}
-
-function setupFoxLab() {
-    const holder = document.getElementById('fox-stage');
-    if (!holder) return;
-    holder.innerHTML = '<div class="fox-loading">Loading fox lab…</div>';
-    ensureThree(() => {
-        if (!holder) return;
-        teardownFoxLab();
-        const THREE = window.THREE;
-        if (!THREE) { holder.innerHTML = '<div class="fox-loading">Three.js unavailable</div>'; return; }
-        foxRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        foxRenderer.setPixelRatio(window.devicePixelRatio || 1);
-        foxRenderer.setSize(holder.clientWidth, holder.clientHeight);
-        holder.innerHTML = '';
-        holder.appendChild(foxRenderer.domElement);
-
-        foxScene = new THREE.Scene();
-        foxCamera = new THREE.PerspectiveCamera(50, holder.clientWidth / holder.clientHeight, 0.1, 100);
-        foxCamera.position.set(2, 1.4, 3);
-
-        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-        const spot = new THREE.DirectionalLight(0xffb000, 0.8);
-        spot.position.set(3, 4, 2);
-        foxScene.add(ambient);
-        foxScene.add(spot);
-
-        foxGroup = new THREE.Group();
-        const orange = new THREE.MeshStandardMaterial({ color: 0xffa040, roughness: 0.6, metalness: 0.1 });
-        const white = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-        const black = new THREE.MeshStandardMaterial({ color: 0x111111 });
-
-        const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.6, 0.6), orange);
-        body.position.set(0, 0.3, 0);
-        foxGroup.add(body);
-
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), orange);
-        head.position.set(0.9, 0.55, 0);
-        foxGroup.add(head);
-
-        const nose = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.2), black);
-        nose.position.set(1.3, 0.45, 0);
-        foxGroup.add(nose);
-
-        const earL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.1), white);
-        earL.position.set(0.75, 0.85, 0.2);
-        const earR = earL.clone(); earR.position.z = -0.2;
-        foxGroup.add(earL); foxGroup.add(earR);
-
-        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.2, 0.2), orange);
-        tail.position.set(-1.0, 0.35, 0);
-        tail.rotation.z = 0.25;
-        foxGroup.add(tail);
-
-        const legs = new THREE.BoxGeometry(0.15, 0.3, 0.15);
-        const legOffsets = [ [0.4, 0, 0.2], [0.4, 0, -0.2], [-0.4, 0, 0.2], [-0.4, 0, -0.2] ];
-        legOffsets.forEach((p, i) => {
-            const leg = new THREE.Mesh(legs, black);
-            leg.position.set(p[0], 0.15, p[2]);
-            foxGroup.add(leg);
-        });
-
-        foxScene.add(foxGroup);
-        const ground = new THREE.Mesh(new THREE.CircleGeometry(3, 40), new THREE.MeshBasicMaterial({ color: 0x101010 }));
-        ground.rotation.x = -Math.PI / 2;
-        foxScene.add(ground);
-
-        const animateFox = function () {
-            if (!foxRenderer || !foxScene || !foxCamera) return;
-            foxGroup.rotation.y += 0.01;
-            foxGroup.position.y = 0.05 + Math.sin(Date.now() / 500) * 0.02;
-            foxRenderer.render(foxScene, foxCamera);
-            foxAnimHandle = requestAnimationFrame(animateFox);
-        };
-        animateFox();
-
-        foxResizeHandler = function () { resizeFoxLab(holder); };
-        window.addEventListener('resize', foxResizeHandler);
-        resizeFoxLab(holder);
-    }, () => {
-        if (holder) holder.innerHTML = '<div class="fox-loading">Fox lab failed to load</div>';
-    });
+    const status = document.getElementById('pg-demo-status');
+    if (status) status.innerText = '3D lab unavailable';
 }
 
 function renderPlaygroundFilesList() {
@@ -1150,21 +1033,42 @@ function submitPlaygroundCommand(evt) {
     evt.target.value = '';
 }
 
-const playgroundThreeExamples = [
-    { id: 'fox-local', label: 'Fox Lab (local)', url: '' },
-    { id: 'transmission', label: 'Physical Transmission', url: 'https://threejs.org/examples/webgl_materials_physical_transmission_alpha.html' },
-    { id: 'toon', label: 'Toon Materials', url: 'https://threejs.org/examples/webgl_materials_toon.html' },
-    { id: 'pixel', label: 'Pixel Post FX', url: 'https://threejs.org/examples/webgl_postprocessing_pixel.html' },
-    { id: 'md2', label: 'MD2 Loader', url: 'https://threejs.org/examples/webgl_loader_md2.html' },
-    { id: 'spot', label: 'Spotlight Lab', url: 'https://threejs.org/examples/webgl_lights_spotlight.html' }
-];
-
 function playgroundPosStyle(id) {
     const state = loadPlaygroundWindowState();
     const info = state[id] || {};
     const x = typeof info.x === 'number' ? info.x : 20;
     const y = typeof info.y === 'number' ? info.y : 20;
     return `style="left:${x}px; top:${y}px;"`;
+}
+
+function canViewFinal3D() {
+    return !!(systemData.features && systemData.features.view3d) && !!clownUnlocked;
+}
+
+function updateView3DButtonState() {
+    const buttons = [
+        document.getElementById('pg-view-3d'),
+        document.getElementById('final-view-3d')
+    ].filter(Boolean);
+    if (!buttons.length) return;
+    const allowed = canViewFinal3D();
+    buttons.forEach((btn) => {
+        btn.disabled = !allowed;
+        btn.classList.toggle('btn-ghost', !allowed);
+        btn.innerText = allowed ? 'View in 3D' : 'View in 3D (locked)';
+    });
+}
+
+function openFinalView3D() {
+    if (!canViewFinal3D()) {
+        showToast('View in 3D locked. Enable in admin and trigger the clown easter egg.', 'warning');
+        return;
+    }
+    const state = loadPlaygroundWindowState();
+    if (!state.three) state.three = { open: true, x: 360, y: 320 };
+    state.three.open = true;
+    savePlaygroundWindowState();
+    nav('pc');
 }
 
 function renderPlaygroundPolygon() {
@@ -1174,7 +1078,9 @@ function renderPlaygroundPolygon() {
         main.style.overflow = 'hidden';
         pcScrollCleanup = function () {
             main.style.overflow = main.dataset.prevOverflow || '';
-            teardownFoxLab();
+            if (window.threeLab && typeof window.threeLab.teardownFoxLab === 'function') {
+                window.threeLab.teardownFoxLab();
+            }
         };
     }
 
@@ -1193,6 +1099,7 @@ function renderPlaygroundPolygon() {
     const saverName = (systemData.screensaver && systemData.screensaver.type) || (saverCatalog[0] ? saverCatalog[0].id : 'none');
     const gamesCount = Array.isArray(systemData.games) ? systemData.games.length : (Array.isArray(defaultData.games) ? defaultData.games.length : 0);
     const todoCount = Array.isArray(systemData.todos) ? systemData.todos.length : 0;
+    const threeDemos = getPlaygroundThreeExamples();
 
     v.innerHTML = `
     <div class="pg-desktop">
@@ -1280,17 +1187,17 @@ function renderPlaygroundPolygon() {
                 </div>
                 <div class="pg-body pg-three">
                     <div class="pg-fox-shell">
-                        <div class="panel-sub">Low-poly fox</div>
+                        <div class="panel-sub">Skeletal preview</div>
                         <div id="fox-stage" class="fox-stage"></div>
-                        <div class="panel-note">Powered by Three.js with theme-aware chrome.</div>
+                        <div class="panel-note">Rigged demo loaded inline with theme-aware chrome.</div>
                     </div>
                     <div class="pg-three-demos">
-                        <div class="panel-sub">Three.js demos</div>
+                        <div class="panel-sub">WebGL demos</div>
                         <div class="pg-demo-list">
-                            ${playgroundThreeExamples.map(d => `<button class="btn btn-sm" onclick="loadThreeExample('${d.id}')">${d.label}</button>`).join('')}
+                            ${threeDemos.map(d => `<button class="btn btn-sm" onclick="loadThreeExample('${d.id}')">${d.label}</button>`).join('') || '<div class="panel-note">No demos available</div>'}
                         </div>
-                        <div class="pg-demo-frame">
-                            <iframe id="pg-demo-frame" title="Three.js demo" loading="lazy"></iframe>
+                        <div class="pg-demo-frame" id="pg-demo-frame">
+                            <canvas id="pg-demo-canvas"></canvas>
                             <div id="pg-demo-status" class="panel-note">Select a demo to load it inline.</div>
                         </div>
                     </div>
@@ -1301,26 +1208,58 @@ function renderPlaygroundPolygon() {
 
     renderPlaygroundFilesList();
     fillPlaygroundEditor();
-    setupFoxLab();
-    loadThreeExample('fox-local');
+    if (window.threeLab && typeof window.threeLab.setupFoxLab === 'function') {
+        window.threeLab.setupFoxLab();
+    } else {
+        const holder = document.getElementById('fox-stage');
+        if (holder) holder.innerHTML = '<div class="fox-loading">3D lab unavailable</div>';
+    }
+    loadThreeExample('skeletal');
+    updateView3DButtonState();
     wirePlaygroundDesktop();
 }
 
-function loadThreeExample(id) {
-    const frame = document.getElementById('pg-demo-frame');
-    const status = document.getElementById('pg-demo-status');
-    if (!frame || !status) return;
-    const demo = playgroundThreeExamples.find(d => d.id === id);
-    if (!demo) { status.innerText = 'Demo unavailable'; return; }
-    if (id === 'fox-local') {
-        frame.src = '';
-        status.innerText = 'Fox lab runs locally above; remote iframe cleared.';
-        return;
-    }
-    status.innerText = 'Loading ' + demo.label + '...';
-    frame.src = demo.url;
-    frame.onload = function () { status.innerText = 'Loaded: ' + demo.label; };
-    frame.onerror = function () { status.innerText = 'Unable to load demo (offline?)'; };
+function renderFinal() {
+    const v = document.getElementById('view');
+    v.innerHTML = `
+        <div class="final-shell">
+            <header class="final-header">
+                <div class="final-kicker">VVS SYSTEM / FINAL</div>
+                <h1>Final Showcase</h1>
+                <p class="final-sub">Offline-ready static scene with theme-aware chrome.</p>
+            </header>
+            <section class="final-card">
+                <div class="final-meta">
+                    <div class="final-badge">LOCAL</div>
+                    <div class="final-lines">
+                        <span>STATUS: READY</span>
+                        <span>MODE: TERMINAL</span>
+                        <span>ACCESS: CONTROLLED</span>
+                    </div>
+                </div>
+                <div class="final-body">
+                    <div class="final-panel">
+                        <h2>Scene Snapshot</h2>
+                        <ul>
+                            <li>Theme-aware gradients &amp; glow layers</li>
+                            <li>Local-only assets (offline safe)</li>
+                            <li>Locked 3D view (admin + easter)</li>
+                        </ul>
+                    </div>
+                    <div class="final-panel">
+                        <h2>Controls</h2>
+                        <p>Unlock the 3D view using the admin checkbox and the clown easter egg.</p>
+                        <div class="final-actions">
+                            <button id="final-view-3d" class="btn" onclick="openFinalView3D()">View in 3D</button>
+                            <span id="final-view-status" class="panel-note">Admin + clown easter egg required.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>`;
+    updateView3DButtonState();
+    const status = document.getElementById('final-view-status');
+    if (status) status.textContent = canViewFinal3D() ? 'Unlocked. Launches the 3D lab.' : 'Locked: enable in admin + trigger easter egg.';
 }
 
 function generateFakeProcesses() {
@@ -1534,7 +1473,22 @@ function checkAdminUnlock() {
     }
 }
 /** easterEggClown - Секретний оверлей з клоуном */
-function easterEggClown() { clownClicks++; if (clownClicks >= 5) { playSfx(400); setTimeout(() => playSfx(300), 100); const o = document.getElementById('clown-overlay'); o.style.display = 'flex'; setTimeout(() => { o.style.display = 'none'; clownClicks = 0; }, 1000); } }
+function easterEggClown() {
+    clownClicks++;
+    if (clownClicks >= 5) {
+        playSfx(400);
+        setTimeout(() => playSfx(300), 100);
+        const o = document.getElementById('clown-overlay');
+        o.style.display = 'flex';
+        clownUnlocked = true;
+        try { localStorage.setItem('vvs_clown_unlocked', '1'); } catch (e) { /* ignore */ }
+        updateView3DButtonState();
+        setTimeout(() => {
+            o.style.display = 'none';
+            clownClicks = 0;
+        }, 1000);
+    }
+}
 /** easterEggClock - Перемикає матричний фон */
 function easterEggClock() { const m = document.getElementById('matrix-bg'); m.style.display = m.style.display === 'block' ? 'none' : 'block'; if (m.style.display === 'block') startMatrix(); }
 /** startMatrix - Запускає анімацію дощу символів Matrix */
@@ -1550,6 +1504,14 @@ function renderDynamicLogo() {
     }
 }
 
+function resolveInitialNavTarget() {
+    const hash = (window.location.hash || '').replace('#', '').trim();
+    if (!hash) return 'home';
+    if (hash === 'playground') return 'pc';
+    const allowed = ['home', 'about', 'resume', 'work', 'obsidian', 'blog', 'todo', 'gallery', 'draw', 'pc', 'final', 'screensaver', 'game', 'contact', 'admin'];
+    return allowed.includes(hash) ? hash : 'home';
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // #SECTION_INIT - Головна ініціалізація (Entry Point)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1557,12 +1519,14 @@ function renderDynamicLogo() {
 /** window.onload - Початкове завантаження, ініціалізація даних та початкова навігація */
 window.onload = () => {
     initData();
+    try { clownUnlocked = localStorage.getItem('vvs_clown_unlocked') === '1'; } catch (e) { clownUnlocked = false; }
     const savedTheme = localStorage.getItem('vvs_theme_v12'); if (savedTheme) document.body.className = `theme-${savedTheme}`;
     renderDynamicLogo();
+    const initialNav = resolveInitialNavTarget();
 
     if (sessionStorage.getItem('boot_shown')) {
         document.getElementById('boot').style.display = 'none';
-        nav('home');
+        nav(initialNav);
     } else {
         let i = 0; const logs = ["BOOTING...", "HACKING PENTAGON: OK", "STATUS: ONLINE"];
         const t = setInterval(() => {
@@ -1578,7 +1542,7 @@ window.onload = () => {
                 setTimeout(() => {
                     document.getElementById('boot').style.display = 'none';
                     sessionStorage.setItem('boot_shown', 'true');
-                    nav('home');
+                    nav(initialNav);
                 }, 400);
             }
         }, 250);
@@ -1588,4 +1552,3 @@ window.onload = () => {
     setInterval(() => { const p = systemData.glitch.footerPhrases; document.getElementById('funny-phrase').innerText = p[Math.floor(Math.random() * p.length)]; }, 5000);
     document.addEventListener('click', (e) => { const menu = document.getElementById('theme-popup'); const btn = document.querySelector('.theme-toggle-btn'); if (!menu.contains(e.target) && e.target !== btn && menu.classList.contains('show')) { menu.classList.remove('show'); } });
 };
-

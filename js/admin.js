@@ -377,10 +377,8 @@ function loadAdminEditor(sec) {
                         <label class="opt-check"><input type="checkbox" id="adm-fx-svg" ${systemData.effects.svgGlow !== false ? 'checked' : ''}> SVG Icons</label>
                         <label class="opt-check"><input type="checkbox" id="adm-fx-pulse" ${systemData.effects.screenPulse ? 'checked' : ''}> Screen Pulse</label>
                         <label class="opt-check"><input type="checkbox" id="adm-home-icons" ${systemData.home.showIcons !== false ? 'checked' : ''}> Show Menu Icons</label>
-<<<<<<< HEAD:js/admin.js
                         <label class="opt-check"><input type="checkbox" id="adm-view3d" ${systemData.features && systemData.features.view3d ? 'checked' : ''}> Enable View in 3D</label>
-=======
->>>>>>> main:admin.js
+                        <label class="opt-check"><input type="checkbox" id="adm-view3d" ${systemData.features && systemData.features.view3d ? 'checked' : ''}> Enable View in 3D</label>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
                         <label class="form-label" for="adm-font-choice" style="margin:0;">Font:</label>
@@ -1272,10 +1270,6 @@ window.saveThemeExtras = function () {
     if (!systemData.effects) systemData.effects = JSON.parse(JSON.stringify(defaultData.effects));
     if (!systemData.home) systemData.home = {};
     if (!systemData.themes) systemData.themes = JSON.parse(JSON.stringify(defaultData.themes));
-<<<<<<< HEAD:js/admin.js
-    if (!systemData.features) systemData.features = JSON.parse(JSON.stringify(defaultData.features));
-=======
->>>>>>> main:admin.js
 
     systemData.effects.glow = document.getElementById('adm-fx-glow').checked;
     systemData.effects.flicker = document.getElementById('adm-fx-flicker').checked;
@@ -1283,10 +1277,6 @@ window.saveThemeExtras = function () {
     systemData.effects.svgGlow = document.getElementById('adm-fx-svg').checked;
     systemData.effects.screenPulse = document.getElementById('adm-fx-pulse').checked;
     systemData.home.showIcons = document.getElementById('adm-home-icons').checked;
-<<<<<<< HEAD:js/admin.js
-    systemData.features.view3d = document.getElementById('adm-view3d').checked;
-=======
->>>>>>> main:admin.js
     const fontSelect = document.getElementById('adm-font-choice');
     systemData.themes.font = fontSelect ? fontSelect.value : 'modern';
 
@@ -1294,10 +1284,6 @@ window.saveThemeExtras = function () {
     if (typeof applyEffects === 'function') applyEffects();
     if (typeof applyFontChoice === 'function') applyFontChoice(systemData.themes.font);
     if (typeof toggleIcons === 'function') toggleIcons(systemData.home.showIcons);
-<<<<<<< HEAD:js/admin.js
-    if (typeof updateView3DButtonState === 'function') updateView3DButtonState();
-=======
->>>>>>> main:admin.js
     showToast('Theme extras applied', 'success');
 };
 
