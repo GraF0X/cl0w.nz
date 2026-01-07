@@ -1172,7 +1172,7 @@ function renderPlaygroundPolygon() {
                 </div>
                 <div class="pg-body pg-three">
                     <div class="pg-fox-shell">
-                        <div class="panel-sub">Skeletal preview</div>
+                        <div class="panel-sub">Fox preview</div>
                         <div id="fox-stage" class="fox-stage"></div>
                         <div class="panel-note">Rigged demo loaded inline with theme-aware chrome.</div>
                     </div>
@@ -1221,8 +1221,8 @@ function ensureFinalsImports() {
         map.id = 'finals-importmap';
         map.textContent = JSON.stringify({
             imports: {
-                three: 'https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js',
-                'three/addons/': 'https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/'
+                three: 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+                'three/addons/': 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/'
             }
         });
         document.head.appendChild(map);

@@ -155,6 +155,32 @@
         ];
     }
 
+    function buildFoxParts(time) {
+        const wag = Math.sin(time * 0.004) * 0.5;
+        const head = mat4Translate(mat4Scale(mat4Identity(), 0.7, 0.6, 0.6), 0, 0.45, 0.6);
+        const body = mat4Scale(mat4Identity(), 1.2, 0.6, 0.6);
+        const legFrontL = mat4Translate(mat4Scale(mat4Identity(), 0.2, 0.4, 0.2), -0.45, -0.6, 0.3);
+        const legFrontR = mat4Translate(mat4Scale(mat4Identity(), 0.2, 0.4, 0.2), 0.45, -0.6, 0.3);
+        const legBackL = mat4Translate(mat4Scale(mat4Identity(), 0.2, 0.4, 0.2), -0.45, -0.6, -0.3);
+        const legBackR = mat4Translate(mat4Scale(mat4Identity(), 0.2, 0.4, 0.2), 0.45, -0.6, -0.3);
+        const tail = mat4Translate(mat4RotateY(mat4Scale(mat4Identity(), 0.2, 0.8, 0.2), wag), 0, 0.1, -0.8);
+        const earL = mat4Translate(mat4Scale(mat4Identity(), 0.15, 0.3, 0.15), -0.2, 0.9, 0.6);
+        const earR = mat4Translate(mat4Scale(mat4Identity(), 0.15, 0.3, 0.15), 0.2, 0.9, 0.6);
+        const snout = mat4Translate(mat4Scale(mat4Identity(), 0.35, 0.2, 0.25), 0, 0.2, 1.0);
+        return [
+            { color: [0.93, 0.55, 0.2], model: body },
+            { color: [0.97, 0.64, 0.25], model: head },
+            { color: [0.2, 0.1, 0.05], model: snout },
+            { color: [0.98, 0.8, 0.6], model: earL },
+            { color: [0.98, 0.8, 0.6], model: earR },
+            { color: [0.93, 0.55, 0.2], model: legFrontL },
+            { color: [0.93, 0.55, 0.2], model: legFrontR },
+            { color: [0.93, 0.55, 0.2], model: legBackL },
+            { color: [0.93, 0.55, 0.2], model: legBackR },
+            { color: [0.98, 0.8, 0.6], model: tail }
+        ];
+    }
+
     function mat4RotateZ(m, rad) {
         const c = Math.cos(rad), s = Math.sin(rad);
         const r = [c, s, 0, 0,
@@ -164,7 +190,7 @@
         return mat4Multiply(m, r);
     }
 
-    function buildSkeletalDemo(canvas, statusEl) {
+    function buildSkeletalDemo(canvas, statusEl, partsBuilder) {
         const gl = createGL(canvas);
         if (!gl) {
             if (statusEl) statusEl.innerText = 'WebGL unavailable';
@@ -223,7 +249,7 @@
             const proj = mat4Perspective(Math.PI / 4, aspect, 0.1, 100);
             let view = mat4LookAt([3, 2, 6], [0, 0.4, 0], [0, 1, 0]);
             view = mat4RotateY(view, Math.sin(time * 0.0004) * 0.2);
-            const parts = buildSkeletonParts(time);
+            const parts = (partsBuilder || buildSkeletonParts)(time);
             parts.forEach((part) => {
                 let model = mat4Translate(mat4Identity(), 0, 0.2, 0);
                 model = mat4Multiply(model, part.model);
@@ -237,6 +263,10 @@
         requestAnimationFrame(render);
         if (statusEl) statusEl.innerText = 'Running offline skeletal demo';
         return Promise.resolve({ stop });
+    }
+
+    function buildFoxDemo(canvas, statusEl) {
+        return buildSkeletalDemo(canvas, statusEl, buildFoxParts);
     }
 
     let foxRunner = null;
@@ -256,7 +286,7 @@
         const status = document.createElement('div');
         status.className = 'panel-note';
         holder.appendChild(status);
-        buildSkeletalDemo(canvas, status).then(function (runner) {
+        buildFoxDemo(canvas, status).then(function (runner) {
             foxRunner = runner;
             if (!runner) holder.innerHTML = '<div class="fox-loading">3D lab unavailable</div>';
         });
@@ -275,7 +305,8 @@
             if (status) status.innerText = 'Canvas missing';
             return;
         }
-        buildSkeletalDemo(canvas, status).then(function (runner) {
+        const builder = id === 'fox' ? buildFoxDemo : buildSkeletalDemo;
+        builder(canvas, status).then(function (runner) {
             demoRunner = runner;
             if (!runner && status) status.innerText = 'Could not start demo';
         });

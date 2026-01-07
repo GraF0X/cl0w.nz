@@ -569,9 +569,7 @@ if (!container || container.dataset.ready === 'true') {
             'Linear': THREE.LinearToneMapping,
             'Reinhard': THREE.ReinhardToneMapping,
             'Cineon': THREE.CineonToneMapping,
-            'ACESFilmic': THREE.ACESFilmicToneMapping,
-            'AgX': THREE.AgXToneMapping,
-            'Neutral': THREE.NeutralToneMapping
+            'ACESFilmic': THREE.ACESFilmicToneMapping
         };
         const toneParams = {
             exposure: 1.0,
