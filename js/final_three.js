@@ -131,7 +131,7 @@ if (!container || container.dataset.ready === 'true') {
         scene.background = new THREE.Color(0x050505);
 
         new RGBELoader()
-            .setPath('https://threejs.org/examples/textures/equirectangular/')
+            .setPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/textures/equirectangular/')
             .load('royal_esplanade_1k.hdr', function (texture) {
                 texture.mapping = THREE.EquirectangularReflectionMapping;
                 scene.environment = texture;
@@ -393,6 +393,15 @@ if (!container || container.dataset.ready === 'true') {
                 scene.add(targetMesh);
 
                 bones.push(targetMesh);
+                if (mesh.skeleton && Array.isArray(mesh.skeleton.boneInverses)) {
+                    mesh.skeleton.boneInverses.push(new THREE.Matrix4());
+                    if (mesh.skeleton.boneMatrices.length !== bones.length * 16) {
+                        mesh.skeleton.boneMatrices = new Float32Array(bones.length * 16);
+                    }
+                    if (mesh.skeleton.boneTexture && mesh.skeleton.computeBoneTexture) {
+                        mesh.skeleton.computeBoneTexture();
+                    }
+                }
                 const targetIndex = bones.length - 1;
 
                 iks.push({
