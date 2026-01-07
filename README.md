@@ -1,42 +1,48 @@
 <!-- README.md: project overview -->
 # cl0w.nz
 
-Terminal-style personal hub with themed UI, admin controls, mini-tools, and an interactive Playground lab. The site is fully client-side and stores user settings in `localStorage`.
+Термінальний персональний хаб із темами, адмін‑панеллю та інтерактивним Playground. Проєкт повністю клієнтський, зберігає налаштування в `localStorage` і працює офлайн.
 
-## Highlights
-- Multi-theme terminal UI with optional effects, font switching, and icon toggles.
-- Admin panel for content management, feature flags, and menu visibility.
-- Modular app sections: Home, About, Work, Notes, Blog, To‑Do, Gallery, Draw, Saver, Games, Playground, Final.
-- Offline-friendly layout (no mandatory server dependencies).
+## Що всередині
+- Багатотемний інтерфейс у стилі термінала (ефекти, шрифти, іконки).
+- Адмін‑панель для керування контентом і видимістю меню.
+- Модульні секції: Home, About, Work, Notes, Blog, To‑Do, Gallery, Draw, Saver, Games, Playground, Final.
+- Playground Polygon: «лабораторія» для тестів UI, нотаток і 3D демо.
 
-## Structure
+## Структура
 ```
 .
-├── assets/                # Media assets (audio, PDFs)
-├── css/                   # Stylesheets
-├── js/                    # Application modules
-├── index.html             # Main entry point
-├── honk.html              # Fun fallback page
-├── README.md              # Project overview
+├── assets/                # Медійні ресурси (аудіо, PDF)
+├── css/                   # Стилі
+├── js/                    # Модулі застосунку
+├── index.html             # Основний UI
+├── final.html             # Окрема сцена 3D
+├── honk.html              # Фан‑сторінка
+├── README.md
 ├── LICENSE
 └── CNAME
 ```
 
-## Local usage
-Open `index.html` in a browser or serve the repo:
+## Локальний запуск
+Відкрийте `index.html` напряму в браузері або підніміть локальний сервер:
 ```
 python -m http.server 8000
 ```
-Then visit `http://localhost:8000`.
+Після цього відкрийте `http://localhost:8000`.
 
-## Admin
-- Admin access is unlocked via the themed easter sequence in the UI.
-- Once unlocked, the `/admin` view lets you toggle sections, manage content, and apply theme extras.
+## Адмін‑доступ
+- Адмін‑панель відкривається через тематичний easter‑sequence в UI.
+- Після розблокування доступні перемикачі секцій, контент і теми.
 
-## Development notes
-- JS modules live in `js/` and are loaded in `index.html`.
-- Shared state is stored in `js/data.js` and saved to `localStorage`.
-- Audio assets (e.g. `assets/xero.wav`) and PDFs live in `assets/`.
+## Playground / Demo
+- Кнопка `/playground` відкриває Playground Polygon.
+- Вікна можна перетягувати на десктопі; на мобільних працює адаптивний стек.
+- 3D демо завантажуються локально через `js/three_lab.js`.
+
+## Нотатки для розробки
+- Головний стан зберігається у `js/data.js`.
+- Основні UI‑рендери знаходяться у `js/core_ui.js`.
+- Палітра тем керується через CSS змінні.
 
 ## Final showcase
-The `/final` menu entry renders the in-app final showcase and includes a gated **View in 3D** action that opens the Playground 3D lab once enabled in admin and after the clown easter egg is triggered.
+Меню `/final` відкриває 3D‑сцену з окремим модулем `js/final_three.js`.

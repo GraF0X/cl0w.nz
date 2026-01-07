@@ -3,45 +3,107 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * renderAbout - Рендерить секцію "Про мене"
- * Відображає текст обраною мовою з ефектом друку
+ * renderAbout - Рендерить секцію "Про мене".
+ * Відображає текст обраною мовою з ефектом друку та опційним фото.
  */
 function renderAbout() {
-    const v = document.getElementById('view');
-    let btns = systemData.about.languages.map(l =>
-        `<button class="btn ${systemData.about.activeLang === l.code ? 'active' : ''}" onclick="switchLang('${l.code}')">${l.label}</button>`
-    ).join('');
+    const view = document.getElementById('view');
+    if (!view) return;
 
-    let html = `<div style="display:flex; justify-content:flex-end; gap:10px; margin-bottom:15px;">${btns}</div>`;
+    const languages = Array.isArray(systemData.about.languages)
+        ? systemData.about.languages
+        : [];
+    const activeLang = languages.find((lang) => lang.code === systemData.about.activeLang)
+        ? systemData.about.activeLang
+        : (languages[0] ? languages[0].code : '');
 
-    html += `<div style="overflow:hidden;">`; // Container to manage floats if needed
+    systemData.about.activeLang = activeLang;
 
-    if (systemData.about.showPhoto) {
-        const photoSrc = systemData.about.photo || systemData.resume.photo;
-        html += `<img src="${photoSrc}" style="float:right; margin-left:20px; margin-bottom:10px; width:150px; border: 2px solid var(--text); object-fit:cover;" alt="Me">`;
-    }
+    const buttons = languages
+        .map((lang) => {
+            const activeClass = activeLang === lang.code ? 'active' : '';
+            return `<button class="btn ${activeClass}" onclick="switchLang('${lang.code}')">${lang.label}</button>`;
+        })
+        .join('');
 
-    html += `<div id="about-txt"></div>`;
-    html += `</div>`;
+    const photoSrc = systemData.about.photo || systemData.resume.photo;
+    const photoMarkup = systemData.about.showPhoto
+        ? `<img src="${photoSrc}" class="about-photo" alt="Me">`
+        : '';
 
-    v.innerHTML = html;
+    view.innerHTML = `
+        <div class="about-lang-switch">${buttons}</div>
+        <div class="about-shell">
+            ${photoMarkup}
+            <div id="about-txt" class="about-text"></div>
+        </div>
+    `;
 
-    const activeData = (systemData.about.languages || []).find(l => l.code === systemData.about.activeLang) || (systemData.about.languages ? systemData.about.languages[0] : null);
+    const activeData = languages.find((lang) => lang.code === activeLang);
     if (activeData) typeEffect(activeData.text, 'about-txt');
 }
 
 /**
- * switchLang - Перемикає мову секції "Про мене"
- * @param {string} langCode - Код мови
+ * switchLang - Перемикає мову секції "Про мене".
+ * @param {string} langCode - Код мови.
  */
-window.switchLang = function (langCode) {
-    if (systemData.about.languages.find(l => l.code === langCode)) {
-        systemData.about.activeLang = langCode;
-        renderAbout();
-    }
+function switchLang(langCode) {
+    if (isTyping || !langCode) return;
+    const languages = Array.isArray(systemData.about.languages)
+        ? systemData.about.languages
+        : [];
+    const exists = languages.find((lang) => lang.code === langCode);
+    if (!exists) return;
+    systemData.about.activeLang = langCode;
+    renderAbout();
 }
-function switchLang(l) { if (currentLang === l || isTyping) return; currentLang = l; renderAbout(); }
-/** typeEffect - Створює ефект поступового друку тексту */
-function typeEffect(html, targetId) { const v = document.getElementById(targetId); v.innerHTML = '<div id="type-box" class="typing"></div>'; const b = document.getElementById('type-box'); isTyping = true; const startTime = Date.now(); const duration = 1000; const timer = setInterval(() => { const elapsed = Date.now() - startTime; let progress = elapsed / duration; if (progress > 1) progress = 1; let i = Math.floor(html.length * progress); const sub = html.substring(0, i); const lastOpen = sub.lastIndexOf('<'); const lastClose = sub.lastIndexOf('>'); if (lastOpen > lastClose) { const closing = html.indexOf('>', lastOpen); if (closing !== -1) i = closing + 1; } if (Math.random() > 0.8) playSfx(200 + Math.random() * 100, 'sine', 0.02, 0.02); b.innerHTML = html.substring(0, i); if (progress === 1) { clearInterval(timer); b.innerHTML = html; b.classList.remove('typing'); isTyping = false; } }, 16); }
+
+window.switchLang = switchLang;
+
+/**
+ * typeEffect - Поступово друкує HTML-текст, щоб імітувати термінальний ввод.
+ * @param {string} html - Текст, який потрібно надрукувати.
+ * @param {string} targetId - ID контейнера для виводу.
+ */
+function typeEffect(html, targetId) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+
+    target.innerHTML = '<div id="type-box" class="typing"></div>';
+    const typeBox = document.getElementById('type-box');
+    if (!typeBox) return;
+
+    isTyping = true;
+    const startTime = Date.now();
+    const durationMs = 1000;
+
+    const timer = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(1, elapsed / durationMs);
+        let sliceIndex = Math.floor(html.length * progress);
+
+        // Не обриваємо HTML-теги посередині.
+        const substring = html.substring(0, sliceIndex);
+        const lastOpen = substring.lastIndexOf('<');
+        const lastClose = substring.lastIndexOf('>');
+        if (lastOpen > lastClose) {
+            const closing = html.indexOf('>', lastOpen);
+            if (closing !== -1) sliceIndex = closing + 1;
+        }
+
+        if (Math.random() > 0.8) {
+            playSfx(200 + Math.random() * 100, 'sine', 0.02, 0.02);
+        }
+
+        typeBox.innerHTML = html.substring(0, sliceIndex);
+
+        if (progress === 1) {
+            clearInterval(timer);
+            typeBox.innerHTML = html;
+            typeBox.classList.remove('typing');
+            isTyping = false;
+        }
+    }, 16);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
