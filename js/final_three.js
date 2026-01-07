@@ -359,6 +359,16 @@ if (!container || container.dataset.ready === 'true') {
                 linkNames: [['mixamorigRightForeArm', 'RightForeArm'], ['mixamorigRightArm', 'RightArm']]
             },
             {
+                name: "LeftElbow",
+                effectorNames: ['mixamorigLeftForeArm', 'LeftForeArm'],
+                linkNames: [['mixamorigLeftArm', 'LeftArm']]
+            },
+            {
+                name: "RightElbow",
+                effectorNames: ['mixamorigRightForeArm', 'RightForeArm'],
+                linkNames: [['mixamorigRightArm', 'RightArm']]
+            },
+            {
                 name: "LeftFoot",
                 effectorNames: ['mixamorigLeftFoot', 'LeftFoot'],
                 linkNames: [['mixamorigLeftLeg', 'LeftLeg'], ['mixamorigLeftUpLeg', 'LeftUpLeg']]
@@ -367,6 +377,26 @@ if (!container || container.dataset.ready === 'true') {
                 name: "RightFoot",
                 effectorNames: ['mixamorigRightFoot', 'RightFoot'],
                 linkNames: [['mixamorigRightLeg', 'RightLeg'], ['mixamorigRightUpLeg', 'RightUpLeg']]
+            },
+            {
+                name: "LeftKnee",
+                effectorNames: ['mixamorigLeftLeg', 'LeftLeg'],
+                linkNames: [['mixamorigLeftUpLeg', 'LeftUpLeg']]
+            },
+            {
+                name: "RightKnee",
+                effectorNames: ['mixamorigRightLeg', 'RightLeg'],
+                linkNames: [['mixamorigRightUpLeg', 'RightUpLeg']]
+            },
+            {
+                name: "Torso",
+                effectorNames: ['mixamorigSpine2', 'Spine2', 'mixamorigSpine1', 'Spine1'],
+                linkNames: [['mixamorigSpine', 'Spine'], ['mixamorigHips', 'Hips']]
+            },
+            {
+                name: "Head",
+                effectorNames: ['mixamorigHead', 'Head'],
+                linkNames: [['mixamorigNeck', 'Neck']]
             }
         ];
 
@@ -486,9 +516,6 @@ if (!container || container.dataset.ready === 'true') {
         };
 
         const pixelToggle = visualFolder.add(postProcessingParams, 'pixelation').name('Pixelation').onChange(() => {
-            if (postProcessingParams.pixelation) {
-                postProcessingParams.pixelation = false;
-            }
             updateComposer();
         });
         pixelToggle.domElement.classList.add('control-inactive');

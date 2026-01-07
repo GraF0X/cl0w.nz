@@ -555,6 +555,17 @@ function applyMenuVisibility() {
     toggle('nav-saver', mv.saver !== false);
 }
 
+function toggleNavMenu(force) {
+    const body = document.body;
+    if (!body) return;
+    const shouldOpen = typeof force === 'boolean' ? force : !body.classList.contains('nav-open');
+    body.classList.toggle('nav-open', shouldOpen);
+    const btn = document.getElementById('nav-toggle');
+    if (btn) btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+}
+
+window.toggleNavMenu = toggleNavMenu;
+
 /**
  * hexToRgba - Конвертує HEX колір у RGBA формат
  * @param {string} hex - HEX колір (#RRGGBB)
@@ -819,6 +830,7 @@ function nav(id) {
     playSfx(440, 'triangle', 0.05);
     document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById('nav-' + id); if (btn) btn.classList.add('active');
+    if (window.innerWidth < 768) toggleNavMenu(false);
     const v = document.getElementById('view'); stopGames();
 
     if (id === 'home') renderHome();

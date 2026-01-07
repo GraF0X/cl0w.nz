@@ -170,11 +170,25 @@ function sizeGameCanvas() {
     const area = document.getElementById('game-area');
     const canvas = document.getElementById('game-canvas');
     if (!area || !canvas) return;
-    const baseW = 640, baseH = 480;
+    const baseW = parseInt(canvas.dataset.baseW || '640', 10);
+    const baseH = parseInt(canvas.dataset.baseH || '480', 10);
     const maxW = area.parentElement ? area.parentElement.clientWidth - 20 : baseW;
-    const scale = Math.min(1, maxW / baseW);
+    const rect = area.getBoundingClientRect();
+    const maxH = window.innerHeight - rect.top - 40;
+    const scale = Math.min(1, maxW / baseW, maxH / baseH);
     canvas.style.width = Math.floor(baseW * scale) + 'px';
     canvas.style.height = Math.floor(baseH * scale) + 'px';
+}
+
+function setGameBaseSize(width, height) {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas) return;
+    const baseW = width || 640;
+    const baseH = height || 480;
+    canvas.dataset.baseW = baseW;
+    canvas.dataset.baseH = baseH;
+    canvas.width = baseW;
+    canvas.height = baseH;
 }
 
 window.addEventListener('resize', sizeGameCanvas);
@@ -349,6 +363,11 @@ function startTetris(canvas, ctx) {
       }
 
       area.style.display = 'block';
+      if (id === 'snake' || id === 'tetris') {
+          setGameBaseSize(480, 360);
+      } else {
+          setGameBaseSize(640, 480);
+      }
       sizeGameCanvas();
       if (customHost) { customHost.innerHTML = ''; customHost.style.display = 'none'; }
       canvas.style.display = 'block';
