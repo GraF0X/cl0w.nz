@@ -251,6 +251,10 @@ if (!container || container.dataset.ready === 'true') {
         controls.update();
 
         stats = new Stats();
+        stats.dom.style.position = 'absolute';
+        stats.dom.style.top = '8px';
+        stats.dom.style.left = '8px';
+        stats.dom.style.zIndex = '5';
         container.appendChild(stats.dom);
 
         clock = new THREE.Clock();
