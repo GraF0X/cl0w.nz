@@ -172,7 +172,9 @@ function sizeGameCanvas() {
     if (!area || !canvas) return;
     const baseW = 640, baseH = 480;
     const maxW = area.parentElement ? area.parentElement.clientWidth - 20 : baseW;
-    const scale = Math.min(1, maxW / baseW);
+    const rect = area.getBoundingClientRect();
+    const maxH = window.innerHeight - rect.top - 40;
+    const scale = Math.min(1, maxW / baseW, maxH / baseH);
     canvas.style.width = Math.floor(baseW * scale) + 'px';
     canvas.style.height = Math.floor(baseH * scale) + 'px';
 }
