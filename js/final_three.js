@@ -35,6 +35,7 @@ if (!container || container.dataset.ready === 'true') {
     container.dataset.ready = 'true';
 
     let camera, scene, renderer, composer, clock, stats, controls;
+    let gui = null;
     let renderPass, renderPixelatedPass;
     let bloomPass, bokehPass, bleachPass, colorCorrectionPass;
     let colorifyPass, hBlurPass, vBlurPass, sepiaPass, vignettePass;
@@ -315,6 +316,7 @@ if (!container || container.dataset.ready === 'true') {
         });
 
         window.addEventListener('resize', onWindowResize);
+        window.finalThreeTeardown = teardown;
     }
 
     function initIK(mesh) {
@@ -456,7 +458,7 @@ if (!container || container.dataset.ready === 'true') {
     }
 
     function createMergedGUI() {
-        const gui = new GUI({ width: 310 });
+        gui = new GUI({ width: 310 });
 
         const visualFolder = gui.addFolder('Visual Settings');
         const pixelParams = {
@@ -769,7 +771,7 @@ if (!container || container.dataset.ready === 'true') {
 
     function animate() {
         if (!container.isConnected) {
-            renderer.setAnimationLoop(null);
+            teardown();
             return;
         }
         const delta = clock.getDelta();
@@ -790,6 +792,9 @@ if (!container || container.dataset.ready === 'true') {
         }
 
         if (controls) controls.update();
+        if (camera) {
+            camera.updateMatrixWorld();
+        }
         if (mixer) mixer.update(delta);
         if (ikSolver && ikConfig.enabled) {
             ikSolver.update();
@@ -802,5 +807,16 @@ if (!container || container.dataset.ready === 'true') {
         }
 
         stats.update();
+    }
+
+    function teardown() {
+        window.removeEventListener('resize', onWindowResize);
+        if (renderer) renderer.setAnimationLoop(null);
+        if (controls) controls.dispose();
+        if (gui) gui.destroy();
+        if (stats && stats.dom && stats.dom.parentNode) stats.dom.parentNode.removeChild(stats.dom);
+        if (renderer && renderer.domElement && renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+        if (asciiEffect && asciiEffect.domElement && asciiEffect.domElement.parentNode) asciiEffect.domElement.parentNode.removeChild(asciiEffect.domElement);
+        if (container) container.dataset.ready = 'false';
     }
 }

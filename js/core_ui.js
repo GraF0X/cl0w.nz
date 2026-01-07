@@ -548,7 +548,7 @@ function applyMenuVisibility() {
     toggle('nav-todo', mv.todo);
     toggle('nav-gallery', mv.gallery);
     toggle('nav-game', mv.game);
-    toggle('nav-finals', mv.final !== false);
+    toggle('nav-character', mv.final !== false);
     // New ones:
     toggle('nav-draw', mv.draw !== false); // default true
     toggle('nav-pc', mv.pc !== false);
@@ -801,6 +801,8 @@ function nav(id) {
         pcScrollCleanup = null;
     }
 
+    if (id === 'final' || id === 'finals') id = 'character';
+
     // Dynamic Title Update
     const baseTitle = systemData.home.browserTitle || "vvs@cl0w.nz";
     const dir = id === 'home' ? ':~$' : ':~/' + id;
@@ -821,7 +823,7 @@ function nav(id) {
     else if (id === 'gallery') renderGallery();
     else if (id === 'draw') renderAsciiDraw();
     else if (id === 'pc') renderPlaygroundPolygon();
-    else if (id === 'final' || id === 'finals') renderFinals();
+    else if (id === 'character') renderCharacter();
     else if (id === 'screensaver') renderScreensaverMenu();
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
@@ -1244,13 +1246,15 @@ function loadFinalsScene() {
     });
 }
 
-function renderFinals() {
+let finalCleanup = null;
+
+function renderCharacter() {
     const v = document.getElementById('view');
     v.innerHTML = `
         <div class="final-shell">
             <header class="final-header">
-                <div class="final-kicker">VVS SYSTEM / FINAL</div>
-                <h1>Final Showcase</h1>
+                <div class="final-kicker">VVS SYSTEM / 3D CHARACTER</div>
+                <h1>3D Character Lab</h1>
                 <p class="final-sub">Offline-ready static scene with theme-aware chrome.</p>
             </header>
             <section class="final-card">
@@ -1269,7 +1273,14 @@ function renderFinals() {
                 </div>
             </section>
         </div>`;
+    if (typeof finalCleanup === 'function') {
+        finalCleanup();
+        finalCleanup = null;
+    }
     loadFinalsScene();
+    if (typeof window.finalThreeTeardown === 'function') {
+        finalCleanup = window.finalThreeTeardown;
+    }
 }
 
 function generateFakeProcesses() {
@@ -1517,8 +1528,8 @@ function resolveInitialNavTarget() {
     const hash = (window.location.hash || '').replace('#', '').trim();
     if (!hash) return 'home';
     if (hash === 'playground') return 'pc';
-    if (hash === 'final') return 'finals';
-    const allowed = ['home', 'about', 'resume', 'work', 'obsidian', 'blog', 'todo', 'gallery', 'draw', 'pc', 'finals', 'screensaver', 'game', 'contact', 'admin'];
+    if (hash === 'final' || hash === 'finals' || hash === '3d-character') return 'character';
+    const allowed = ['home', 'about', 'resume', 'work', 'obsidian', 'blog', 'todo', 'gallery', 'draw', 'pc', 'character', 'screensaver', 'game', 'contact', 'admin'];
     return allowed.includes(hash) ? hash : 'home';
 }
 
