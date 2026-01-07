@@ -1,5 +1,7 @@
+
 /* admin.js */
 window.__admin_loaded = true;
+
 
 const HELP_CONTENT = {
     templates: {
@@ -1313,3 +1315,4 @@ function downloadSource() {
     document.body.removeChild(a);
     alert("data.js downloaded! Please replace the file in your site folder.");
 }
+
