@@ -410,15 +410,21 @@ function generateFakeProcesses() {
 function updateTreeVisuals() {
     const contactBtn = document.getElementById('nav-contact');
     if (contactBtn) {
+        contactBtn.querySelectorAll('.nav-label').forEach((label, index) => {
+            if (index > 0) label.remove();
+        });
+        contactBtn.childNodes.forEach((node) => {
+            if (node.nodeType === Node.TEXT_NODE && node.textContent.includes('/link')) {
+                node.remove();
+            }
+        });
         let label = contactBtn.querySelector('.nav-label');
         if (!label) {
             label = document.createElement('span');
             label.className = 'nav-label';
-            label.textContent = ' /link';
             contactBtn.appendChild(label);
-        } else {
-            label.textContent = ' /link';
         }
+        label.textContent = ' /link';
     }
 
     const adminBtn = document.getElementById('nav-admin');
