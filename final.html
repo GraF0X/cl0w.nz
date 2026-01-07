@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final // View</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-amber final-page">
+    <div class="final-shell">
+        <header class="final-header">
+            <div class="final-kicker">VVS SYSTEM / FINAL</div>
+            <h1>Final Showcase</h1>
+            <p class="final-sub">Offline-ready static scene with theme-aware chrome.</p>
+        </header>
+
+        <section class="final-card">
+            <div class="final-meta">
+                <div class="final-badge">LOCAL</div>
+                <div class="final-lines">
+                    <span>STATUS: READY</span>
+                    <span>MODE: TERMINAL</span>
+                    <span>ACCESS: CONTROLLED</span>
+                </div>
+            </div>
+            <div class="final-body">
+                <div class="final-panel">
+                    <h2>Scene Snapshot</h2>
+                    <ul>
+                        <li>Theme-aware gradients &amp; glow layers</li>
+                        <li>Local-only assets (offline safe)</li>
+                        <li>Locked 3D view (admin + easter)</li>
+                    </ul>
+                </div>
+                <div class="final-panel">
+                    <h2>Controls</h2>
+                    <p>Unlock the 3D view using the admin checkbox and the clown easter egg.</p>
+                    <div class="final-actions">
+                        <button id="final-view-3d" class="btn">View in 3D</button>
+                        <span id="final-view-status" class="panel-note"></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        (function () {
+            const theme = localStorage.getItem('vvs_theme_v12');
+            if (theme) document.body.className = 'theme-' + theme + ' final-page';
+            try {
+                const raw = localStorage.getItem('vvs_system_data_v15');
+                const data = raw ? JSON.parse(raw) : {};
+                if (data.themes && data.themes.font) {
+                    const target = data.themes.font === 'pixel'
+                        ? "'Press Start 2P', 'VT323', 'Courier New', monospace"
+                        : "'JetBrains Mono', 'Fira Code', monospace";
+                    document.documentElement.style.setProperty('--font-main', target);
+                    document.body.classList.toggle('pixel-font', data.themes.font === 'pixel');
+                }
+                const enabled = !!(data.features && data.features.view3d);
+                const clown = localStorage.getItem('vvs_clown_unlocked') === '1';
+                const ready = enabled && clown;
+                const btn = document.getElementById('final-view-3d');
+                const status = document.getElementById('final-view-status');
+                if (btn) {
+                    btn.disabled = !ready;
+                    if (!ready) btn.classList.add('btn-ghost');
+                    btn.addEventListener('click', () => {
+                        if (!ready) return;
+                        window.open('index.html#pc', '_blank');
+                    });
+                }
+                if (status) {
+                    status.textContent = ready
+                        ? 'Unlocked. Launching playground 3D lab in a new tab.'
+                        : 'Locked: enable in admin + trigger easter egg.';
+                }
+            } catch (e) {
+                // ignore storage errors
+            }
+        })();
+    </script>
+</body>
+</html>
