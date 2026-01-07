@@ -1,7 +1,7 @@
-/* admin.js loader */
+/* work.js loader */
 (function () {
-    if (window.__admin_loaded) return;
+    if (window.__work_loaded) return;
     var s = document.createElement('script');
-    s.src = 'js/admin.js';
+    s.src = 'js/work.js';
     document.head.appendChild(s);
 })();
