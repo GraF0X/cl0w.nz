@@ -15,9 +15,12 @@ const defaultData = {
         "svgGlow": true,
         "screenPulse": false
     },
+<<<<<<< HEAD:js/data.js
     "features": {
         "view3d": false
     },
+=======
+>>>>>>> main:data.js
     "screensaver": {
         "enabled": true,
         "timeout": 60,
