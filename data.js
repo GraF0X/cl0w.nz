@@ -290,7 +290,8 @@ const defaultData = {
         "blog": true,
         "todo": true,
         "gallery": true,
-        "game": true
+        "game": true,
+        "final": true
     },
     "obsidian": {
         "cats": [

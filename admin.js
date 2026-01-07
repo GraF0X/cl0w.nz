@@ -408,6 +408,7 @@ function loadAdminEditor(sec) {
                     <label class="opt-check"><input type="checkbox" id="mv-work" ${systemData.menuVisibility.work ? 'checked' : ''}> Work</label>
                     <label class="opt-check"><input type="checkbox" id="mv-notes" ${systemData.menuVisibility.notes ? 'checked' : ''}> Notes</label>
                     <label class="opt-check"><input type="checkbox" id="mv-blog" ${systemData.menuVisibility.blog ? 'checked' : ''}> Blog</label>
+                    <label class="opt-check"><input type="checkbox" id="mv-final" ${systemData.menuVisibility.final !== false ? 'checked' : ''}> Final</label>
                     <label class="opt-check"><input type="checkbox" id="mv-todo" ${systemData.menuVisibility.todo ? 'checked' : ''}> Todo</label>
                     <label class="opt-check"><input type="checkbox" id="mv-gallery" ${systemData.menuVisibility.gallery ? 'checked' : ''}> Gallery</label>
                     <label class="opt-check"><input type="checkbox" id="mv-game" ${systemData.menuVisibility.game ? 'checked' : ''}> Game</label>
@@ -438,6 +439,7 @@ window.saveMenuVis = function () {
     systemData.menuVisibility.work = document.getElementById('mv-work').checked;
     systemData.menuVisibility.notes = document.getElementById('mv-notes').checked;
     systemData.menuVisibility.blog = document.getElementById('mv-blog').checked;
+    systemData.menuVisibility.final = document.getElementById('mv-final').checked;
     systemData.menuVisibility.todo = document.getElementById('mv-todo').checked;
     systemData.menuVisibility.gallery = document.getElementById('mv-gallery').checked;
     systemData.menuVisibility.game = document.getElementById('mv-game').checked;

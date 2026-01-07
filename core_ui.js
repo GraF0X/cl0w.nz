@@ -535,6 +535,7 @@ function applyMenuVisibility() {
     toggle('nav-todo', mv.todo);
     toggle('nav-gallery', mv.gallery);
     toggle('nav-game', mv.game);
+    toggle('nav-final', mv.final !== false);
     // New ones:
     toggle('nav-draw', mv.draw !== false); // default true
     toggle('nav-pc', mv.pc !== false);
@@ -807,6 +808,7 @@ function nav(id) {
     else if (id === 'gallery') renderGallery();
     else if (id === 'draw') renderAsciiDraw();
     else if (id === 'pc') renderPlaygroundPolygon();
+    else if (id === 'final') renderFinal();
     else if (id === 'screensaver') renderScreensaverMenu();
     else if (id === 'game') renderGameMenu();
     else if (id === 'contact') renderLinks();
@@ -1044,12 +1046,17 @@ function canViewFinal3D() {
 }
 
 function updateView3DButtonState() {
-    const btn = document.getElementById('pg-view-3d');
-    if (!btn) return;
+    const buttons = [
+        document.getElementById('pg-view-3d'),
+        document.getElementById('final-view-3d')
+    ].filter(Boolean);
+    if (!buttons.length) return;
     const allowed = canViewFinal3D();
-    btn.disabled = !allowed;
-    btn.classList.toggle('btn-ghost', !allowed);
-    btn.innerText = allowed ? 'View in 3D' : 'View in 3D (locked)';
+    buttons.forEach((btn) => {
+        btn.disabled = !allowed;
+        btn.classList.toggle('btn-ghost', !allowed);
+        btn.innerText = allowed ? 'View in 3D' : 'View in 3D (locked)';
+    });
 }
 
 function openFinalView3D() {
@@ -1057,7 +1064,11 @@ function openFinalView3D() {
         showToast('View in 3D locked. Enable in admin and trigger the clown easter egg.', 'warning');
         return;
     }
-    window.open('final.html', '_blank');
+    const state = loadPlaygroundWindowState();
+    if (!state.three) state.three = { open: true, x: 360, y: 320 };
+    state.three.open = true;
+    savePlaygroundWindowState();
+    nav('pc');
 }
 
 function renderPlaygroundPolygon() {
@@ -1185,10 +1196,6 @@ function renderPlaygroundPolygon() {
                         <div class="pg-demo-list">
                             ${threeDemos.map(d => `<button class="btn btn-sm" onclick="loadThreeExample('${d.id}')">${d.label}</button>`).join('') || '<div class="panel-note">No demos available</div>'}
                         </div>
-                        <div class="pg-three-actions">
-                            <button id="pg-view-3d" class="btn btn-sm" onclick="openFinalView3D()">View in 3D</button>
-                            <span class="panel-note">Admin + clown easter egg required.</span>
-                        </div>
                         <div class="pg-demo-frame" id="pg-demo-frame">
                             <canvas id="pg-demo-canvas"></canvas>
                             <div id="pg-demo-status" class="panel-note">Select a demo to load it inline.</div>
@@ -1210,6 +1217,49 @@ function renderPlaygroundPolygon() {
     loadThreeExample('skeletal');
     updateView3DButtonState();
     wirePlaygroundDesktop();
+}
+
+function renderFinal() {
+    const v = document.getElementById('view');
+    v.innerHTML = `
+        <div class="final-shell">
+            <header class="final-header">
+                <div class="final-kicker">VVS SYSTEM / FINAL</div>
+                <h1>Final Showcase</h1>
+                <p class="final-sub">Offline-ready static scene with theme-aware chrome.</p>
+            </header>
+            <section class="final-card">
+                <div class="final-meta">
+                    <div class="final-badge">LOCAL</div>
+                    <div class="final-lines">
+                        <span>STATUS: READY</span>
+                        <span>MODE: TERMINAL</span>
+                        <span>ACCESS: CONTROLLED</span>
+                    </div>
+                </div>
+                <div class="final-body">
+                    <div class="final-panel">
+                        <h2>Scene Snapshot</h2>
+                        <ul>
+                            <li>Theme-aware gradients &amp; glow layers</li>
+                            <li>Local-only assets (offline safe)</li>
+                            <li>Locked 3D view (admin + easter)</li>
+                        </ul>
+                    </div>
+                    <div class="final-panel">
+                        <h2>Controls</h2>
+                        <p>Unlock the 3D view using the admin checkbox and the clown easter egg.</p>
+                        <div class="final-actions">
+                            <button id="final-view-3d" class="btn" onclick="openFinalView3D()">View in 3D</button>
+                            <span id="final-view-status" class="panel-note">Admin + clown easter egg required.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>`;
+    updateView3DButtonState();
+    const status = document.getElementById('final-view-status');
+    if (status) status.textContent = canViewFinal3D() ? 'Unlocked. Launches the 3D lab.' : 'Locked: enable in admin + trigger easter egg.';
 }
 
 function generateFakeProcesses() {
@@ -1458,7 +1508,7 @@ function resolveInitialNavTarget() {
     const hash = (window.location.hash || '').replace('#', '').trim();
     if (!hash) return 'home';
     if (hash === 'playground') return 'pc';
-    const allowed = ['home', 'about', 'resume', 'work', 'obsidian', 'blog', 'todo', 'gallery', 'draw', 'pc', 'screensaver', 'game', 'contact', 'admin'];
+    const allowed = ['home', 'about', 'resume', 'work', 'obsidian', 'blog', 'todo', 'gallery', 'draw', 'pc', 'final', 'screensaver', 'game', 'contact', 'admin'];
     return allowed.includes(hash) ? hash : 'home';
 }
 
