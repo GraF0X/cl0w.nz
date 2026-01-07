@@ -516,9 +516,6 @@ if (!container || container.dataset.ready === 'true') {
         };
 
         const pixelToggle = visualFolder.add(postProcessingParams, 'pixelation').name('Pixelation').onChange(() => {
-            if (postProcessingParams.pixelation) {
-                postProcessingParams.pixelation = false;
-            }
             updateComposer();
         });
         pixelToggle.domElement.classList.add('control-inactive');
